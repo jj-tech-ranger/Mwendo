@@ -1,0 +1,210 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with multi-role support, custom claim state, and active role",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "phoneNumber": { "type": "string", "maxLength": 20 },
+        "role": { "type": "string", "enum": ["passenger", "sacco_official", "sacco_manager", "authority", "admin"] },
+        "activeRole": { "type": "string", "enum": ["passenger", "sacco_official", "sacco_manager", "authority", "admin"] },
+        "roles": { "type": "array" },
+        "saccoId": { "type": "string" },
+        "authorityId": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "isActive": { "type": "boolean" },
+        "trustScore": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "isActive"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "Commuter and matatu trip records",
+      "type": "object",
+      "properties": {
+        "vehicleRegNumber": { "type": "string", "maxLength": 20 },
+        "saccoId": { "type": "string" },
+        "saccoName": { "type": "string" },
+        "routeName": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "active", "completed", "auto_completed", "cancelled", "discarded"] },
+        "currentSpeedKmH": { "type": "number" },
+        "maxSpeedKmH": { "type": "number" },
+        "avgSpeedKmH": { "type": "number" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "telemetryStoragePath": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["vehicleRegNumber", "saccoId", "status", "startTime"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Public transport vehicle registration and risk profile",
+      "type": "object",
+      "properties": {
+        "regNumber": { "type": "string", "maxLength": 20 },
+        "saccoId": { "type": "string" },
+        "saccoName": { "type": "string" },
+        "capacity": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "maintenance", "suspended"] },
+        "riskScore": { "type": "number" },
+        "riskTier": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "insuranceExpiry": { "type": "string" },
+        "inspectionExpiry": { "type": "string" }
+      },
+      "required": ["regNumber", "saccoId", "capacity", "status"]
+    },
+    "SACCO": {
+      "title": "SACCO",
+      "description": "Savings and Credit Cooperative Organization",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150 },
+        "registrationCode": { "type": "string" },
+        "fleetCount": { "type": "number" },
+        "safetyScore": { "type": "number" },
+        "contactPhone": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "under_review", "suspended"] }
+      },
+      "required": ["name", "registrationCode", "status"]
+    },
+    "BlackSpot": {
+      "title": "BlackSpot",
+      "description": "High accident risk geographic point or route segment",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "routeName": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "hazardDescription": { "type": "string" },
+        "reportedByUid": { "type": "string" },
+        "verifiedByAuthority": { "type": "boolean" },
+        "evidencePhotoUrls": { "type": "array" }
+      },
+      "required": ["name", "routeName", "latitude", "longitude", "severity", "reportedByUid"]
+    },
+    "SafetyAlert": {
+      "title": "SafetyAlert",
+      "description": "Real-time safety alert, overspeed or SOS trigger",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string" },
+        "vehicleRegNumber": { "type": "string" },
+        "saccoId": { "type": "string" },
+        "type": { "type": "string", "enum": ["overspeeding", "blackspot_approaching", "harsh_braking", "sos", "route_deviation"] },
+        "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "message": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "speedKmH": { "type": "number" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "resolved", "cancelled"] }
+      },
+      "required": ["tripId", "vehicleRegNumber", "saccoId", "type", "severity", "timestamp"]
+    },
+    "Violation": {
+      "title": "Violation",
+      "description": "Recorded traffic or speed violation",
+      "type": "object",
+      "properties": {
+        "saccoId": { "type": "string" },
+        "vehicleRegNumber": { "type": "string" },
+        "recordedSpeedKmH": { "type": "number" },
+        "speedLimitKmH": { "type": "number" },
+        "severity": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "reviewed", "disputed", "dismissed"] }
+      },
+      "required": ["saccoId", "vehicleRegNumber", "recordedSpeedKmH", "speedLimitKmH", "timestamp", "status"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "Passenger or citizen safety complaint",
+      "type": "object",
+      "properties": {
+        "saccoId": { "type": "string" },
+        "vehicleRegNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "investigating", "resolved"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["saccoId", "title", "description", "status", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System administrative audit trail",
+      "type": "object",
+      "properties": {
+        "saccoId": { "type": "string" },
+        "actorName": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "target": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["actorName", "actorRole", "action", "timestamp"]
+    },
+    "ProcessedEvent": {
+      "title": "ProcessedEvent",
+      "description": "Idempotency ledger entry for Cloud Function triggers",
+      "type": "object",
+      "properties": {
+        "eventId": { "type": "string" },
+        "handler": { "type": "string" },
+        "processedAt": { "type": "string" }
+      },
+      "required": ["eventId", "handler", "processedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile collection"
+    },
+    "/trips/{tripId}": {
+      "schema": { "$ref": "#/entities/Trip" },
+      "description": "Active and past trip records"
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": { "$ref": "#/entities/Vehicle" },
+      "description": "Vehicle records and risk profiles"
+    },
+    "/saccos/{saccoId}": {
+      "schema": { "$ref": "#/entities/SACCO" },
+      "description": "SACCO cooperative records"
+    },
+    "/black_spots/{spotId}": {
+      "schema": { "$ref": "#/entities/BlackSpot" },
+      "description": "Black spots and hazardous points"
+    },
+    "/safety_alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/SafetyAlert" },
+      "description": "Realtime safety alerts and SOS"
+    },
+    "/violations/{violationId}": {
+      "schema": { "$ref": "#/entities/Violation" },
+      "description": "Speed and safety violation records"
+    },
+    "/complaints/{complaintId}": {
+      "schema": { "$ref": "#/entities/Complaint" },
+      "description": "Citizen safety complaints"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Administrative audit logs"
+    },
+    "/processedEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/ProcessedEvent" },
+      "description": "Function execution idempotency ledger"
+    }
+  }
+}

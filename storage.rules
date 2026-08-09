@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Default deny
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Telemetry storage (owner-scoped)
+    match /telemetry/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // User avatars (2MB limit, image only)
+    match /avatars/{userId}/{filename} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)');
+    }
+
+    // Complaint Evidence (5MB limit, image or video)
+    match /evidence/{complaintId}/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && (
+                     request.resource.contentType.matches('image/(jpeg|png|webp|jpg)') ||
+                     request.resource.contentType.matches('video/(mp4|quicktime|webm)')
+                   );
+    }
+
+    // Black spot evidence photo uploads (5MB limit)
+    match /black_spots/{spotId}/{filename} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)');
+    }
+  }
+}

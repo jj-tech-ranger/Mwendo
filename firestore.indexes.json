@@ -1,0 +1,72 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "saccoId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "startTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vehicleRegNumber", "order": "ASCENDING" },
+        { "fieldPath": "startTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trips",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "startTime", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "safety_alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "saccoId", "order": "ASCENDING" },
+        { "fieldPath": "severity", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "violations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vehicleRegNumber", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "violations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "saccoId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "black_spots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "severity", "order": "ASCENDING" },
+        { "fieldPath": "verifiedByAuthority", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "telemetry",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vehicleRegNumber", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

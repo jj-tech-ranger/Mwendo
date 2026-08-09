@@ -1,0 +1,10 @@
+{
+  "name": "Mwendo Salama",
+  "description": "Production PSV passenger-safety platform for Kenya",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
