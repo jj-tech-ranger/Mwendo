@@ -34,7 +34,7 @@ export const RegisterScreen: React.FC = () => {
     defaultValues: {
       fullName: currentUser?.displayName && !currentUser?.isAnonymous ? currentUser.displayName : '',
       email: currentUser?.email || '',
-      terms: true,
+      terms: false,
     },
   });
 
@@ -98,7 +98,7 @@ export const RegisterScreen: React.FC = () => {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-md">
           <Input
             label="Display / Full Name"
-            placeholder="Passenger #104 or Juma Mwangi"
+            placeholder="Enter your name"
             icon="person"
             error={errors.fullName?.message}
             {...register('fullName')}
@@ -107,7 +107,7 @@ export const RegisterScreen: React.FC = () => {
           <Input
             label="Email Address"
             type="email"
-            placeholder="juma@example.com"
+            placeholder="Enter your email"
             icon="mail"
             error={errors.email?.message}
             {...register('email')}

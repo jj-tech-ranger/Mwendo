@@ -50,9 +50,6 @@ const UnauthorizedScreen = lazy(() =>
 );
 
 // System Error & Full-Page Layouts
-const ComponentShowcaseScreen = lazy(() =>
-  import('../features/dev/ComponentShowcaseScreen').then((m) => ({ default: m.ComponentShowcaseScreen }))
-);
 const MaintenanceModeScreen = lazy(() =>
   import('../features/common/MaintenanceModeScreen').then((m) => ({ default: m.MaintenanceModeScreen }))
 );
@@ -294,10 +291,6 @@ const router = createBrowserRouter([
   },
 
   // System Layouts
-  {
-    path: '/dev/components',
-    element: <ComponentShowcaseScreen />,
-  },
   {
     path: '/maintenance',
     element: <MaintenanceModeScreen />,

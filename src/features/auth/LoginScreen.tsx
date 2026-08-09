@@ -113,7 +113,7 @@ export const LoginScreen: React.FC = () => {
           <Input
             label="Email Address"
             type="email"
-            placeholder="juma@example.com"
+            placeholder="Enter your email"
             icon="mail"
             error={errors.email?.message}
             {...register('email')}
