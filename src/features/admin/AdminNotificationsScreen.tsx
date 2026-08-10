@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { AuditLog } from '../../types';
 
 export const AdminNotificationsScreen: React.FC = () => {
   const { user: currentAdmin } = useAuthStore();
@@ -11,23 +12,21 @@ export const AdminNotificationsScreen: React.FC = () => {
   const [audience, setAudience] = useState('all');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [broadcastLogs, setBroadcastLogs] = useState<AuditLog[]>([]);
 
-  const pastBroadcasts = [
-    {
-      id: 'bc-101',
-      title: 'Heavy Rainfall Warning on A104 Waiyaki Way Corridor',
-      audience: 'All Commuters (Nairobi County)',
-      recipients: 18400,
-      sentAt: '2026-08-07T16:00:00Z',
-    },
-    {
-      id: 'bc-102',
-      title: 'NTSA Speed Governor Calibration Notice',
-      audience: 'SACCO Officials & Managers',
-      recipients: 1420,
-      sentAt: '2026-08-01T09:00:00Z',
-    },
-  ];
+  useEffect(() => {
+    loadLogs();
+  }, []);
+
+  async function loadLogs() {
+    try {
+      const logs = await auditLogRepository.getAll();
+      const broadcasts = logs.filter((l) => l.action === 'SEND_PUSH_BROADCAST');
+      setBroadcastLogs(broadcasts);
+    } catch (err) {
+      console.error('Failed to load broadcast logs:', err);
+    }
+  }
 
   async function handleSendBroadcast(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +47,7 @@ export const AdminNotificationsScreen: React.FC = () => {
       setToastMsg(`Push notification broadcast dispatched to target audience (${audience}).`);
       setTitle('');
       setBody('');
+      await loadLogs();
     } catch (err) {
       console.error('Failed to send broadcast:', err);
     } finally {
@@ -100,7 +100,7 @@ export const AdminNotificationsScreen: React.FC = () => {
                 onChange={(e) => setAudience(e.target.value)}
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface font-label-mono mt-1"
               >
-                <option value="all">All Commuters & Staff (52k+ Users)</option>
+                <option value="all">All Registered Users</option>
                 <option value="passengers">Passengers Only</option>
                 <option value="sacco_officials">SACCO Officials & Managers</option>
                 <option value="authorities">NTSA & County Inspectors</option>
@@ -114,7 +114,7 @@ export const AdminNotificationsScreen: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="e.g. Flash Flooding Alert on Thika Superhighway"
+                placeholder="e.g. Traffic Alert or Safety Announcement"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface mt-1"
@@ -148,20 +148,23 @@ export const AdminNotificationsScreen: React.FC = () => {
           </h3>
 
           <div className="space-y-sm text-xs font-body-sm">
-            {pastBroadcasts.map((b) => (
-              <div key={b.id} className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-on-surface">{b.title}</span>
-                  <span className="font-label-mono text-[10px] text-outline">
-                    {new Date(b.sentAt).toLocaleDateString()}
-                  </span>
+            {broadcastLogs.length === 0 ? (
+              <p className="text-xs text-on-surface-variant font-mono p-4">No past push broadcasts sent yet.</p>
+            ) : (
+              broadcastLogs.map((b) => (
+                <div key={b.id} className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-on-surface">{b.target}</span>
+                    <span className="font-label-mono text-[10px] text-outline">
+                      {new Date(b.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between font-label-mono text-[10px] text-outline">
+                    <span>Sender: {b.actorName}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between font-label-mono text-[10px] text-outline">
-                  <span>Scope: {b.audience}</span>
-                  <span className="text-primary font-bold">{b.recipients.toLocaleString()} Delivered</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

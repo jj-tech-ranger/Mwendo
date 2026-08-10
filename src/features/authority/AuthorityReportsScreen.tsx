@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LineChartWrapper, BarChartWrapper, DonutChartWrapper } from '../../components/charts/Charts';
 import { useAuthStore } from '../../store/useAuthStore';
+import { saccoRepository, blackSpotRepository, violationRepository } from '../../repositories';
+import { SACCO, BlackSpot, Violation } from '../../types';
 
 export const AuthorityReportsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -12,31 +14,61 @@ export const AuthorityReportsScreen: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
-  // Chart data mocks for reports preview
-  const speedTrendData = [
-    { day: 'Mon', waivers: 4, infractions: 28, complianceRate: 91 },
-    { day: 'Tue', waivers: 2, infractions: 34, complianceRate: 88 },
-    { day: 'Wed', waivers: 5, infractions: 22, complianceRate: 93 },
-    { day: 'Thu', waivers: 3, infractions: 41, complianceRate: 85 },
-    { day: 'Fri', waivers: 6, infractions: 52, complianceRate: 81 },
-    { day: 'Sat', waivers: 8, infractions: 64, complianceRate: 78 },
-    { day: 'Sun', waivers: 4, infractions: 38, complianceRate: 87 },
-  ];
+  const [saccos, setSaccos] = useState<SACCO[]>([]);
+  const [blackSpots, setBlackSpots] = useState<BlackSpot[]>([]);
+  const [violations, setViolations] = useState<Violation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const saccoComplianceData = [
-    { name: 'Super Metro Sacco', value: 92, color: '#1A5C2E' },
-    { name: '2NK Sacco', value: 74, color: '#E67E22' },
-    { name: 'MetroLink Express', value: 62, color: '#C0392B' },
-    { name: 'Citi Hoppa', value: 88, color: '#185FA5' },
-    { name: 'KBS Sacco', value: 83, color: '#0F6E56' },
-  ];
+  useEffect(() => {
+    async function loadData() {
+      setIsLoading(true);
+      try {
+        const [sList, bList, vList] = await Promise.all([
+          saccoRepository.getAll(),
+          blackSpotRepository.getAll(),
+          violationRepository.getAll(),
+        ]);
+        setSaccos(sList);
+        setBlackSpots(bList);
+        setViolations(vList);
+      } catch (err) {
+        console.error('Error loading report analytics:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadData();
+  }, []);
 
-  const hazardBreakdownData = [
-    { name: 'Accident Prone', value: 45, color: '#C0392B' },
-    { name: 'Unmarked Bumps', value: 25, color: '#E67E22' },
-    { name: 'Pothole Clusters', value: 15, color: '#185FA5' },
-    { name: 'Dark Corridors', value: 15, color: '#64748B' },
-  ];
+  const saccoComplianceData = saccos.map((s, idx) => ({
+    name: s.name,
+    value: s.safetyScore || 100,
+    color: idx % 2 === 0 ? '#1A5C2E' : '#185FA5',
+  }));
+
+  const speedTrendData = Object.entries(
+    violations.reduce((acc, v) => {
+      const day = new Date(v.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+      acc[day] = (acc[day] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([day, infractions]) => ({
+    day,
+    infractions,
+    complianceRate: Math.max(70, 100 - infractions * 2),
+  }));
+
+  const hazardBreakdownData = Object.entries(
+    blackSpots.reduce((acc, spot) => {
+      const type = spot.hazardType || 'accident_prone';
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  ).map(([type, count], idx) => ({
+    name: type.replace('_', ' ').toUpperCase(),
+    value: count,
+    color: ['#C0392B', '#E67E22', '#185FA5', '#64748B'][idx % 4],
+  }));
 
   // CSV Exporter
   const handleExportCsv = () => {

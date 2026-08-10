@@ -142,23 +142,37 @@ export const AuthorityDashboard: React.FC = () => {
     return markers;
   }, [filteredSpots, filteredAlerts]);
 
-  // Chart data for Speed Trends & County Violations
-  const speedTrendData = [
-    { time: '06:00', avgSpeed: 62, violations: 2, limit: 80 },
-    { time: '09:00', avgSpeed: 78, violations: 7, limit: 80 },
-    { time: '12:00', avgSpeed: 84, violations: 12, limit: 80 },
-    { time: '15:00', avgSpeed: 75, violations: 5, limit: 80 },
-    { time: '18:00', avgSpeed: 88, violations: 14, limit: 80 },
-    { time: '21:00', avgSpeed: 69, violations: 4, limit: 80 },
-  ];
+  // Dynamic Speed Trend aggregation from real violations
+  const speedTrendData = useMemo(() => {
+    const hours: Record<string, { time: string; avgSpeed: number; violations: number }> = {};
+    for (const v of violations) {
+      const date = new Date(v.timestamp);
+      const hourStr = `${String(date.getHours()).padStart(2, '0')}:00`;
+      if (!hours[hourStr]) {
+        hours[hourStr] = { time: hourStr, avgSpeed: 0, violations: 0 };
+      }
+      hours[hourStr].violations += 1;
+      hours[hourStr].avgSpeed = v.recordedSpeedKmH;
+    }
+    return Object.values(hours).sort((a, b) => a.time.localeCompare(b.time));
+  }, [violations]);
 
-  const countyViolationData = [
-    { county: 'Nairobi', low: 12, high: 24 },
-    { county: 'Kiambu', low: 8, high: 15 },
-    { county: 'Machakos', low: 5, high: 11 },
-    { county: 'Nakuru', low: 10, high: 18 },
-    { county: 'Mombasa', low: 6, high: 14 },
-  ];
+  // Dynamic County Violation aggregation from real violations
+  const countyViolationData = useMemo(() => {
+    const counts: Record<string, { county: string; low: number; high: number }> = {};
+    for (const v of violations) {
+      const c = v.locationName || 'Nairobi Corridor';
+      if (!counts[c]) {
+        counts[c] = { county: c, low: 0, high: 0 };
+      }
+      if (v.severity === 'high' || v.severity === 'critical') {
+        counts[c].high += 1;
+      } else {
+        counts[c].low += 1;
+      }
+    }
+    return Object.values(counts);
+  }, [violations]);
 
   return (
     <div className="space-y-lg">

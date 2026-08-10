@@ -240,7 +240,7 @@ const LoadingFallback = () => (
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <PassengerDashboard />,
+    element: <WelcomeScreen />,
   },
   {
     path: '/onboarding',

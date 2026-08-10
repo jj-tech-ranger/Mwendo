@@ -14,7 +14,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Step 4 is Confirmation
-  const [locationName, setLocationName] = useState('Thika Road – Near Survey of Kenya');
+  const [locationName, setLocationName] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [hazardType, setHazardType] = useState<'accident_prone' | 'pothole' | 'carjacking_risk' | 'poor_lighting' | 'unmarked_bump'>('accident_prone');

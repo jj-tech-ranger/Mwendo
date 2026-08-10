@@ -23,64 +23,10 @@ export const SaccoViolationsScreen: React.FC = () => {
     setLoading(true);
     try {
       const docs = await violationRepository.getAll([where('saccoId', '==', saccoId)]);
-      if (docs.length > 0) {
-        setViolations(docs);
-      } else {
-        const defaults: Violation[] = saccoId === 'sacco_greenline' ? [
-          {
-            id: 'v_gl_1',
-            violationId: 'VIO-9911',
-            saccoId: 'sacco_greenline',
-            vehicleRegNumber: 'KDC 202G',
-            driverName: 'Driver #202',
-            routeName: 'Mombasa Road',
-            recordedSpeedKmH: 89,
-            speedLimitKmH: 80,
-            severity: 'high',
-            confidenceScore: 0.96,
-            isCorroborated: true,
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-            locationName: 'Mombasa Road near Cabanas',
-          },
-        ] : [
-          {
-            id: 'v_ml_1',
-            violationId: 'VIO-8821',
-            saccoId: 'sacco_metrolink',
-            vehicleRegNumber: 'KCB 450Z',
-            driverName: 'Driver #45',
-            routeName: 'Thika Superhighway',
-            recordedSpeedKmH: 94,
-            speedLimitKmH: 80,
-            severity: 'high',
-            confidenceScore: 0.98,
-            isCorroborated: true,
-            timestamp: new Date().toISOString(),
-            status: 'pending',
-            locationName: 'Thika Road near Kasarani Stadium',
-          },
-          {
-            id: 'v_ml_2',
-            violationId: 'VIO-8822',
-            saccoId: 'sacco_metrolink',
-            vehicleRegNumber: 'KCC 789X',
-            driverName: 'Driver #10',
-            routeName: 'Ngong Road',
-            recordedSpeedKmH: 72,
-            speedLimitKmH: 50,
-            severity: 'medium',
-            confidenceScore: 0.92,
-            isCorroborated: false,
-            timestamp: new Date(Date.now() - 3600000).toISOString(),
-            status: 'reviewed',
-            locationName: 'Ngong Road near City Mortuary',
-          },
-        ];
-        setViolations(defaults);
-      }
+      setViolations(docs);
     } catch (err) {
       console.warn('Error loading violations:', err);
+      setViolations([]);
     } finally {
       setLoading(false);
     }

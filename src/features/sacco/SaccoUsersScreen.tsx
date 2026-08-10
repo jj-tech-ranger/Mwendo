@@ -27,18 +27,7 @@ export const SaccoUsersScreen: React.FC = () => {
     setLoading(true);
     try {
       const docs = await teamUserRepository.getAll([where('saccoId', '==', saccoId)]);
-      if (docs.length > 0) {
-        setTeamUsers(docs);
-      } else {
-        const defaults: TeamUser[] = saccoId === 'sacco_greenline' ? [
-          { id: 'tu_gl_1', saccoId: 'sacco_greenline', name: 'GreenLine Manager', email: 'manager@greenline.co.ke', role: 'sacco_manager', status: 'active', lastActive: 'Just now' },
-          { id: 'tu_gl_2', saccoId: 'sacco_greenline', name: 'Ops Officer #1', email: 'ops@greenline.co.ke', role: 'operations', status: 'active', lastActive: '2 hours ago' },
-        ] : [
-          { id: 'tu_ml_1', saccoId: 'sacco_metrolink', name: 'MetroLink Admin', email: 'admin@metrolink.co.ke', role: 'sacco_manager', status: 'active', lastActive: 'Just now' },
-          { id: 'tu_ml_2', saccoId: 'sacco_metrolink', name: 'Dispatch Officer', email: 'dispatch@metrolink.co.ke', role: 'operations', status: 'invited', lastActive: 'Pending' },
-        ];
-        setTeamUsers(defaults);
-      }
+      setTeamUsers(docs);
     } catch (err) {
       console.warn('Error loading team users:', err);
     } finally {

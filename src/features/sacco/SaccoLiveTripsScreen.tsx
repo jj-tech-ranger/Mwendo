@@ -14,61 +14,8 @@ export const SaccoLiveTripsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'map' | 'incidents'>('map');
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
 
-  const [trips, setTrips] = useState<any[]>([
-    {
-      id: 't_1',
-      plateNumber: saccoId === 'sacco_greenline' ? 'KDC 101G' : 'KDA 123A',
-      driverName: 'Driver #22',
-      routeName: 'Thika Superhighway',
-      currentSpeedKmH: 74,
-      status: 'active',
-      passengers: 28,
-      isOverspeeding: false,
-    },
-    {
-      id: 't_2',
-      plateNumber: saccoId === 'sacco_greenline' ? 'KDC 202G' : 'KCB 450Z',
-      driverName: 'Driver #45',
-      routeName: 'Mombasa Road',
-      currentSpeedKmH: 89,
-      status: 'active',
-      passengers: 14,
-      isOverspeeding: true,
-    },
-    {
-      id: 't_3',
-      plateNumber: saccoId === 'sacco_greenline' ? 'KDC 303G' : 'KDD 555M',
-      driverName: 'Driver #12',
-      routeName: 'Waiyaki Way',
-      currentSpeedKmH: 62,
-      status: 'active',
-      passengers: 32,
-      isOverspeeding: false,
-    },
-  ]);
-
-  const [incidents, setIncidents] = useState<any[]>([
-    {
-      id: 'inc_1',
-      type: 'Overspeed Alert',
-      plate: saccoId === 'sacco_greenline' ? 'KDC 202G' : 'KCB 450Z',
-      speed: '89 km/h (Limit: 80)',
-      location: 'Mombasa Rd - Near Cabanas',
-      time: '3 mins ago',
-      severity: 'high',
-      acknowledged: false,
-    },
-    {
-      id: 'inc_2',
-      type: 'Black Spot Proximity',
-      plate: saccoId === 'sacco_greenline' ? 'KDC 101G' : 'KDA 123A',
-      speed: '74 km/h',
-      location: 'Thika Rd - Survey of Kenya',
-      time: '12 mins ago',
-      severity: 'medium',
-      acknowledged: true,
-    },
-  ]);
+  const [trips, setTrips] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadLiveData() {
@@ -143,30 +90,34 @@ export const SaccoLiveTripsScreen: React.FC = () => {
               Active Vehicles On Route — {saccoName}
             </h3>
 
-            {trips.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => setSelectedTripId(t.id)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                  selectedTripId === t.id
-                    ? 'border-primary bg-primary/10 shadow-sm'
-                    : t.isOverspeeding
-                    ? 'border-error/50 bg-error/5'
-                    : 'border-outline-variant/30 bg-surface-container/50 hover:bg-surface-container'
-                }`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-mono font-bold text-primary text-sm">{t.plateNumber}</span>
-                  <Badge variant={t.isOverspeeding ? 'danger' : 'success'} className="font-mono text-[10px]">
-                    {t.currentSpeedKmH} km/h
-                  </Badge>
+            {trips.length === 0 ? (
+              <p className="text-xs text-on-surface-variant font-mono p-4">No active trips currently tracked for this SACCO.</p>
+            ) : (
+              trips.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => setSelectedTripId(t.id)}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                    selectedTripId === t.id
+                      ? 'border-primary bg-primary/10 shadow-sm'
+                      : t.isOverspeeding
+                      ? 'border-error/50 bg-error/5'
+                      : 'border-outline-variant/30 bg-surface-container/50 hover:bg-surface-container'
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono font-bold text-primary text-sm">{t.plateNumber}</span>
+                    <Badge variant={t.isOverspeeding ? 'danger' : 'success'} className="font-mono text-[10px]">
+                      {t.currentSpeedKmH} km/h
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-on-surface-variant mt-1 flex justify-between">
+                    <span>{t.routeName}</span>
+                    <span>{t.driverName}</span>
+                  </div>
                 </div>
-                <div className="text-xs text-on-surface-variant mt-1 flex justify-between">
-                  <span>{t.routeName}</span>
-                  <span>{t.driverName}</span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </Card>
 
           {/* Interactive Live Map Display (Right 60%) */}
@@ -184,24 +135,20 @@ export const SaccoLiveTripsScreen: React.FC = () => {
                 <div className="absolute w-3/4 h-1 bg-slate-700 transform -rotate-12 rounded-full" />
                 <div className="absolute w-2/3 h-1 bg-slate-700 transform rotate-45 rounded-full" />
 
-                {/* Vehicle Markers */}
-                <div className="absolute top-1/3 left-1/3 flex flex-col items-center group cursor-pointer">
-                  <span className="material-symbols-outlined text-2xl text-emerald-400 animate-bounce">
-                    navigation
-                  </span>
-                  <span className="bg-emerald-950 text-emerald-200 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-500">
-                    {trips[0]?.plateNumber || 'KDA 123A'} (74 km/h)
-                  </span>
-                </div>
-
-                <div className="absolute bottom-1/3 right-1/4 flex flex-col items-center group cursor-pointer">
-                  <span className="material-symbols-outlined text-2xl text-error animate-ping">
-                    warning
-                  </span>
-                  <span className="bg-red-950 text-red-200 text-[10px] font-mono px-2 py-0.5 rounded border border-red-500 font-bold">
-                    {trips[1]?.plateNumber || 'KCB 450Z'} (89 km/h - OVERSPEED)
-                  </span>
-                </div>
+                {trips.length > 0 ? (
+                  <div className="absolute top-1/3 left-1/3 flex flex-col items-center group cursor-pointer">
+                    <span className="material-symbols-outlined text-2xl text-emerald-400 animate-bounce">
+                      navigation
+                    </span>
+                    <span className="bg-emerald-950 text-emerald-200 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-500">
+                      {trips[0]?.plateNumber} ({trips[0]?.currentSpeedKmH || 0} km/h)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-slate-400 font-mono text-xs z-10 bg-slate-800/80 px-4 py-2 rounded-xl">
+                    No active vehicles signal
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -211,7 +158,12 @@ export const SaccoLiveTripsScreen: React.FC = () => {
       {/* INCIDENTS TAB */}
       {activeTab === 'incidents' && (
         <div className="space-y-4">
-          {incidents.map((inc) => (
+          {incidents.length === 0 ? (
+            <Card className="p-8 text-center text-xs text-on-surface-variant font-mono">
+              No active incidents reported for this SACCO.
+            </Card>
+          ) : (
+            incidents.map((inc) => (
             <Card
               key={inc.id}
               className={`p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-l-4 ${
@@ -245,7 +197,8 @@ export const SaccoLiveTripsScreen: React.FC = () => {
                 )}
               </div>
             </Card>
-          ))}
+          ))
+        )}
         </div>
       )}
     </div>

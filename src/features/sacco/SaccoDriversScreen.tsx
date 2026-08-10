@@ -30,19 +30,7 @@ export const SaccoDriversScreen: React.FC = () => {
     setLoading(true);
     try {
       const docs = await driverRepository.getAll([where('saccoId', '==', saccoId)]);
-      if (docs.length > 0) {
-        setDrivers(docs);
-      } else {
-        const defaults: Driver[] = saccoId === 'sacco_greenline' ? [
-          { id: 'd_gl_1', name: 'Driver #201', licenseNumber: 'DL-GL8812', saccoId: 'sacco_greenline', assignedVehicleReg: 'KDC 101G', routeName: 'Waiyaki Way', status: 'active', safetyScore: 94, totalTrips: 120, totalViolations: 1 },
-          { id: 'd_gl_2', name: 'Driver #202', licenseNumber: 'DL-GL9931', saccoId: 'sacco_greenline', assignedVehicleReg: 'KDC 202G', routeName: 'Thika Road', status: 'active', safetyScore: 89, totalTrips: 98, totalViolations: 2 },
-        ] : [
-          { id: 'd_ml_1', name: 'Driver #22', licenseNumber: 'DL-ML1234', saccoId: 'sacco_metrolink', assignedVehicleReg: 'KDA 123A', routeName: 'Thika Superhighway', status: 'active', safetyScore: 92, totalTrips: 340, totalViolations: 3 },
-          { id: 'd_ml_2', name: 'Driver #45', licenseNumber: 'DL-ML5678', saccoId: 'sacco_metrolink', assignedVehicleReg: 'KCB 450Z', routeName: 'Mombasa Road', status: 'active', safetyScore: 88, totalTrips: 210, totalViolations: 5 },
-          { id: 'd_ml_3', name: 'Driver #10', licenseNumber: 'DL-ML9012', saccoId: 'sacco_metrolink', assignedVehicleReg: 'KCC 789X', routeName: 'Ngong Road', status: 'suspended', safetyScore: 61, totalTrips: 150, totalViolations: 14 },
-        ];
-        setDrivers(defaults);
-      }
+      setDrivers(docs);
     } catch (err) {
       console.warn('Error loading drivers:', err);
     } finally {

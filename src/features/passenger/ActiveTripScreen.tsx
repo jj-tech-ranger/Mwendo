@@ -26,9 +26,9 @@ export const ActiveTripScreen: React.FC = () => {
   } = useTripStore();
 
   // Local UI State
-  const [setupPlate, setSetupPlate] = useState('KDA 123A');
-  const [setupSacco, setSetupSacco] = useState('MetroLink SACCO');
-  const [setupRoute, setSetupRoute] = useState('Thika Road – Nairobi CBD');
+  const [setupPlate, setSetupPlate] = useState('');
+  const [setupSacco, setSetupSacco] = useState('');
+  const [setupRoute, setSetupRoute] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
 
@@ -74,13 +74,15 @@ export const ActiveTripScreen: React.FC = () => {
   // Initial Auto Start if coming from Dashboard
   useEffect(() => {
     if (!isTracking && !summaryData) {
-      startTrip({
-        plateNumber: setupPlate,
-        saccoName: setupSacco,
-        routeName: setupRoute,
-      });
-      // Initial telemetry default speed
-      updateTelemetry(62);
+      if (setupPlate) {
+        startTrip({
+          plateNumber: setupPlate,
+          saccoName: setupSacco,
+          routeName: setupRoute,
+        });
+      }
+      // Initial telemetry default speed 0
+      updateTelemetry(0);
     }
   }, []);
 

@@ -85,15 +85,15 @@ export const PassengerProfileScreen: React.FC = () => {
       {/* 3-Stat Strip */}
       <Card className="p-4 grid grid-cols-3 divide-x divide-outline-variant/20 text-center font-mono">
         <div>
-          <div className="text-xl font-black text-on-surface">47</div>
+          <div className="text-xl font-black text-on-surface">0</div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Trips</div>
         </div>
         <div>
-          <div className="text-xl font-black text-emerald-700">78</div>
+          <div className="text-xl font-black text-emerald-700">--</div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Trust Score</div>
         </div>
         <div>
-          <div className="text-xl font-black text-on-surface">9</div>
+          <div className="text-xl font-black text-on-surface">0</div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Reports</div>
         </div>
       </Card>

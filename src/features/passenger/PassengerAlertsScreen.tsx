@@ -8,54 +8,8 @@ export const PassengerAlertsScreen: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'achievements' | 'trust' | 'reports'>('alerts');
   const [selectedAlert, setSelectedAlert] = useState<any | null>(null);
 
-  const [alertsList] = useState([
-    {
-      id: 'a1',
-      title: 'Overspeed Warning Triggered',
-      route: 'Thika Road – Near Survey of Kenya',
-      time: '10 mins ago',
-      type: 'overspeed',
-      severity: 'high',
-      message: 'Vehicle KDA 123A was logged traveling at 94 km/h (Limit: 80 km/h).',
-    },
-    {
-      id: 'a2',
-      title: 'Black Spot Approaching',
-      route: 'Waiyaki Way – Kangemi Flyover',
-      time: '1 hour ago',
-      type: 'blackspot',
-      severity: 'medium',
-      message: 'Entering high-accident corridor. Exercise caution.',
-    },
-    {
-      id: 'a3',
-      title: 'Trust Score Increased (+10)',
-      route: 'System Reward',
-      time: 'Yesterday',
-      type: 'system',
-      severity: 'safe',
-      message: 'Your black spot hazard report on Mombasa Road was verified by 14 commuters.',
-    },
-  ]);
-
-  const [reportsList] = useState([
-    {
-      id: 'r1',
-      title: 'Unmarked Speed Bump on Highway',
-      location: 'Mombasa Road – Sameer Park',
-      date: '07 Aug 2026',
-      status: 'published',
-      trustBonus: '+10 Score',
-    },
-    {
-      id: 'r2',
-      title: 'Pothole across outer lane',
-      location: 'Ngong Road – Dagoretti',
-      date: '02 Aug 2026',
-      status: 'pending',
-      trustBonus: 'Under Review',
-    },
-  ]);
+  const [alertsList] = useState<any[]>([]);
+  const [reportsList] = useState<any[]>([]);
 
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
@@ -108,39 +62,47 @@ export const PassengerAlertsScreen: React.FC = () => {
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant">
             <span>Recent Activity</span>
-            <span>3 Unread</span>
+            <span>{alertsList.length} Unread</span>
           </div>
 
-          {alertsList.map((alert) => (
-            <Card
-              key={alert.id}
-              onClick={() => setSelectedAlert(alert)}
-              className="p-4 cursor-pointer hover:bg-surface-container-high/50 transition-colors space-y-2 border border-outline-variant/30"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`p-1.5 rounded-full ${
-                      alert.severity === 'high'
-                        ? 'bg-error/20 text-error'
-                        : alert.severity === 'medium'
-                        ? 'bg-amber-500/20 text-amber-600'
-                        : 'bg-emerald-500/20 text-emerald-700'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-base block">
-                      {alert.type === 'overspeed' ? 'speed' : alert.type === 'blackspot' ? 'warning' : 'verified'}
+          {alertsList.length === 0 ? (
+            <div className="p-8 text-center bg-surface-container-low rounded-2xl border border-outline-variant/30 space-y-1">
+              <span className="material-symbols-outlined text-3xl text-on-surface-variant">notifications_off</span>
+              <p className="text-xs font-bold text-on-surface">No Unread Alerts</p>
+              <p className="text-[11px] text-on-surface-variant">You have no active safety or overspeed notifications.</p>
+            </div>
+          ) : (
+            alertsList.map((alert) => (
+              <Card
+                key={alert.id}
+                onClick={() => setSelectedAlert(alert)}
+                className="p-4 cursor-pointer hover:bg-surface-container-high/50 transition-colors space-y-2 border border-outline-variant/30"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`p-1.5 rounded-full ${
+                        alert.severity === 'high'
+                          ? 'bg-error/20 text-error'
+                          : alert.severity === 'medium'
+                          ? 'bg-amber-500/20 text-amber-600'
+                          : 'bg-emerald-500/20 text-emerald-700'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-base block">
+                        {alert.type === 'overspeed' ? 'speed' : alert.type === 'blackspot' ? 'warning' : 'verified'}
+                      </span>
                     </span>
-                  </span>
-                  <span className="font-bold text-sm text-on-surface">{alert.title}</span>
+                    <span className="font-bold text-sm text-on-surface">{alert.title}</span>
+                  </div>
+
+                  <span className="text-[10px] font-mono text-on-surface-variant">{alert.time}</span>
                 </div>
 
-                <span className="text-[10px] font-mono text-on-surface-variant">{alert.time}</span>
-              </div>
-
-              <p className="text-xs text-on-surface-variant">{alert.route}</p>
-            </Card>
-          ))}
+                <p className="text-xs text-on-surface-variant">{alert.route}</p>
+              </Card>
+            ))
+          )}
         </div>
       )}
 

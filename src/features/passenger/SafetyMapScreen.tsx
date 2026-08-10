@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { blackSpotRepository } from '../../repositories';
+import { BlackSpot } from '../../types';
 
 interface HazardPin {
   id: string;
@@ -17,66 +19,40 @@ interface HazardPin {
   distanceKm: number;
 }
 
-const SAMPLE_HAZARDS: HazardPin[] = [
-  {
-    id: 'spot_1',
-    title: 'Unmarked Speed Bump & Sharp Curve',
-    type: 'blackspot',
-    severity: 'high',
-    locationName: 'Mombasa Road – Near Sameer Park',
-    corroborationCount: 14,
-    description: 'High frequency of rear-end crashes due to missing warning signs.',
-    distanceKm: 0.8,
-  },
-  {
-    id: 'spot_2',
-    title: 'Frequent Carjacking & Poor Lighting Zone',
-    type: 'danger_zone',
-    severity: 'high',
-    locationName: 'Waiyaki Way – Near Kangemi Flyover',
-    corroborationCount: 22,
-    description: 'Limited street lighting after sunset; caution advised for night commuters.',
-    distanceKm: 1.4,
-  },
-  {
-    id: 'spot_3',
-    title: 'Flooding Risk & Deep Pothole',
-    type: 'hotspot',
-    severity: 'medium',
-    locationName: 'Ngong Road – Dagoretti Junction',
-    corroborationCount: 8,
-    description: 'Deep pothole across outer lane causing sudden evasive braking.',
-    distanceKm: 2.1,
-  },
-  {
-    id: 'hospital_1',
-    title: 'Nairobi West Hospital Emergency Wing',
-    type: 'hospital',
-    severity: 'low',
-    locationName: 'Gandhi Avenue, Nairobi',
-    corroborationCount: 100,
-    description: '24/7 Level 5 Trauma & Emergency Services.',
-    distanceKm: 1.2,
-  },
-  {
-    id: 'police_1',
-    title: 'Kilimani Police Station',
-    type: 'police',
-    severity: 'low',
-    locationName: 'Argwings Kodhek Road',
-    corroborationCount: 100,
-    description: '24/7 Traffic Police Post & Emergency Hotline.',
-    distanceKm: 1.8,
-  },
-];
-
 export const SafetyMapScreen: React.FC = () => {
   const navigate = useNavigate();
+  const [hazards, setHazards] = useState<HazardPin[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedHazard, setSelectedHazard] = useState<HazardPin | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'hazards' | 'emergency'>('all');
 
-  const filteredHazards = SAMPLE_HAZARDS.filter((h) => {
+  useEffect(() => {
+    async function loadHazards() {
+      setIsLoading(true);
+      try {
+        const spots: BlackSpot[] = await blackSpotRepository.getAll();
+        const mapped: HazardPin[] = spots.map((s) => ({
+          id: s.id,
+          title: s.name,
+          type: s.hazardType === 'accident_prone' ? 'blackspot' : 'danger_zone',
+          severity: s.severity === 'critical' ? 'high' : (s.severity || 'high'),
+          locationName: s.routeName || `${s.county || 'Corridor'}`,
+          corroborationCount: s.corroborationCount || 0,
+          description: s.description || 'Reported black spot location.',
+          distanceKm: 1.0,
+        }));
+        setHazards(mapped);
+      } catch (err) {
+        console.error('Failed to load safety map hazards:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadHazards();
+  }, []);
+
+  const filteredHazards = hazards.filter((h) => {
     if (activeCategory === 'hazards' && (h.type === 'hospital' || h.type === 'police')) return false;
     if (activeCategory === 'emergency' && h.type !== 'hospital' && h.type !== 'police') return false;
     if (searchQuery) {

@@ -12,25 +12,16 @@ export const SaccoDashboard: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalTrips: 8412,
-    totalViolations: 214,
-    highRiskVehicles: 6,
-    activePilots: 61,
-    safetyScore: 82,
+    totalTrips: 0,
+    totalViolations: 0,
+    highRiskVehicles: 0,
+    activePilots: 0,
+    safetyScore: 100,
   });
 
-  const [recentReports] = useState([
-    { id: '1', title: 'Overspeed Warning - KDA 123A', time: '12 mins ago', severity: 'high', route: 'Thika Road' },
-    { id: '2', title: 'Unmarked Speed Bump Report', time: '45 mins ago', severity: 'medium', route: 'Mombasa Road' },
-    { id: '3', title: 'Route Deviation Alert - KCB 450Z', time: '2 hours ago', severity: 'low', route: 'Waiyaki Way' },
-  ]);
+  const [recentReports] = useState<any[]>([]);
 
-  const [routeRankings] = useState([
-    { name: 'Thika Superhighway', riskScore: 88, violations: 94, status: 'high' },
-    { name: 'Waiyaki Way', riskScore: 62, violations: 48, status: 'medium' },
-    { name: 'Mombasa Road Corridor', riskScore: 45, violations: 28, status: 'low' },
-    { name: 'Ngong Road Express', riskScore: 18, violations: 8, status: 'safe' },
-  ]);
+  const [routeRankings] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadSaccoData() {
@@ -42,25 +33,15 @@ export const SaccoDashboard: React.FC = () => {
           violationRepository.getAll([where('saccoId', '==', saccoId)]),
         ]);
 
-        if (trips.length > 0 || vehicles.length > 0) {
-          setStats({
-            totalTrips: trips.length > 0 ? trips.length * 12 : (saccoId === 'sacco_greenline' ? 3420 : 8412),
-            totalViolations: violations.length > 0 ? violations.length : (saccoId === 'sacco_greenline' ? 89 : 214),
-            highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length || (saccoId === 'sacco_greenline' ? 2 : 6),
-            activePilots: vehicles.filter((v) => v.status === 'active').length || (saccoId === 'sacco_greenline' ? 38 : 61),
-            safetyScore: saccoId === 'sacco_greenline' ? 91 : 82,
-          });
-        } else {
-          setStats({
-            totalTrips: saccoId === 'sacco_greenline' ? 3420 : 8412,
-            totalViolations: saccoId === 'sacco_greenline' ? 89 : 214,
-            highRiskVehicles: saccoId === 'sacco_greenline' ? 2 : 6,
-            activePilots: saccoId === 'sacco_greenline' ? 38 : 61,
-            safetyScore: saccoId === 'sacco_greenline' ? 91 : 82,
-          });
-        }
+        setStats({
+          totalTrips: trips.length,
+          totalViolations: violations.length,
+          highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length,
+          activePilots: vehicles.filter((v) => v.status === 'active').length,
+          safetyScore: violations.length === 0 ? 100 : Math.max(50, 100 - violations.length * 5),
+        });
       } catch (err) {
-        console.warn('Error fetching Firestore sacco data, using scoped defaults:', err);
+        console.warn('Error fetching Firestore sacco data:', err);
       } finally {
         setLoading(false);
       }
@@ -210,52 +191,60 @@ export const SaccoDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            {recentReports.map((r) => (
-              <div
-                key={r.id}
-                className="p-3 bg-surface-container rounded-xl flex items-center justify-between border border-outline-variant/20"
-              >
-                <div className="space-y-1">
-                  <div className="font-bold text-xs text-on-surface">{r.title}</div>
-                  <div className="text-[11px] text-on-surface-variant">{r.route}</div>
+            {recentReports.length === 0 ? (
+              <p className="text-xs text-on-surface-variant font-mono">No recent safety alerts logged.</p>
+            ) : (
+              recentReports.map((r) => (
+                <div
+                  key={r.id}
+                  className="p-3 bg-surface-container rounded-xl flex items-center justify-between border border-outline-variant/20"
+                >
+                  <div className="space-y-1">
+                    <div className="font-bold text-xs text-on-surface">{r.title}</div>
+                    <div className="text-[11px] text-on-surface-variant">{r.route}</div>
+                  </div>
+                  <div className="text-right">
+                    <Badge
+                      variant={r.severity === 'high' ? 'danger' : r.severity === 'medium' ? 'warning' : 'neutral'}
+                      className="text-[10px] font-mono uppercase"
+                    >
+                      {r.severity}
+                    </Badge>
+                    <div className="text-[10px] font-mono text-on-surface-variant mt-1">{r.time}</div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <Badge
-                    variant={r.severity === 'high' ? 'danger' : r.severity === 'medium' ? 'warning' : 'neutral'}
-                    className="text-[10px] font-mono uppercase"
-                  >
-                    {r.severity}
-                  </Badge>
-                  <div className="text-[10px] font-mono text-on-surface-variant mt-1">{r.time}</div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
 
         <Card className="p-6 space-y-4">
           <h2 className="text-sm font-bold text-on-surface">Route Risk Breakdown</h2>
           <div className="space-y-3 text-xs">
-            {routeRankings.map((rk, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex justify-between font-medium">
-                  <span>{rk.name}</span>
-                  <span className="font-mono text-on-surface-variant">{rk.violations} violations</span>
+            {routeRankings.length === 0 ? (
+              <p className="text-xs text-on-surface-variant font-mono">No route risk data recorded.</p>
+            ) : (
+              routeRankings.map((rk, idx) => (
+                <div key={idx} className="space-y-1">
+                  <div className="flex justify-between font-medium">
+                    <span>{rk.name}</span>
+                    <span className="font-mono text-on-surface-variant">{rk.violations} violations</span>
+                  </div>
+                  <div className="h-2 bg-surface-container rounded-full overflow-hidden">
+                    <div
+                      style={{ width: `${rk.riskScore}%` }}
+                      className={`h-full ${
+                        rk.status === 'high'
+                          ? 'bg-error'
+                          : rk.status === 'medium'
+                          ? 'bg-amber-500'
+                          : 'bg-primary'
+                      }`}
+                    />
+                  </div>
                 </div>
-                <div className="h-2 bg-surface-container rounded-full overflow-hidden">
-                  <div
-                    style={{ width: `${rk.riskScore}%` }}
-                    className={`h-full ${
-                      rk.status === 'high'
-                        ? 'bg-error'
-                        : rk.status === 'medium'
-                        ? 'bg-amber-500'
-                        : 'bg-primary'
-                    }`}
-                  />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </Card>
       </div>

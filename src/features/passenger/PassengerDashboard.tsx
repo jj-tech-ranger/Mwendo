@@ -11,12 +11,12 @@ import { useTripStore } from '../../store/useTripStore';
 export const PassengerDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { startTrip } = useTripStore();
+  const { startTrip, activeTrip } = useTripStore();
 
   const [isGuestMode, setIsGuestMode] = useState(false);
-  const [plateNumber, setPlateNumber] = useState('KDA 123A');
-  const [sacco, setSacco] = useState('MetroLink SACCO');
-  const [route, setRoute] = useState('Thika Road – Nairobi CBD');
+  const [plateNumber, setPlateNumber] = useState('');
+  const [sacco, setSacco] = useState('');
+  const [route, setRoute] = useState('');
 
   const handleStartTrip = () => {
     if (!plateNumber.trim()) return;
@@ -63,7 +63,7 @@ export const PassengerDashboard: React.FC = () => {
           <BrandMark className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-black tracking-tight text-on-surface">
-              {isGuestMode ? 'Welcome, Guest' : `Good evening, ${user?.displayName || 'Passenger #104'}`}
+              {isGuestMode ? 'Welcome, Guest' : `Good evening, ${user?.displayName || 'Passenger'}`}
             </h1>
             <p className="text-xs text-on-surface-variant font-medium">
               {isGuestMode ? 'Civic Road Safety Monitor' : 'Mwendo Salama Passenger'}
@@ -82,7 +82,6 @@ export const PassengerDashboard: React.FC = () => {
             aria-label="Notifications"
           >
             <span className="material-symbols-outlined text-2xl">notifications</span>
-            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-error rounded-full ring-2 ring-background animate-pulse" />
           </button>
         )}
       </div>
@@ -139,6 +138,7 @@ export const PassengerDashboard: React.FC = () => {
                 onChange={(e) => setSacco(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
               >
+                <option value="">-- Select SACCO --</option>
                 <option value="MetroLink SACCO">MetroLink SACCO</option>
                 <option value="GreenLine SACCO">GreenLine SACCO</option>
                 <option value="TransitStar SACCO">TransitStar SACCO</option>
@@ -155,6 +155,7 @@ export const PassengerDashboard: React.FC = () => {
                 onChange={(e) => setRoute(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
               >
+                <option value="">-- Select Route --</option>
                 <option value="Thika Road – Nairobi CBD">Thika Road – Nairobi CBD</option>
                 <option value="Waiyaki Way – Westlands">Waiyaki Way – Westlands</option>
                 <option value="Mombasa Road – Syokimau">Mombasa Road – Syokimau</option>
@@ -168,6 +169,7 @@ export const PassengerDashboard: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <Button
             onClick={handleStartTrip}
+            disabled={!plateNumber.trim()}
             className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-lg">speed</span>
@@ -202,8 +204,10 @@ export const PassengerDashboard: React.FC = () => {
             <span className="text-xs font-medium">Trips Tracked</span>
             <span className="material-symbols-outlined text-primary text-xl">directions_bus</span>
           </div>
-          <div className="text-2xl font-black font-mono text-on-surface">47</div>
-          <p className="text-[11px] text-emerald-700 font-medium">100% Verified</p>
+          <div className="text-2xl font-black font-mono text-on-surface">{activeTrip ? 1 : 0}</div>
+          <p className="text-[11px] text-on-surface-variant font-medium">
+            {activeTrip ? '1 Trip Active' : 'No trips logged'}
+          </p>
         </Card>
 
         {/* Stat 2: Recent Alerts */}
@@ -212,8 +216,8 @@ export const PassengerDashboard: React.FC = () => {
             <span className="text-xs font-medium">Recent Alerts</span>
             <span className="material-symbols-outlined text-warning text-xl">notifications_active</span>
           </div>
-          <div className="text-2xl font-black font-mono text-on-surface">2</div>
-          <p className="text-[11px] text-amber-700 font-medium">Thika Road corridor</p>
+          <div className="text-2xl font-black font-mono text-on-surface">0</div>
+          <p className="text-[11px] text-on-surface-variant font-medium">No alerts</p>
         </Card>
 
         {/* Stat 3: Safety Score */}
@@ -223,20 +227,20 @@ export const PassengerDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-emerald-600 text-xl">verified_user</span>
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black font-mono text-emerald-800">86</span>
+            <span className="text-2xl font-black font-mono text-emerald-800">--</span>
             <span className="text-xs text-on-surface-variant font-mono">/100</span>
           </div>
-          <p className="text-[11px] text-emerald-700 font-medium">Low Risk Passenger</p>
+          <p className="text-[11px] text-on-surface-variant font-medium">No safety data yet</p>
         </Card>
 
         {/* Stat 4: Nearby Danger Zones */}
-        <Card className="p-4 space-y-1 border-warning/30 bg-amber-500/5">
+        <Card className="p-4 space-y-1 border-outline-variant/30 bg-surface-container-low">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">Danger Zones</span>
-            <span className="material-symbols-outlined text-amber-600 text-xl">report</span>
+            <span className="material-symbols-outlined text-outline text-xl">report</span>
           </div>
-          <div className="text-2xl font-black font-mono text-amber-800">3</div>
-          <p className="text-[11px] text-amber-700 font-medium">Within 2.5 km</p>
+          <div className="text-2xl font-black font-mono text-on-surface">0</div>
+          <p className="text-[11px] text-on-surface-variant font-medium">No reported spots</p>
         </Card>
       </div>
 
