@@ -158,6 +158,28 @@ export const PrimaryLogo: React.FC<{ className?: string; isDark?: boolean }> = (
   isDark = false,
 }) => <MwendoSalamaFullLogo className={className} isDark={isDark} />;
 
+export const HorizontalLogo: React.FC<{ className?: string; isDark?: boolean }> = ({
+  className = 'h-8',
+  isDark = false,
+}) => (
+  <div className={`flex items-center gap-2.5 ${className}`}>
+    <ShieldSpeedometerMark
+      className="h-8 w-8 shrink-0"
+      color={isDark ? '#ffffff' : '#1b4d2e'}
+      bgColor={isDark ? '#1b4d2e' : undefined}
+      isSquare={isDark}
+    />
+    <div className="flex flex-col leading-none">
+      <span className={`font-black text-lg tracking-tight ${isDark ? 'text-white' : 'text-on-surface'}`}>
+        Mwendo<span className={isDark ? 'text-emerald-400' : 'text-primary'}>Salama</span>
+      </span>
+      <span className={`text-[9px] font-medium tracking-wider uppercase ${isDark ? 'text-emerald-200/80' : 'text-on-surface-variant/80'}`}>
+        Safe Journeys
+      </span>
+    </div>
+  </div>
+);
+
 export const SecondaryLogo: React.FC<{ className?: string }> = ({ className = 'h-16 w-auto' }) => (
   <MwendoSalamaFullLogo className={className} isDark={true} />
 );
