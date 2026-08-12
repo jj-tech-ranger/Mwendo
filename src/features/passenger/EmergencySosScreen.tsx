@@ -5,9 +5,11 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
 import { alertRepository } from '../../repositories';
+import { useAuthStore } from '../../store/useAuthStore';
 
 export const EmergencySosScreen: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [sosSent, setSosSent] = useState(false);
@@ -39,7 +41,7 @@ export const EmergencySosScreen: React.FC = () => {
     try {
       const newAlert = {
         id: `sos_${Date.now()}`,
-        userId: 'passenger_me',
+        userId: user?.uid || user?.id || 'passenger_me',
         title: 'Emergency SOS Triggered',
         type: 'sos',
         severity: 'danger',

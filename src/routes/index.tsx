@@ -48,6 +48,12 @@ const AccountSuspendedScreen = lazy(() =>
 const UnauthorizedScreen = lazy(() =>
   import('../features/auth/UnauthorizedScreen').then((m) => ({ default: m.UnauthorizedScreen }))
 );
+const MfaEnrollmentScreen = lazy(() =>
+  import('../features/auth/MfaEnrollmentScreen').then((m) => ({ default: m.MfaEnrollmentScreen }))
+);
+const MfaChallengeScreen = lazy(() =>
+  import('../features/auth/MfaChallengeScreen').then((m) => ({ default: m.MfaChallengeScreen }))
+);
 
 // System Error & Full-Page Layouts
 const ComponentShowcaseScreen = lazy(() =>
@@ -291,6 +297,14 @@ const router = createBrowserRouter([
   {
     path: '/auth/unauthorized',
     element: <UnauthorizedScreen />,
+  },
+  {
+    path: '/auth/mfa-enrollment',
+    element: <MfaEnrollmentScreen />,
+  },
+  {
+    path: '/auth/mfa-challenge',
+    element: <MfaChallengeScreen />,
   },
 
   // System Layouts

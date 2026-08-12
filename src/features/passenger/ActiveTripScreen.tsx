@@ -127,11 +127,13 @@ export const ActiveTripScreen: React.FC = () => {
     const calculatedOverspeedCount = detectedViolations.length;
 
     const completed = endTrip();
+    const userId = currentUser?.uid || currentUser?.id;
     const result: any = completed
-      ? { ...completed, overspeedEventsCount: calculatedOverspeedCount, violationsCount: calculatedOverspeedCount }
+      ? { ...completed, userId: completed.userId || userId, overspeedEventsCount: calculatedOverspeedCount, violationsCount: calculatedOverspeedCount }
       : {
           id: `trip_${Date.now()}`,
           tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
+          userId,
           plateNumber: activeTrip?.plateNumber || setupPlate,
           saccoName: activeTrip?.saccoName || setupSacco,
           routeName: activeTrip?.routeName || setupRoute,

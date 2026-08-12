@@ -34,9 +34,24 @@ export const LoginScreen: React.FC = () => {
   const onSubmit = async (data: LoginFormValues) => {
     setErrorMsg(null);
     try {
-      await authService.signInWithEmail(data.email, data.password);
-      navigate('/passenger');
+      const profile = await authService.signInWithEmail(data.email, data.password);
+      const role = profile.activeRole || profile.role;
+      if (role === 'admin' || role === 'authority') {
+        if (!profile.isMfaEnrolled) {
+          navigate('/auth/mfa-enrollment');
+        } else {
+          navigate('/auth/mfa-challenge');
+        }
+      } else if (role === 'sacco_manager') {
+        navigate('/sacco');
+      } else {
+        navigate('/passenger');
+      }
     } catch (err: any) {
+      if (err.code === 'auth/multi-factor-auth-required') {
+        navigate('/auth/mfa-challenge', { state: { resolver: err.resolver } });
+        return;
+      }
       console.error('Sign in error:', err);
       setErrorMsg(err.message || 'Invalid email or password');
     }
@@ -46,9 +61,24 @@ export const LoginScreen: React.FC = () => {
     setErrorMsg(null);
     setIsGoogleLoading(true);
     try {
-      await authService.signInWithGoogle();
-      navigate('/passenger');
+      const profile = await authService.signInWithGoogle();
+      const role = profile.activeRole || profile.role;
+      if (role === 'admin' || role === 'authority') {
+        if (!profile.isMfaEnrolled) {
+          navigate('/auth/mfa-enrollment');
+        } else {
+          navigate('/auth/mfa-challenge');
+        }
+      } else if (role === 'sacco_manager') {
+        navigate('/sacco');
+      } else {
+        navigate('/passenger');
+      }
     } catch (err: any) {
+      if (err.code === 'auth/multi-factor-auth-required') {
+        navigate('/auth/mfa-challenge', { state: { resolver: err.resolver } });
+        return;
+      }
       console.error('Google sign in error:', err);
       setErrorMsg('Failed to sign in with Google');
     } finally {

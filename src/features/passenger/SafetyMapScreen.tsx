@@ -6,8 +6,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
-import { blackSpotRepository } from '../../repositories';
-import { BlackSpot } from '../../types';
+import { publicPinRepository } from '../../repositories';
 import { useToast } from '../../components/ui/Toast';
 
 interface HazardPin {
@@ -35,20 +34,49 @@ export const SafetyMapScreen: React.FC = () => {
     async function loadHazards() {
       setIsLoading(true);
       try {
-        const spots: BlackSpot[] = await blackSpotRepository.getAll();
-        const mapped: HazardPin[] = spots.map((s) => ({
-          id: s.id,
-          title: s.name,
-          type: s.hazardType === 'accident_prone' ? 'blackspot' : 'danger_zone',
-          severity: s.severity === 'critical' ? 'high' : (s.severity || 'high'),
-          locationName: s.routeName || `${s.county || 'Corridor'}`,
-          corroborationCount: s.corroborationCount || 0,
-          description: s.description || 'Reported black spot location.',
+        const pins = await publicPinRepository.getAll();
+        const mapped: HazardPin[] = pins.map((p: any) => ({
+          id: p.id,
+          title: p.title || p.name || 'Hazardous Location',
+          type: (p.type === 'hospital' || p.type === 'police' || p.type === 'hotspot' || p.type === 'danger_zone')
+            ? p.type
+            : (p.hazardType === 'accident_prone' ? 'blackspot' : 'blackspot'),
+          severity: p.severity === 'critical' ? 'high' : (p.severity || 'high'),
+          locationName: p.routeName || p.locationName || 'Corridor',
+          corroborationCount: p.corroborationCount || p.corroborationsCount || 0,
+          description: p.description || 'Verified public safety hazard location.',
           distanceKm: 1.0,
         }));
-        setHazards(mapped);
+
+        if (mapped.length === 0) {
+          // Default public pins for unpopulated state
+          setHazards([
+            {
+              id: 'pin_default_1',
+              title: 'Kinungi Blackspot (A104)',
+              type: 'blackspot',
+              severity: 'high',
+              locationName: 'Naivasha - Nakuru Highway',
+              corroborationCount: 14,
+              description: 'High frequency collision area near Kinungi flyover.',
+              distanceKm: 2.5,
+            },
+            {
+              id: 'pin_default_2',
+              title: 'Salgaa Deceleration Hill',
+              type: 'blackspot',
+              severity: 'high',
+              locationName: 'Nakuru - Eldoret Highway',
+              corroborationCount: 22,
+              description: 'Steep incline with runaway truck ramp.',
+              distanceKm: 12.0,
+            },
+          ]);
+        } else {
+          setHazards(mapped);
+        }
       } catch (err) {
-        console.error('Failed to load safety map hazards:', err);
+        console.error('Failed to load public pin safety hazards:', err);
       } finally {
         setIsLoading(false);
       }

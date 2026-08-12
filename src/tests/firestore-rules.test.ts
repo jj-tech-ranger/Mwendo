@@ -20,10 +20,9 @@ function evaluateFirestoreRules(
   data: any,
   auth: { uid: string; token: Record<string, any> } | null
 ): boolean {
-  if (!auth) return false;
-  if (auth.token?.isSuspended === true) return false;
+  if (auth?.token?.isSuspended === true) return false;
 
-  const activeRole = auth.token?.activeRole || null;
+  const activeRole = auth?.token?.activeRole || null;
   const isAdmin = activeRole === 'admin';
   const isAuthority = activeRole === 'authority' || isAdmin;
 
@@ -33,7 +32,18 @@ function evaluateFirestoreRules(
 
   const existingData = offlineStore[path] || null;
 
-  if (collection === 'trips') {
+  if (collection === 'public_pins' || collection === 'feature_flags' || collection === 'system_config') {
+    if (action === 'read') return true;
+  }
+
+  if (!auth) return false;
+
+  const isRegisteredUser =
+    auth != null &&
+    auth.token?.firebase?.sign_in_provider !== 'anonymous' &&
+    auth.token?.provider_id !== 'anonymous';
+
+  if (collection === 'trips' || collection === 'violations' || collection === 'safety_alerts') {
     if (action === 'read') {
       if (existingData?.userId === auth.uid) return true;
       if (
@@ -44,8 +54,13 @@ function evaluateFirestoreRules(
       if (isAdmin || activeRole === 'authority') return true;
       return false;
     }
-    if (action === 'create') return true;
+    if (action === 'create') {
+      return isRegisteredUser && data?.userId === auth.uid;
+    }
     if (action === 'update') {
+      if (collection === 'violations') {
+        return (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId) || isAuthority;
+      }
       if (existingData?.userId === auth.uid) return true;
       if (
         existingData?.saccoId &&
@@ -57,8 +72,48 @@ function evaluateFirestoreRules(
     }
   }
 
-  if (collection === 'vehicles') {
+  if (collection === 'black_spots') {
+    if (action === 'read') return auth != null;
+    if (action === 'create') {
+      return isRegisteredUser && data?.reportedByUid === auth.uid;
+    }
+    if (action === 'update') {
+      return isAuthority || (auth != null && existingData?.reportedByUid === auth.uid);
+    }
+    if (action === 'delete') return isAuthority;
+  }
+
+  if (collection === 'public_pins') {
     if (action === 'read') return true;
+    if (action === 'create' || action === 'update' || action === 'delete') {
+      return isAuthority || isAdmin;
+    }
+  }
+
+  if (collection === 'complaints') {
+    if (action === 'read') {
+      if (auth == null) return false;
+      if (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId) return true;
+      if (isAuthority || isAdmin) return true;
+      if (existingData?.reportedByUid === auth.uid) return true;
+      return false;
+    }
+    if (action === 'create') {
+      return isRegisteredUser && data?.reportedByUid === auth.uid;
+    }
+    if (action === 'update') {
+      return isAuthority || isAdmin || (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId);
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  if (collection === 'vehicles' || collection === 'drivers') {
+    if (action === 'read') {
+      const targetSaccoId = existingData?.saccoId;
+      if (isAdmin || activeRole === 'authority') return true;
+      if (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId) return true;
+      return false;
+    }
     if (action === 'create' || action === 'update') {
       const targetSaccoId = data?.saccoId || existingData?.saccoId;
       const isAllowedRole =
@@ -66,14 +121,28 @@ function evaluateFirestoreRules(
         isAdmin ||
         (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
       if (!isAllowedRole) return false;
-      if (data?.riskScore !== undefined || data?.riskTier !== undefined) return false;
+      if (collection === 'vehicles' && (data?.riskScore !== undefined || data?.riskTier !== undefined)) return false;
       return true;
     }
   }
 
   if (collection === 'users') {
-    if (action === 'read') return true;
-    if (action === 'create') return auth.uid === docId;
+    if (action === 'read') {
+      if (!auth) return false;
+      if (auth.uid === docId) return true;
+      if (isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId && existingData.saccoId === auth.token?.saccoId) return true;
+      return false;
+    }
+    if (action === 'create') {
+      if (auth.uid !== docId) return false;
+      if (data?.role && data.role !== 'passenger') return false;
+      if (data?.activeRole !== 'passenger') return false;
+      if (!Array.isArray(data?.roles) || data.roles.length !== 1 || data.roles[0] !== 'passenger') return false;
+      if ('saccoId' in data || 'authorityId' in data || 'authorityScope' in data || 'badgeNumber' in data) return false;
+      if ('isActive' in data && data.isActive !== true) return false;
+      return true;
+    }
     if (action === 'update') {
       if (isAdmin) return true;
       if (auth.uid !== docId) return false;
@@ -100,10 +169,63 @@ function evaluateFirestoreRules(
     if (action === 'create' || action === 'update' || action === 'delete') return false;
   }
 
+  if (collection === 'audit_logs') {
+    if (action === 'read') {
+      if (auth == null) return false;
+      if (activeRole === 'authority' || isAdmin) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId) return true;
+      return false;
+    }
+    if (action === 'create') {
+      if (!auth) return false;
+      const isAllowedRole = activeRole === 'authority' || isAdmin || activeRole === 'sacco_manager';
+      return isAllowedRole && data?.actorRole === activeRole;
+    }
+    if (action === 'update' || action === 'delete') return false;
+  }
+
+  if (collection === 'team_users') {
+    if (!auth) return false;
+    if (action === 'read') {
+      return isAdmin || (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId);
+    }
+    if (action === 'create') {
+      return activeRole === 'sacco_manager' && data?.saccoId === auth.token?.saccoId;
+    }
+    if (action === 'update' || action === 'delete') {
+      return isAdmin || (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId);
+    }
+  }
+
+  if (collection === 'processedEvents') {
+    if (action === 'read') return isAdmin;
+    if (action === 'create' || action === 'update' || action === 'delete') return false;
+  }
+
   return false;
 }
 
-function getContext(uid?: string, tokenClaims: Record<string, any> = {}) {
+function evaluateStorageRules(
+  action: 'read' | 'write',
+  path: string,
+  auth: { uid: string; token: Record<string, any> } | null
+): boolean {
+  if (!auth) return false;
+  if (auth.token?.isSuspended === true) return false;
+
+  const parts = path.split('/').filter(Boolean);
+  const root = parts[0];
+  if (root === 'evidence') {
+    const saccoId = parts[1];
+    const activeRole = auth.token?.activeRole;
+    if (activeRole === 'admin' || activeRole === 'authority') return true;
+    if (activeRole === 'sacco_manager' && auth.token?.saccoId === saccoId) return true;
+    return false;
+  }
+  return false;
+}
+
+function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   const auth = uid ? { uid, token: { activeRole: 'passenger', ...tokenClaims } } : null;
 
   if (testEnv && !isOfflineFallback) {
@@ -132,7 +254,26 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}) {
               if (!allowed) throw new Error('PERMISSION_DENIED: Firestore security rules blocked update');
               offlineStore[path] = { ...(offlineStore[path] || {}), ...data };
             },
+            delete: async () => {
+              const allowed = evaluateFirestoreRules('delete', path, null, auth);
+              if (!allowed) throw new Error('PERMISSION_DENIED: Firestore security rules blocked delete');
+              delete offlineStore[path];
+            },
           };
+        },
+      }),
+    }),
+    storage: () => ({
+      ref: (path: string) => ({
+        get: async () => {
+          const allowed = evaluateStorageRules('read', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
+          return true;
+        },
+        put: async () => {
+          const allowed = evaluateStorageRules('write', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
+          return true;
         },
       }),
     }),
@@ -223,6 +364,15 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('(c) a user cannot elevate their own activeRole to admin', async () => {
+    offlineStore['users/user_1'] = {
+      uid: 'user_1',
+      displayName: 'John Doe',
+      role: 'passenger',
+      activeRole: 'passenger',
+      roles: ['passenger'],
+      isActive: true,
+    };
+
     const user1Context = getContext('user_1', { activeRole: 'passenger' });
 
     // User attempts to elevate role / activeRole to admin in /users/user_1 -> MUST FAIL
@@ -235,8 +385,36 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
 
     // User updates authorized profile field (displayName) in /users/user_1 -> MUST SUCCEED
     await assertSucceeds(
-      user1Context.firestore().collection('users').doc('user_1').set({
+      user1Context.firestore().collection('users').doc('user_1').update({
         displayName: 'Updated John Doe',
+      })
+    );
+  });
+
+  it('SEC-009: user creating profile with activeRole: admin must fail, but activeRole: passenger must succeed', async () => {
+    const newUserContext = getContext('new_user_99', { activeRole: 'passenger' });
+
+    // Signed-in user attempting set() on new users/new_user_99 doc with activeRole: 'admin' MUST FAIL
+    await assertFails(
+      newUserContext.firestore().collection('users').doc('new_user_99').set({
+        uid: 'new_user_99',
+        displayName: 'Attacker',
+        role: 'admin',
+        activeRole: 'admin',
+        roles: ['admin'],
+        isActive: true,
+      })
+    );
+
+    // Same write with activeRole: 'passenger' and roles: ['passenger'] MUST SUCCEED
+    await assertSucceeds(
+      newUserContext.firestore().collection('users').doc('new_user_99').set({
+        uid: 'new_user_99',
+        displayName: 'New Commuter',
+        role: 'passenger',
+        activeRole: 'passenger',
+        roles: ['passenger'],
+        isActive: true,
       })
     );
   });
@@ -265,4 +443,463 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
   });
+
+  it('SEC-001: tenant scoping for vehicles and drivers reads', async () => {
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('vehicles').doc('veh_sacco_A').set({
+          plateNumber: 'KCA 111A',
+          saccoId: 'sacco_A',
+          riskScore: 90,
+        });
+        await context.firestore().collection('vehicles').doc('veh_sacco_B').set({
+          plateNumber: 'KCB 222B',
+          saccoId: 'sacco_B',
+          riskScore: 75,
+        });
+        await context.firestore().collection('drivers').doc('drv_sacco_A').set({
+          name: 'Driver A',
+          saccoId: 'sacco_A',
+          licenseNumber: 'DL123',
+        });
+        await context.firestore().collection('drivers').doc('drv_sacco_B').set({
+          name: 'Driver B',
+          saccoId: 'sacco_B',
+          licenseNumber: 'DL456',
+        });
+      });
+    } else {
+      offlineStore['vehicles/veh_sacco_A'] = { plateNumber: 'KCA 111A', saccoId: 'sacco_A', riskScore: 90 };
+      offlineStore['vehicles/veh_sacco_B'] = { plateNumber: 'KCB 222B', saccoId: 'sacco_B', riskScore: 75 };
+      offlineStore['drivers/drv_sacco_A'] = { name: 'Driver A', saccoId: 'sacco_A', licenseNumber: 'DL123' };
+      offlineStore['drivers/drv_sacco_B'] = { name: 'Driver B', saccoId: 'sacco_B', licenseNumber: 'DL456' };
+    }
+
+    const saccoAManager = getContext('manager_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    const passengerUser = getContext('passenger_1', { activeRole: 'passenger' });
+    const adminUser = getContext('admin_1', { activeRole: 'admin' });
+    const authorityUser = getContext('auth_1', { activeRole: 'authority' });
+
+    // SACCO A manager reads own SACCO vehicle & driver -> SUCCEEDS
+    await assertSucceeds(saccoAManager.firestore().collection('vehicles').doc('veh_sacco_A').get());
+    await assertSucceeds(saccoAManager.firestore().collection('drivers').doc('drv_sacco_A').get());
+
+    // SACCO A manager attempts reading SACCO B vehicle & driver -> FAILS
+    await assertFails(saccoAManager.firestore().collection('vehicles').doc('veh_sacco_B').get());
+    await assertFails(saccoAManager.firestore().collection('drivers').doc('drv_sacco_B').get());
+
+    // Passenger attempts reading vehicle & driver -> FAILS
+    await assertFails(passengerUser.firestore().collection('vehicles').doc('veh_sacco_A').get());
+    await assertFails(passengerUser.firestore().collection('drivers').doc('drv_sacco_A').get());
+
+    // Admin & Authority read any vehicle & driver -> SUCCEEDS
+    await assertSucceeds(adminUser.firestore().collection('vehicles').doc('veh_sacco_B').get());
+    await assertSucceeds(adminUser.firestore().collection('drivers').doc('drv_sacco_B').get());
+    await assertSucceeds(authorityUser.firestore().collection('vehicles').doc('veh_sacco_A').get());
+    await assertSucceeds(authorityUser.firestore().collection('drivers').doc('drv_sacco_A').get());
+  });
+
+  it('SEC-003: create rules bind documents to authenticated user and reject spoofing & anonymous writes', async () => {
+    const userA = getContext('user_a', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
+    const anonUser = getContext('user_anon', { activeRole: 'passenger', firebase: { sign_in_provider: 'anonymous' } });
+
+    const collectionsWithUserId = ['trips', 'violations', 'safety_alerts'];
+
+    for (const col of collectionsWithUserId) {
+      // 1. Create with caller's own uid -> SUCCEEDS
+      await assertSucceeds(
+        userA.firestore().collection(col).doc(`${col}_doc1`).set({
+          userId: 'user_a',
+          saccoId: 'sacco_A',
+          createdAt: new Date().toISOString(),
+        })
+      );
+
+      // 2. Create with spoofed userId -> FAILS
+      await assertFails(
+        userA.firestore().collection(col).doc(`${col}_doc2`).set({
+          userId: 'user_spoofed_victim',
+          saccoId: 'sacco_A',
+          createdAt: new Date().toISOString(),
+        })
+      );
+
+      // 3. Anonymous create -> FAILS
+      await assertFails(
+        anonUser.firestore().collection(col).doc(`${col}_doc3`).set({
+          userId: 'user_anon',
+          saccoId: 'sacco_A',
+          createdAt: new Date().toISOString(),
+        })
+      );
+    }
+
+    // black_spots checks reportedByUid
+    // 1. Create with caller's own reportedByUid -> SUCCEEDS
+    await assertSucceeds(
+      userA.firestore().collection('black_spots').doc('spot_doc1').set({
+        reportedByUid: 'user_a',
+        title: 'Road hazard near town',
+        hazardType: 'pothole',
+        createdAt: new Date().toISOString(),
+      })
+    );
+
+    // 2. Create with spoofed reportedByUid -> FAILS
+    await assertFails(
+      userA.firestore().collection('black_spots').doc('spot_doc2').set({
+        reportedByUid: 'user_spoofed_victim',
+        title: 'Fake hazard report',
+        hazardType: 'pothole',
+        createdAt: new Date().toISOString(),
+      })
+    );
+
+    // 3. Anonymous create -> FAILS
+    await assertFails(
+      anonUser.firestore().collection('black_spots').doc('spot_doc3').set({
+        reportedByUid: 'user_anon',
+        title: 'Anon hazard report',
+        hazardType: 'pothole',
+        createdAt: new Date().toISOString(),
+      })
+    );
+  });
+
+  it('SEC-002: complaints update has ownership/tenant check and reads are scoped', async () => {
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('complaints').doc('c_sacco_A').set({
+          saccoId: 'sacco_A',
+          reportedByUid: 'passenger_1',
+          title: 'Speeding Matatu',
+          description: 'Driving recklessly',
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        });
+        await context.firestore().collection('complaints').doc('c_sacco_B').set({
+          saccoId: 'sacco_B',
+          reportedByUid: 'passenger_2',
+          title: 'Overcharging',
+          description: 'Fares doubled',
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        });
+      });
+    } else {
+      offlineStore['complaints/c_sacco_A'] = {
+        saccoId: 'sacco_A',
+        reportedByUid: 'passenger_1',
+        title: 'Speeding Matatu',
+        description: 'Driving recklessly',
+        status: 'open',
+        createdAt: new Date().toISOString(),
+      };
+      offlineStore['complaints/c_sacco_B'] = {
+        saccoId: 'sacco_B',
+        reportedByUid: 'passenger_2',
+        title: 'Overcharging',
+        description: 'Fares doubled',
+        status: 'open',
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    const passenger1 = getContext('passenger_1', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
+    const passenger2 = getContext('passenger_2', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
+    const saccoAManager = getContext('manager_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    const adminUser = getContext('admin_1', { activeRole: 'admin' });
+    const authorityUser = getContext('auth_1', { activeRole: 'authority' });
+
+    // 1. Reads:
+    // passenger_1 reads their own complaint c_sacco_A -> SUCCEEDS
+    await assertSucceeds(passenger1.firestore().collection('complaints').doc('c_sacco_A').get());
+
+    // passenger_1 reads passenger_2's complaint c_sacco_B -> FAILS
+    await assertFails(passenger1.firestore().collection('complaints').doc('c_sacco_B').get());
+
+    // passenger_2 reads their own complaint c_sacco_B -> SUCCEEDS
+    await assertSucceeds(passenger2.firestore().collection('complaints').doc('c_sacco_B').get());
+
+    // saccoAManager reads c_sacco_A -> SUCCEEDS
+    await assertSucceeds(saccoAManager.firestore().collection('complaints').doc('c_sacco_A').get());
+
+    // saccoAManager reads c_sacco_B -> FAILS
+    await assertFails(saccoAManager.firestore().collection('complaints').doc('c_sacco_B').get());
+
+    // authority & admin read any complaint -> SUCCEEDS
+    await assertSucceeds(authorityUser.firestore().collection('complaints').doc('c_sacco_A').get());
+    await assertSucceeds(adminUser.firestore().collection('complaints').doc('c_sacco_B').get());
+
+    // 2. Updates:
+    // passenger_1 attempts to update complaint c_sacco_A -> FAILS
+    await assertFails(passenger1.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'resolved' }));
+
+    // saccoAManager updates c_sacco_A -> SUCCEEDS
+    await assertSucceeds(saccoAManager.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'investigating' }));
+
+    // saccoAManager attempts to update c_sacco_B -> FAILS
+    await assertFails(saccoAManager.firestore().collection('complaints').doc('c_sacco_B').update({ status: 'resolved' }));
+
+    // authority updates c_sacco_A -> SUCCEEDS
+    await assertSucceeds(authorityUser.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'resolved' }));
+
+    // 3. Creates:
+    // passenger_1 creates complaint with own reportedByUid -> SUCCEEDS
+    await assertSucceeds(
+      passenger1.firestore().collection('complaints').doc('c_new_1').set({
+        saccoId: 'sacco_A',
+        reportedByUid: 'passenger_1',
+        title: 'New Complaint',
+        description: 'Details',
+        status: 'open',
+        createdAt: new Date().toISOString(),
+      })
+    );
+
+    // passenger_1 creates complaint with spoofed reportedByUid -> FAILS
+    await assertFails(
+      passenger1.firestore().collection('complaints').doc('c_new_2').set({
+        saccoId: 'sacco_A',
+        reportedByUid: 'passenger_2',
+        title: 'Spoofed Complaint',
+        description: 'Details',
+        status: 'open',
+        createdAt: new Date().toISOString(),
+      })
+    );
+  });
+
+  it('SEC-005: guest/anonymous read of raw black_spots fails while public_pins read succeeds', async () => {
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('black_spots').doc('spot_raw_1').set({
+          name: 'Raw Hazard Spot',
+          reportedByUid: 'secret_user_123',
+          verifiedByAuthority: false,
+          createdAt: new Date().toISOString(),
+        });
+        await context.firestore().collection('public_pins').doc('pin_pub_1').set({
+          title: 'Public Hazard Pin',
+          routeName: 'Nairobi - Thika Superhighway',
+          latitude: -1.28,
+          longitude: 36.82,
+          severity: 'high',
+        });
+      });
+    } else {
+      offlineStore['black_spots/spot_raw_1'] = {
+        name: 'Raw Hazard Spot',
+        reportedByUid: 'secret_user_123',
+        verifiedByAuthority: false,
+        createdAt: new Date().toISOString(),
+      };
+      offlineStore['public_pins/pin_pub_1'] = {
+        title: 'Public Hazard Pin',
+        routeName: 'Nairobi - Thika Superhighway',
+        latitude: -1.28,
+        longitude: 36.82,
+        severity: 'high',
+      };
+    }
+
+    const unauthGuest = getContext(undefined, {});
+    const registeredUser = getContext('user_reg_1', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
+
+    // 1. Anonymous read of raw black_spots -> FAILS
+    await assertFails(unauthGuest.firestore().collection('black_spots').doc('spot_raw_1').get());
+
+    // 2. Authenticated user read of raw black_spots -> SUCCEEDS
+    await assertSucceeds(registeredUser.firestore().collection('black_spots').doc('spot_raw_1').get());
+
+    // 3. Anonymous read of public_pins -> SUCCEEDS
+    await assertSucceeds(unauthGuest.firestore().collection('public_pins').doc('pin_pub_1').get());
+  });
+
+  it('SEC-010: passenger cannot create audit_logs; sacco_manager must match actorRole claim; audit_logs are immutable', async () => {
+    const passenger = getContext('passenger_1', { activeRole: 'passenger' });
+    const saccoManager = getContext('sacco_mgr_1', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    const admin = getContext('admin_1', { activeRole: 'admin' });
+
+    // 1. Passenger cannot create any audit log entry
+    await assertFails(
+      passenger.firestore().collection('audit_logs').doc('log_1').set({
+        actorName: 'Passenger One',
+        actorRole: 'passenger',
+        action: 'TEST_ACTION',
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    // 2. SACCO manager forging actorRole: 'admin' fails
+    await assertFails(
+      saccoManager.firestore().collection('audit_logs').doc('log_spoof').set({
+        actorName: 'SACCO Mgr',
+        actorRole: 'admin',
+        action: 'SUSPEND_USER',
+        saccoId: 'sacco_A',
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    // 3. SACCO manager creating matching actorRole: 'sacco_manager' succeeds
+    await assertSucceeds(
+      saccoManager.firestore().collection('audit_logs').doc('log_valid').set({
+        actorName: 'SACCO Mgr',
+        actorRole: 'sacco_manager',
+        action: 'ADD_VEHICLE',
+        saccoId: 'sacco_A',
+        timestamp: new Date().toISOString(),
+      })
+    );
+
+    // 4. Update or delete audit_logs fails even for admin (immutable ledger)
+    await assertFails(
+      admin.firestore().collection('audit_logs').doc('log_valid').update({
+        action: 'MUTATED_ACTION',
+      })
+    );
+    await assertFails(admin.firestore().collection('audit_logs').doc('log_valid').delete());
+  });
+
+  it('DATA-001: team_users collection rules enforce tenant isolation', async () => {
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('team_users').doc('user_A').set({
+          email: 'driver@saccoA.com',
+          saccoId: 'sacco_A',
+          role: 'sacco_manager',
+        });
+        await context.firestore().collection('team_users').doc('user_B').set({
+          email: 'driver@saccoB.com',
+          saccoId: 'sacco_B',
+          role: 'sacco_manager',
+        });
+      });
+    } else {
+      offlineStore['team_users/user_A'] = { email: 'driver@saccoA.com', saccoId: 'sacco_A', role: 'sacco_manager' };
+      offlineStore['team_users/user_B'] = { email: 'driver@saccoB.com', saccoId: 'sacco_B', role: 'sacco_manager' };
+    }
+
+    const managerA = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+
+    // 1. Manager A can create a team_user for sacco_A
+    await assertSucceeds(
+      managerA.firestore().collection('team_users').doc('user_A_new').set({
+        email: 'new@saccoA.com',
+        saccoId: 'sacco_A',
+        role: 'sacco_manager',
+      })
+    );
+
+    // 2. Manager A cannot create a team_user for sacco_B
+    await assertFails(
+      managerA.firestore().collection('team_users').doc('user_B_spoof').set({
+        email: 'new@saccoB.com',
+        saccoId: 'sacco_B',
+        role: 'sacco_manager',
+      })
+    );
+
+    // 3. Manager A can read own sacco_A team_user
+    await assertSucceeds(managerA.firestore().collection('team_users').doc('user_A').get());
+
+    // 4. Manager A cannot read cross-tenant sacco_B team_user
+    await assertFails(managerA.firestore().collection('team_users').doc('user_B').get());
+  });
+
+  it('SEC-007: non-admin client write/read to processedEvents is denied', async () => {
+    const passenger = getContext('passenger_1', { activeRole: 'passenger' });
+    const admin = getContext('admin_1', { activeRole: 'admin' });
+
+    // 1. Client write to processedEvents is denied
+    await assertFails(
+      passenger.firestore().collection('processedEvents').doc('event_123').set({
+        eventId: 'event_123',
+        handler: 'computeVehicleRisk',
+      })
+    );
+
+    // 2. Non-admin read to processedEvents is denied
+    await assertFails(passenger.firestore().collection('processedEvents').doc('event_123').get());
+
+    // 3. Admin read to processedEvents succeeds
+    await assertSucceeds(admin.firestore().collection('processedEvents').doc('event_123').get());
+  });
+
+  it('SEC-006: user with stale saccoId claim but non-manager activeRole cannot access evidence storage', async () => {
+    // User with a leftover saccoId claim but activeRole: 'passenger'
+    const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
+    // Legitimate SACCO manager
+    const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+
+    // 1. Stale claim user access denied
+    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+
+    // 2. Legitimate manager access succeeds
+    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+  });
+
+  it('BE-001 / SEC-004: suspended user with isSuspended claim is denied Firestore writes', async () => {
+    // 1. Active passenger user write succeeds
+    const activePassenger = getContext('user_active_1', { activeRole: 'passenger', isSuspended: false });
+    await assertSucceeds(
+      activePassenger.firestore().collection('complaints').doc('complaint_101').set({
+        id: 'complaint_101',
+        saccoId: 'sacco_A',
+        vehicleRegNumber: 'KCA 123A',
+        description: 'Overcharging during peak hours',
+        category: 'overcharging',
+        status: 'open',
+        reportedByUid: 'user_active_1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    // 2. Suspended user with isSuspended: true claim write is denied by rules
+    const suspendedPassenger = getContext('user_suspended_1', { activeRole: 'passenger', isSuspended: true });
+    await assertFails(
+      suspendedPassenger.firestore().collection('complaints').doc('complaint_102').set({
+        id: 'complaint_102',
+        saccoId: 'sacco_A',
+        vehicleRegNumber: 'KCA 123A',
+        description: 'Unsafe driving report',
+        category: 'unsafe_driving',
+        status: 'open',
+        reportedByUid: 'user_suspended_1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  });
+
+  it('PRIV-001: users collection read restrictions enforce privacy (passenger A cannot read passenger B profile)', async () => {
+    offlineStore['users/passenger_A'] = { uid: 'passenger_A', displayName: 'Alice', phoneNumber: '+254711111111', role: 'passenger' };
+    offlineStore['users/passenger_B'] = { uid: 'passenger_B', displayName: 'Bob', phoneNumber: '+254722222222', role: 'passenger' };
+    offlineStore['users/sacco_user_A'] = { uid: 'sacco_user_A', displayName: 'Driver A', saccoId: 'sacco_A' };
+
+    const passengerA = getContext('passenger_A', { activeRole: 'passenger' });
+    const adminUser = getContext('admin_1', { activeRole: 'admin' });
+    const saccoManagerA = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+
+    // 1. Passenger A can read own profile
+    await assertSucceeds(passengerA.firestore().collection('users').doc('passenger_A').get());
+
+    // 2. Passenger A CANNOT read Passenger B profile
+    await assertFails(passengerA.firestore().collection('users').doc('passenger_B').get());
+
+    // 3. Admin can read anyone's profile
+    await assertSucceeds(adminUser.firestore().collection('users').doc('passenger_A').get());
+    await assertSucceeds(adminUser.firestore().collection('users').doc('passenger_B').get());
+
+    // 4. SACCO Manager A can read user in sacco_A
+    await assertSucceeds(saccoManagerA.firestore().collection('users').doc('sacco_user_A').get());
+
+    // 5. SACCO Manager A CANNOT read Passenger B (not in sacco_A)
+    await assertFails(saccoManagerA.firestore().collection('users').doc('passenger_B').get());
+  });
 });
+

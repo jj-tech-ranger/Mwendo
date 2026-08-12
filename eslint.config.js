@@ -3,7 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tsPlugin.config(
   {
-    ignores: ['dist/**', 'node_modules/**', '.aistudio/**'],
+    ignores: ['dist/**', 'node_modules/**', '.aistudio/**', 'apps/functions/lib/**'],
   },
   ...tsPlugin.configs.recommended,
   {

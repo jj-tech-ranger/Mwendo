@@ -1,18 +1,31 @@
 import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoNotificationsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [notifications, setNotifications] = useState<any[]>([]);
 
   const handleMarkAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

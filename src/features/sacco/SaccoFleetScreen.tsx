@@ -4,15 +4,16 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Vehicle } from '../../types';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoFleetScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'all' | 'provisional'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
@@ -40,6 +41,7 @@ export const SaccoFleetScreen: React.FC = () => {
   const [provisionalVehicles, setProvisionalVehicles] = useState<any[]>([]);
 
   const loadVehicles = async () => {
+    if (!saccoId) return;
     setLoading(true);
     try {
       const docs = await vehicleRepository.getAll([where('saccoId', '==', saccoId)]);
@@ -74,7 +76,8 @@ export const SaccoFleetScreen: React.FC = () => {
   };
 
   const handleSaveVehicle = async () => {
-    if (!formPlate) return;
+    if (!formPlate || !saccoId) return;
+
     const vehicleId = editingVehicle ? editingVehicle.id : `v_${Date.now()}`;
     const newVehicle: Vehicle = {
       id: vehicleId,
@@ -103,6 +106,7 @@ export const SaccoFleetScreen: React.FC = () => {
   };
 
   const handleConfirmClaim = async () => {
+    if (!saccoId) return;
     setIsClaiming(true);
     setTimeout(async () => {
       if (claimingVehicle) {
@@ -133,6 +137,18 @@ export const SaccoFleetScreen: React.FC = () => {
     const matchesSearch = v.regNumber.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

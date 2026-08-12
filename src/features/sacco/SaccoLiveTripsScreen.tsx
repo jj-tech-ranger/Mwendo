@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { tripRepository, alertRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoLiveTripsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeTab, setActiveTab] = useState<'map' | 'incidents'>('map');
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
@@ -19,6 +20,7 @@ export const SaccoLiveTripsScreen: React.FC = () => {
 
   useEffect(() => {
     async function loadLiveData() {
+      if (!saccoId) return;
       try {
         const liveTrips = await tripRepository.getAll([where('saccoId', '==', saccoId)]);
         if (liveTrips.length > 0) {
@@ -47,6 +49,18 @@ export const SaccoLiveTripsScreen: React.FC = () => {
       prev.map((inc) => (inc.id === id ? { ...inc, acknowledged: true } : inc))
     );
   };
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

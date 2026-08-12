@@ -4,15 +4,16 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { teamUserRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { TeamUser } from '../../types';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoUsersScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'roles'>('users');
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
@@ -24,6 +25,7 @@ export const SaccoUsersScreen: React.FC = () => {
   const [inviteRole, setInviteRole] = useState<'sacco_manager' | 'operations' | 'viewer'>('operations');
 
   const loadTeamUsers = async () => {
+    if (!saccoId) return;
     setLoading(true);
     try {
       const docs = await teamUserRepository.getAll([where('saccoId', '==', saccoId)]);
@@ -40,7 +42,7 @@ export const SaccoUsersScreen: React.FC = () => {
   }, [saccoId]);
 
   const handleInvite = async () => {
-    if (!inviteName || !inviteEmail) return;
+    if (!inviteName || !inviteEmail || !saccoId) return;
     const newUser: TeamUser = {
       id: `tu_${Date.now()}`,
       saccoId,
@@ -62,6 +64,18 @@ export const SaccoUsersScreen: React.FC = () => {
       setInviteEmail('');
     }
   };
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

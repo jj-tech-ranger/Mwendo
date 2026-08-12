@@ -3,10 +3,12 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { MfaEnrollmentScreen } from '../auth/MfaEnrollmentScreen';
 
 export const AdminSecurityScreen: React.FC = () => {
   const { user: currentAdmin } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'security' | 'backup'>('security');
+  const [showMfaModal, setShowMfaModal] = useState(false);
 
   // Restore Backup Confirmation State
   const [selectedBackupToRestore, setSelectedBackupToRestore] = useState<string | null>(null);
@@ -92,17 +94,27 @@ export const AdminSecurityScreen: React.FC = () => {
             </h3>
 
             <div className="space-y-md text-xs font-body-sm">
-              {/* TODO: Implement Google Cloud Identity Platform TOTP mandatory MFA for admin/authority per master-architecture.md §5.5 */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-md rounded-xl bg-surface-container-low gap-2">
                 <div>
                   <p className="font-bold text-on-surface">Mandatory MFA for System Admins</p>
-                  <p className="text-[11px] text-on-surface-variant">Requires TOTP or SMS verification for /admin access.</p>
+                  <p className="text-[11px] text-on-surface-variant">Requires Google Cloud Identity Platform TOTP verification for /admin access.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="warning">MFA: Not yet configured</Badge>
-                  <Button size="sm" variant="outline" disabled className="text-[10px] py-1 px-2">
-                    Set up MFA
-                  </Button>
+                  {currentAdmin?.isMfaEnrolled ? (
+                    <>
+                      <Badge variant="success">MFA: Configured (TOTP)</Badge>
+                      <Button size="sm" variant="outline" onClick={() => setShowMfaModal(true)} className="text-[10px] py-1 px-2">
+                        Reconfigure
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="warning">MFA: Mandatory (Pending)</Badge>
+                      <Button size="sm" variant="primary" onClick={() => setShowMfaModal(true)} className="text-[10px] py-1 px-2">
+                        Set up MFA
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -220,6 +232,10 @@ export const AdminSecurityScreen: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+      {/* MFA Enrollment Modal */}
+      {showMfaModal && (
+        <MfaEnrollmentScreen isModal onClose={() => setShowMfaModal(false)} />
       )}
     </div>
   );

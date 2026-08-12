@@ -22,6 +22,8 @@ export interface UserProfile {
   badgeNumber?: string | undefined;
   isVerified: boolean;
   isActive: boolean;
+  isMfaEnrolled?: boolean | undefined;
+  isMfaVerified?: boolean | undefined;
   isAnonymous?: boolean | undefined;
   trustScore?: number | undefined;
   emergencyContacts?: Array<{ name: string; phone: string; relationship: string }> | undefined;
@@ -34,7 +36,7 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-export type TripStatus = 'scheduled' | 'active' | 'completed' | 'auto_completed' | 'cancelled' | 'discarded';
+export type TripStatus = 'active' | 'completed' | 'auto_completed' | 'incomplete_signal_lost' | 'discarded';
 
 export interface GPSPoint {
   latitude: number;
@@ -198,6 +200,7 @@ export interface Complaint {
   saccoId: string;
   vehicleRegNumber?: string;
   passengerName?: string;
+  reportedByUid?: string;
   title: string;
   description: string;
   status: 'open' | 'investigating' | 'resolved';

@@ -2,15 +2,16 @@ import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 import { useToast } from '../../components/ui/Toast';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoReportsScreen: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [generating, setGenerating] = useState(false);
   const [reportReady, setReportReady] = useState(false);
@@ -26,6 +27,18 @@ export const SaccoReportsScreen: React.FC = () => {
       setReportReady(true);
     }, 1500);
   };
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

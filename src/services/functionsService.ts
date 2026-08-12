@@ -46,21 +46,35 @@ export const functionsService = {
    */
   async computeVehicleRisk(event: VehicleRiskEvent): Promise<{ processed: boolean; riskScore: number; riskTier: string }> {
     const ledgerRef = doc(db, 'processedEvents', event.eventId);
-    const ledgerSnap = await getDoc(ledgerRef);
+    let isAlreadyProcessed = false;
 
     // Idempotency check
-    if (ledgerSnap.exists()) {
+    // This client-side idempotency guard is best-effort only post-SEC-007; the authoritative guard requires the Cloud-Functions Admin-SDK write path landing in Phase 3 (BE-001).
+    try {
+      const ledgerSnap = await getDoc(ledgerRef);
+      if (ledgerSnap.exists()) {
+        isAlreadyProcessed = true;
+      }
+    } catch {
+      // Ignored: Post-SEC-007, processedEvents is read/write restricted to Admin/Server SDK.
+    }
+
+    if (isAlreadyProcessed) {
       console.log(`[computeVehicleRisk] Event ${event.eventId} already processed.`);
       return { processed: false, riskScore: 0, riskTier: 'existing' };
     }
 
-    // Mark event as processed in ledger
-    await setDoc(ledgerRef, {
-      eventId: event.eventId,
-      handler: 'computeVehicleRisk',
-      vehicleRegNumber: event.vehicleRegNumber,
-      processedAt: new Date().toISOString(),
-    });
+    try {
+      // Mark event as processed in ledger
+      await setDoc(ledgerRef, {
+        eventId: event.eventId,
+        handler: 'computeVehicleRisk',
+        vehicleRegNumber: event.vehicleRegNumber,
+        processedAt: new Date().toISOString(),
+      });
+    } catch {
+      // Ignored: Post-SEC-007, non-admin client writes to processedEvents are blocked by security rules.
+    }
 
     // Lookup vehicle and past risk events
     const vehicleId = event.vehicleId || event.vehicleRegNumber.replace(/\s+/g, '_');
@@ -233,6 +247,8 @@ export const functionsService = {
   /**
    * Gen 2 Function: syncPublicPins (§9.5)
    * Periodically syncs high-severity black spots to the lightweight public_pins collection.
+   * NOTE (SEC-005 / §7.3): syncPublicPins MUST ONLY copy records where verifiedByAuthority: true / status: 'published'.
+   * It MUST NEVER copy reportedByUid, user PII, or unmoderated reports to public_pins. The real version will be enforced in Phase 3 backend Cloud Functions.
    */
   async syncPublicPins(): Promise<{ syncedCount: number }> {
     const spotsQuery = query(
@@ -474,6 +490,36 @@ export const functionsService = {
       return res.data;
     } catch (err) {
       console.warn(`[functionsService] Cloud Function ${functionName} remote call failed, invoking local fallback:`, err);
+      if (functionName === 'suspendUser') {
+        const targetUid = data.targetUid;
+        await updateDoc(doc(db, 'users', targetUid), {
+          isActive: false,
+          updatedAt: new Date().toISOString(),
+        });
+        await setDoc(doc(collection(db, 'audit_logs')), {
+          action: `SUSPEND_USER (${data.reason || 'Admin action'})`,
+          actorName: 'System Admin',
+          actorRole: 'admin',
+          target: `User ID: ${targetUid}`,
+          timestamp: new Date().toISOString(),
+        });
+        return { success: true, targetUid, isSuspended: true } as any;
+      }
+      if (functionName === 'reactivateUser') {
+        const targetUid = data.targetUid;
+        await updateDoc(doc(db, 'users', targetUid), {
+          isActive: true,
+          updatedAt: new Date().toISOString(),
+        });
+        await setDoc(doc(collection(db, 'audit_logs')), {
+          action: 'UNSUSPEND_USER',
+          actorName: 'System Admin',
+          actorRole: 'admin',
+          target: `User ID: ${targetUid}`,
+          timestamp: new Date().toISOString(),
+        });
+        return { success: true, targetUid, isSuspended: false } as any;
+      }
       if (functionName === 'computeVehicleRisk') {
         return (await this.computeVehicleRisk(data)) as any;
       }

@@ -4,15 +4,16 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { driverRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Driver } from '../../types';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoDriversScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +28,7 @@ export const SaccoDriversScreen: React.FC = () => {
   const [assignedVehicleReg, setAssignedVehicleReg] = useState('');
 
   const loadDrivers = async () => {
+    if (!saccoId) return;
     setLoading(true);
     try {
       const docs = await driverRepository.getAll([where('saccoId', '==', saccoId)]);
@@ -43,7 +45,7 @@ export const SaccoDriversScreen: React.FC = () => {
   }, [saccoId]);
 
   const handleAddDriver = async () => {
-    if (!name || !licenseNumber) return;
+    if (!name || !licenseNumber || !saccoId) return;
     const newDriver: Driver = {
       id: `d_${Date.now()}`,
       name,
@@ -76,6 +78,18 @@ export const SaccoDriversScreen: React.FC = () => {
     d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     d.licenseNumber.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

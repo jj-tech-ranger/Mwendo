@@ -3,23 +3,25 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { auditLogRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { AuditLog } from '../../types';
 import { useToast } from '../../components/ui/Toast';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoSettingsScreen: React.FC = () => {
   const { showToast } = useToast();
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'audit' | 'help'>('profile');
   const [logs, setLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
     async function loadLogs() {
+      if (!saccoId) return;
       try {
         const docs = await auditLogRepository.getAll([where('saccoId', '==', saccoId)]);
         if (docs.length > 0) {
@@ -52,6 +54,18 @@ export const SaccoSettingsScreen: React.FC = () => {
     }
     loadLogs();
   }, [saccoId]);
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

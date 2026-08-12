@@ -14,6 +14,7 @@ import {
   User as FirebaseUser,
   EmailAuthProvider,
   linkWithCredential,
+  getMultiFactorResolver,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
@@ -72,6 +73,8 @@ export const authService = {
         authorityId: data.authorityId,
         isVerified: firebaseUser.emailVerified || data.isVerified || false,
         isActive: data.isActive !== false,
+        isMfaEnrolled: Boolean(data.isMfaEnrolled),
+        isMfaVerified: Boolean(data.isMfaVerified),
         createdAt: data.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         isAnonymous: firebaseUser.isAnonymous,
@@ -88,6 +91,8 @@ export const authService = {
       role: defaultRole,
       isVerified: firebaseUser.emailVerified || false,
       isActive: true,
+      isMfaEnrolled: false,
+      isMfaVerified: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       isAnonymous: firebaseUser.isAnonymous,
@@ -104,8 +109,19 @@ export const authService = {
   },
 
   async signInWithEmail(email: string, pass: string) {
-    const cred = await signInWithEmailAndPassword(auth, email, pass);
-    return await this.fetchOrInitUserProfile(cred.user);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
+      return await this.fetchOrInitUserProfile(cred.user);
+    } catch (err: any) {
+      if (err.code === 'auth/multi-factor-auth-required') {
+        const resolver = getMultiFactorResolver(auth, err);
+        const mfaError = new Error('Multi-factor authentication required.');
+        (mfaError as any).code = 'auth/multi-factor-auth-required';
+        (mfaError as any).resolver = resolver;
+        throw mfaError;
+      }
+      throw err;
+    }
   },
 
   async registerWithEmail(email: string, pass: string, displayName: string, role: UserRole = 'passenger') {

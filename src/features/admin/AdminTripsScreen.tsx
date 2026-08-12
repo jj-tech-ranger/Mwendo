@@ -42,11 +42,18 @@ export const AdminTripsScreen: React.FC = () => {
             Auto Completed
           </span>
         );
+      case 'incomplete_signal_lost':
+        return (
+          <span className="font-label-mono text-[10px] text-amber-600 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-bold">
+            Signal Lost
+          </span>
+        );
       case 'discarded':
-      case 'cancelled':
-        return <Badge variant="danger">Discarded / Cancelled</Badge>;
-      default:
-        return <Badge variant="neutral">{s}</Badge>;
+        return <Badge variant="danger">Discarded</Badge>;
+      default: {
+        const _exhaustive: never = s;
+        return <Badge variant="neutral">{_exhaustive}</Badge>;
+      }
     }
   };
 
@@ -121,6 +128,7 @@ export const AdminTripsScreen: React.FC = () => {
           <option value="active">active</option>
           <option value="completed">completed</option>
           <option value="auto_completed">auto_completed</option>
+          <option value="incomplete_signal_lost">incomplete_signal_lost</option>
           <option value="discarded">discarded</option>
         </select>
       </div>

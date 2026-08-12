@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { driverRepository, vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Driver, Vehicle } from '../../types';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoAnalyticsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'leaderboards'>('analytics');
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -17,6 +18,7 @@ export const SaccoAnalyticsScreen: React.FC = () => {
 
   useEffect(() => {
     async function loadData() {
+      if (!saccoId) return;
       try {
         const [dList, vList] = await Promise.all([
           driverRepository.getAll([where('saccoId', '==', saccoId)]),
@@ -33,6 +35,18 @@ export const SaccoAnalyticsScreen: React.FC = () => {
 
   const topDrivers = [...drivers].sort((a, b) => b.safetyScore - a.safetyScore);
   const flaggedVehicles = vehicles.filter((v) => v.status === 'suspended' || v.status === 'maintenance');
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

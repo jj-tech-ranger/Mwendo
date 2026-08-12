@@ -103,6 +103,8 @@ describe('RoleGuard - Route Level Security', () => {
         email: 'admin@test.com',
         displayName: 'Admin User',
         role: 'admin',
+        isMfaEnrolled: true,
+        isMfaVerified: true,
         isActive: true,
         isVerified: true,
         createdAt: '2026-01-01',

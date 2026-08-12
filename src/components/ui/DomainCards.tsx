@@ -5,6 +5,7 @@ import { Avatar } from './Avatar';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { cn } from '../../lib/utils';
+import { TripStatus } from '../../types';
 
 /* ==========================================
  * 1. MetricCard / StatCard
@@ -182,7 +183,7 @@ export interface TripCardProps {
   maxSpeedKmh: number;
   violationsCount: number;
   safetyScore: number;
-  status: 'active' | 'completed' | 'auto_completed' | 'incomplete_signal_lost';
+  status: TripStatus;
   onSelect?: () => void;
   className?: string;
 }

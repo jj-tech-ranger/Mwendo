@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { tripRepository, violationRepository, vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoDashboard: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -25,6 +26,7 @@ export const SaccoDashboard: React.FC = () => {
 
   useEffect(() => {
     async function loadSaccoData() {
+      if (!saccoId) return;
       setLoading(true);
       try {
         const [trips, vehicles, violations] = await Promise.all([
@@ -49,6 +51,18 @@ export const SaccoDashboard: React.FC = () => {
 
     loadSaccoData();
   }, [saccoId]);
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

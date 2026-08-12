@@ -6,14 +6,16 @@ import { OfflineBanner } from '../common/OfflineBanner';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { LanguageToggle } from '../common/LanguageToggle';
 import { useAuthStore } from '../../store/useAuthStore';
+import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoShell: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const { user, setUser } = useAuthStore();
 
-  const currentSaccoId = user?.saccoId || 'sacco_metrolink';
-  const currentSaccoName = currentSaccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const currentSaccoId = getEffectiveSaccoId(user?.saccoId) || 'sacco_metrolink';
+  const currentSaccoName = getSaccoName(currentSaccoId);
 
   const handleSwitchSacco = (newSaccoId: string) => {
     if (!user) return;
@@ -93,8 +95,8 @@ export const SaccoShell: React.FC = () => {
             </button>
           </div>
 
-          {/* SACCO Active Switcher Badge */}
-          {!isCollapsed && (
+          {/* SACCO Active Switcher Badge (Dev Only) */}
+          {SHOW_DEV_TOOLS && !isCollapsed && (
             <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 overflow-hidden">
                 <span className="material-symbols-outlined text-primary text-base">domain</span>

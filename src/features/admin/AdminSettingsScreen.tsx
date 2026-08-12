@@ -3,10 +3,12 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 import { useAuthStore } from '../../store/useAuthStore';
+import { MfaEnrollmentScreen } from '../auth/MfaEnrollmentScreen';
 
 export const AdminSettingsScreen: React.FC = () => {
   const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'settings' | 'profile' | 'docs' | 'states'>('settings');
+  const [showMfaModal, setShowMfaModal] = useState(false);
 
   return (
     <div className="space-y-lg">
@@ -130,15 +132,24 @@ export const AdminSettingsScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2 text-xs font-body-sm">
-            {/* TODO: Implement Google Cloud Identity Platform TOTP mandatory MFA for admin/authority per master-architecture.md §5.5 */}
             <div className="p-md rounded-xl bg-surface-container-low flex items-center justify-between">
               <div>
                 <span className="block font-bold">Security Status</span>
-                <span className="text-[10px] text-on-surface-variant font-mono">MFA: Not yet configured</span>
+                {user?.isMfaEnrolled ? (
+                  <span className="text-[10px] text-emerald-600 font-mono font-bold">MFA: Configured (TOTP)</span>
+                ) : (
+                  <span className="text-[10px] text-amber-600 font-mono font-bold">MFA: Mandatory (Pending)</span>
+                )}
               </div>
-              <Button size="sm" variant="outline" disabled className="text-[10px] py-1 px-2">
-                Set up MFA
-              </Button>
+              {user?.isMfaEnrolled ? (
+                <Button size="sm" variant="outline" onClick={() => setShowMfaModal(true)} className="text-[10px] py-1 px-2">
+                  Reconfigure
+                </Button>
+              ) : (
+                <Button size="sm" variant="primary" onClick={() => setShowMfaModal(true)} className="text-[10px] py-1 px-2">
+                  Set up MFA
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -186,6 +197,9 @@ export const AdminSettingsScreen: React.FC = () => {
             <div className="h-4 bg-slate-800 rounded w-1/2" />
           </div>
         </div>
+      )}
+      {showMfaModal && (
+        <MfaEnrollmentScreen isModal onClose={() => setShowMfaModal(false)} />
       )}
     </div>
   );

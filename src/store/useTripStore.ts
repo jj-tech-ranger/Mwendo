@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Trip, GPSPoint } from '../types';
+import { useAuthStore } from './useAuthStore';
 
 interface TripState {
   activeTrip: Trip | null;
@@ -39,9 +40,12 @@ export const useTripStore = create<TripState>((set, get) => ({
   plateNumber: '',
 
   startTrip: ({ plateNumber, saccoName, routeName }) => {
+    const currentUser = useAuthStore.getState().user;
+    const userId = currentUser?.uid || currentUser?.id;
     const newTrip: Trip = {
       id: `trip_${Date.now()}`,
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
+      ...(userId ? { userId } : {}),
       vehicleRegNumber: plateNumber.toUpperCase(),
       plateNumber: plateNumber.toUpperCase(),
       saccoId: 'sacco_metrolink',

@@ -17,6 +17,10 @@ service cloud.firestore {
       return request.auth != null && isNotSuspended();
     }
 
+    function isRegisteredUser() {
+      return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -62,9 +66,24 @@ service cloud.firestore {
     }
 
     // Users Collection
+    // SECURITY NOTICE (SEC-009): The roles, activeRole, saccoId, authorityId, authorityScope, and badgeNumber fields
+    // in the Firestore users document are display/UI-convenience fields ONLY. They must NEVER be treated as an
+    // authorization source in Firestore security rules or backend services — the ONLY authorization source
+    // for security rules is request.auth.token.activeRole (custom claim).
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isOwner(userId);
+      allow read: if isSignedIn() && (
+        isOwner(userId) || isAdmin() || isAuthority() ||
+        (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId)
+      );
+      allow create: if isSignedIn() && isOwner(userId)
+        && (!('role' in request.resource.data) || request.resource.data.role == 'passenger')
+        && request.resource.data.activeRole == 'passenger'
+        && request.resource.data.roles == ['passenger']
+        && !('saccoId' in request.resource.data)
+        && !('authorityId' in request.resource.data)
+        && !('authorityScope' in request.resource.data)
+        && !('badgeNumber' in request.resource.data)
+        && !('isActive' in request.resource.data && request.resource.data.isActive != true);
       allow update: if (
         isAdmin() || (
           isOwner(userId) &&
@@ -90,7 +109,7 @@ service cloud.firestore {
         isAdmin() ||
         hasActiveRole('authority')
       );
-      allow create: if isSignedIn();
+      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
@@ -101,7 +120,7 @@ service cloud.firestore {
 
     // Vehicles Collection
     match /vehicles/{vehicleId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
       allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
       // Disallow client updates modifying riskScore or riskTier (must be computed by server Cloud Functions Gen2)
       allow update: if (isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId))
@@ -127,8 +146,8 @@ service cloud.firestore {
 
     // Black Spots Collection
     match /black_spots/{spotId} {
-      allow read: if true; // Public access for commuters/drivers
-      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
       allow update: if isAuthority() || isAdmin() || (
         isSignedIn() && resource.data.reportedByUid == request.auth.uid
       );
@@ -143,7 +162,7 @@ service cloud.firestore {
         isAdmin() ||
         hasActiveRole('authority')
       );
-      allow create: if isSignedIn();
+      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
@@ -160,22 +179,26 @@ service cloud.firestore {
         isAdmin() ||
         hasActiveRole('authority')
       );
-      allow create: if isSignedIn();
+      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
       allow update: if (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority();
       allow delete: if isAdmin();
     }
 
     // Complaints Collection
     match /complaints/{complaintId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow read: if isSignedIn() && (
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+        isAuthority() || isAdmin() ||
+        resource.data.reportedByUid == request.auth.uid
+      );
+      allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
+      allow update: if isAuthority() || isAdmin() || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId));
       allow delete: if isAdmin();
     }
 
     // Drivers Collection
     match /drivers/{driverId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
       allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
       allow update: if isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId);
       allow delete: if isAdmin();
@@ -190,13 +213,23 @@ service cloud.firestore {
     // Audit Logs Collection
     match /audit_logs/{logId} {
       allow read: if isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId);
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow create: if (isAuthority() || isAdmin() || hasActiveRole('sacco_manager'))
+        && request.resource.data.actorRole == getActiveRole();
+      allow update, delete: if false;
+    }
+
+    // Team Users Collection
+    match /team_users/{teamUserId} {
+      allow read: if isSignedIn() && (isAdmin() || isSaccoManager(resource.data.saccoId));
+      allow create: if isSaccoManager(request.resource.data.saccoId);
+      allow update: if isAdmin() || isSaccoManager(resource.data.saccoId);
+      allow delete: if isAdmin() || isSaccoManager(resource.data.saccoId);
     }
 
     // Processed Events Idempotency Ledger
     match /processedEvents/{eventId} {
-      allow read, write: if isSignedIn();
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // Public Pins Sync

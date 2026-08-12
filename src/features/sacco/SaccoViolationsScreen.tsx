@@ -4,15 +4,16 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { violationRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Violation } from '../../types';
+import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoViolationsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const saccoId = user?.saccoId || 'sacco_metrolink';
-  const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
+  const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [violations, setViolations] = useState<Violation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +21,7 @@ export const SaccoViolationsScreen: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const loadViolations = async () => {
+    if (!saccoId) return;
     setLoading(true);
     try {
       const docs = await violationRepository.getAll([where('saccoId', '==', saccoId)]);
@@ -41,6 +43,18 @@ export const SaccoViolationsScreen: React.FC = () => {
       v.vehicleRegNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (v.violationId && v.violationId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  if (!saccoId) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Account Not Fully Provisioned"
+        description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

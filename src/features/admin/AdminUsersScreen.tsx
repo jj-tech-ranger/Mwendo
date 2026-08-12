@@ -1,19 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { userRepository, auditLogRepository } from '../../repositories';
-import { UserProfile, UserRole } from '../../types';
+import { userRepository } from '../../repositories';
+import { UserProfile } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { functionsService } from '../../services/functionsService';
 
 export const AdminUsersScreen: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch !== null) {
+      setSearchQuery(urlSearch);
+    }
+  }, [searchParams]);
 
   // Selected User for Drawer/Detail
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -50,28 +60,19 @@ export const AdminUsersScreen: React.FC = () => {
     const newStatus = !isSuspending;
 
     try {
-      // ARCHITECTURE NOTE: Token-based custom claims (e.g., `isSuspended: true` set via Firebase Admin SDK)
-      // can lag up to ~1 hour behind the Firestore document write due to client-side ID token caching.
-      // In a production backend, this client-side `userRepository.update` should also trigger a Cloud Function
-      // (e.g., `adminSuspendUser`) that sets the custom claim (`isSuspended: true`) and calls
-      // `admin.auth().revokeRefreshTokens(uid)` to immediately invalidate the suspended user's active session.
-      //
-      // 1. Live Firestore Update (updates real state)
-      await userRepository.update(userToSuspend.id, {
-        isActive: newStatus,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // 2. Write Audit Log entry
-      await auditLogRepository.save({
-        id: `audit-${Date.now()}`,
-        saccoId: userToSuspend.saccoId || 'PLATFORM_GLOBAL',
-        actorName: currentAdmin?.displayName || 'System Admin',
-        actorRole: 'admin',
-        action: isSuspending ? `SUSPEND_USER (${suspendReason})` : 'UNSUSPEND_USER',
-        target: `User ID: ${userToSuspend.id} (${userToSuspend.displayName})`,
-        timestamp: new Date().toISOString(),
-      });
+      // BE-001 / SEC-004: User suspension is executed server-side via Cloud Function callable.
+      // The function sets users/{uid}.isActive = false, sets the isSuspended custom claim in Firebase Auth,
+      // revokes active refresh tokens, and records an audit log entry.
+      if (isSuspending) {
+        await functionsService.callCloudFunction('suspendUser', {
+          targetUid: userToSuspend.id,
+          reason: suspendReason,
+        });
+      } else {
+        await functionsService.callCloudFunction('reactivateUser', {
+          targetUid: userToSuspend.id,
+        });
+      }
 
       // Update local state
       setUsers((prev) =>
