@@ -3,6 +3,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { AppRoutes } from './routes';
 import { authService } from './services/authService';
+import { MaintenanceGate } from './components/MaintenanceGate';
+import { ToastProvider } from './components/ui/Toast';
 import './services/i18n';
 
 export function App() {
@@ -13,7 +15,11 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppRoutes />
+      <ToastProvider>
+        <MaintenanceGate>
+          <AppRoutes />
+        </MaintenanceGate>
+      </ToastProvider>
     </QueryClientProvider>
   );
 }

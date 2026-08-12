@@ -28,6 +28,12 @@ export const AdminSystemHealthScreen: React.FC = () => {
 
   return (
     <div className="bg-[#0A0F1D] text-slate-100 p-lg sm:p-xl rounded-2xl border border-slate-800 space-y-lg font-label-mono shadow-2xl">
+      {/* Simulation Banner */}
+      <div className="p-sm px-md rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-2">
+        <span className="material-symbols-outlined text-base text-amber-400">warning</span>
+        <span>Simulated data — not connected to live monitoring</span>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-slate-800 pb-md">
         <div>

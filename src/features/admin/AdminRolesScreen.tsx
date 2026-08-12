@@ -72,11 +72,6 @@ export const AdminRolesScreen: React.FC = () => {
       permissions: [],
     },
     {
-      name: 'SACCO Official',
-      code: 'sacco_official',
-      permissions: [],
-    },
-    {
       name: 'Passenger / Commuter',
       code: 'passenger',
       permissions: [],
@@ -95,7 +90,7 @@ export const AdminRolesScreen: React.FC = () => {
           </p>
         </div>
 
-        <Badge variant="info">5 Platform Roles Defined</Badge>
+        <Badge variant="info">4 Platform Roles Defined</Badge>
       </div>
 
       {/* Architecture Context Callout */}

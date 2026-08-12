@@ -3,11 +3,11 @@ import { cn } from '../../lib/utils';
 
 export interface FilterChipProps {
   label: string;
-  isActive?: boolean;
-  count?: number;
-  icon?: string;
-  onClick?: () => void;
-  className?: string;
+  isActive?: boolean | undefined;
+  count?: number | undefined;
+  icon?: string | undefined;
+  onClick?: (() => void) | undefined;
+  className?: string | undefined;
 }
 
 export const FilterChip: React.FC<FilterChipProps> = ({

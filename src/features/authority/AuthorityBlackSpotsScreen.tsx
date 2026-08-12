@@ -3,10 +3,13 @@ import { blackSpotRepository, auditLogRepository } from '../../repositories';
 import { BlackSpot, SeverityLevel, HazardType } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AuthorityBlackSpotsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [blackSpots, setBlackSpots] = useState<BlackSpot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,29 +67,6 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
 
   // Heat map markers
   const mapMarkers: MapMarker[] = useMemo(() => {
-    if (filteredSpots.length === 0) {
-      return [
-        {
-          id: 'b1',
-          lat: -1.286389,
-          lng: 36.817223,
-          type: 'blackspot',
-          title: 'A104 Waiyaki Way - Kangemi Blackspot',
-          subtitle: 'Accident Prone Corridor • 18 Crashes Logged',
-          severity: 'high',
-        },
-        {
-          id: 'b2',
-          lat: -1.25,
-          lng: 36.89,
-          type: 'blackspot',
-          title: 'Thika Superhighway - Githurai Unmarked Bump',
-          subtitle: 'Unmarked Speed Bump Hazard',
-          severity: 'medium',
-        },
-      ];
-    }
-
     return filteredSpots.map((spot, idx) => ({
       id: spot.id || `spot-${idx}`,
       lat: spot.latitude || -1.286389 + (idx % 3) * 0.03,
@@ -128,7 +108,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error('Failed to verify black spot:', err);
-      alert('Error updating black spot status.');
+      showToast('error', 'Update Failed', 'Error updating black spot status.');
     }
   };
 
@@ -136,7 +116,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
   const handleCreateSpot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName || !formRoute) {
-      alert('Please fill in title and route name.');
+      showToast('warning', 'Missing Fields', 'Please fill in title and route name.');
       return;
     }
 
@@ -174,7 +154,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error('Failed to publish black spot:', err);
-      alert('Failed to publish black spot.');
+      showToast('error', 'Publish Failed', 'Failed to publish black spot.');
     }
   };
 
@@ -333,46 +313,15 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
                     </tr>
                   ))
                 ) : (
-                  [
-                    {
-                      id: 'bs-1',
-                      name: 'A104 Waiyaki Way - Kangemi Flyover',
-                      routeName: 'Nairobi - Nakuru Highway',
-                      county: 'Nairobi',
-                      hazardType: 'accident_prone',
-                      severity: 'critical' as SeverityLevel,
-                      accidentCount12M: 24,
-                    },
-                    {
-                      id: 'bs-2',
-                      name: 'Thika Superhighway - Githurai Unmarked Bumps',
-                      routeName: 'Thika Superhighway',
-                      county: 'Kiambu',
-                      hazardType: 'unmarked_bump',
-                      severity: 'high' as SeverityLevel,
-                      accidentCount12M: 11,
-                    },
-                  ].map((spot) => (
-                    <tr key={spot.id} className="hover:bg-surface-container-low/50">
-                      <td className="py-3 px-3 font-bold text-on-surface">{spot.name}</td>
-                      <td className="py-3 px-3 text-on-surface-variant">{spot.routeName}</td>
-                      <td className="py-3 px-3 font-label-mono">{spot.county}</td>
-                      <td className="py-3 px-3 uppercase text-[11px] font-label-mono text-outline">
-                        {spot.hazardType}
-                      </td>
-                      <td className="py-3 px-3">
-                        <Badge variant={spot.severity === 'critical' ? 'danger' : 'warning'}>
-                          {spot.severity.toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-3 font-label-mono font-bold text-rose-600">
-                        {spot.accidentCount12M}
-                      </td>
-                      <td className="py-3 px-3">
-                        <Badge variant="success">VERIFIED & LIVE</Badge>
-                      </td>
-                    </tr>
-                  ))
+                  <tr key="empty">
+                    <td colSpan={7} className="py-8">
+                      <EmptyState
+                        title="No Black Spots Registered"
+                        description="No official black spots registered yet."
+                        icon="report_problem"
+                      />
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

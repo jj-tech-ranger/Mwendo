@@ -3,9 +3,12 @@ import { inspectionReportRepository, vehicleRepository, auditLogRepository } fro
 import { InspectionReport, Vehicle } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AuthorityInspectionsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [reports, setReports] = useState<InspectionReport[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -69,7 +72,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
   const handleSaveInspection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!plate) {
-      alert('Vehicle registration plate is required.');
+      showToast('warning', 'Plate Required', 'Vehicle registration plate is required.');
       return;
     }
 
@@ -117,7 +120,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       console.error('Failed to save inspection report:', err);
-      alert('Error saving inspection report.');
+      showToast('error', 'Save Failed', 'Error saving inspection report.');
     }
   };
 
@@ -262,64 +265,15 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                     </tr>
                   ))
                 ) : (
-                  [
-                    {
-                      id: 'insp-1',
-                      vehicleRegNumber: 'KCG 482B',
-                      saccoName: 'MetroLink Express',
-                      county: 'Nairobi',
-                      speedGovernorStatus: 'valid' as const,
-                      brakeStatus: 'pass' as const,
-                      tireStatus: 'pass' as const,
-                      overallResult: 'passed' as const,
-                      certificateNumber: 'NTSA-CERT-884912',
-                      expiryDate: '2027-08-08',
-                      inspectorName: 'Inspector Omondi (NTSA-882)',
-                    },
-                    {
-                      id: 'insp-2',
-                      vehicleRegNumber: 'KDA 912Z',
-                      saccoName: '2NK Sacco',
-                      county: 'Kiambu',
-                      speedGovernorStatus: 'tampered' as const,
-                      brakeStatus: 'fail' as const,
-                      tireStatus: 'pass' as const,
-                      overallResult: 'impounded' as const,
-                      inspectorName: 'Inspector Kamau (NTSA-410)',
-                    },
-                  ].map((r) => (
-                    <tr key={r.id} className="hover:bg-surface-container-low/50">
-                      <td className="py-3 px-3 font-bold text-on-surface">{r.vehicleRegNumber}</td>
-                      <td className="py-3 px-3 text-on-surface-variant">{r.saccoName}</td>
-                      <td className="py-3 px-3 font-label-mono">{r.county}</td>
-                      <td className="py-3 px-3">
-                        <Badge variant={r.speedGovernorStatus === 'valid' ? 'success' : 'danger'}>
-                          {r.speedGovernorStatus.toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-3 font-label-mono text-[11px]">
-                        Brakes: {r.brakeStatus.toUpperCase()} | Tires: {r.tireStatus.toUpperCase()}
-                      </td>
-                      <td className="py-3 px-3">
-                        <Badge variant={r.overallResult === 'passed' ? 'success' : 'danger'}>
-                          {r.overallResult.toUpperCase()}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-3 font-label-mono text-outline">
-                        {r.certificateNumber ? (
-                          <div>
-                            <div className="text-primary font-bold">{r.certificateNumber}</div>
-                            <div className="text-[10px]">Exp: {r.expiryDate}</div>
-                          </div>
-                        ) : (
-                          'No Certificate Issued'
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-on-surface-variant text-[11px]">
-                        {r.inspectorName}
-                      </td>
-                    </tr>
-                  ))
+                  <tr key="empty">
+                    <td colSpan={8} className="py-8">
+                      <EmptyState
+                        title="No Inspections Logged"
+                        description="No vehicle inspection reports logged yet."
+                        icon="fact_check"
+                      />
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

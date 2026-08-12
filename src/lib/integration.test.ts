@@ -27,15 +27,16 @@ describe('End-to-End Simulation Test: Synthetic Trip Violation & Risk Score Move
     // 2. Run overspeed detection algorithm (uses SpeedSmoother EMA)
     const violations = detectOverspeedViolations(syntheticTripSamples, 80);
     expect(violations.length).toBe(1);
-    expect(violations[0].maxSpeedKmH).toBeGreaterThan(95);
-    expect(violations[0].durationSec).toBeGreaterThanOrEqual(4.0);
+    expect(violations[0]?.maxSpeedKmH).toBeGreaterThan(95);
+    expect(violations[0]?.durationSec).toBeGreaterThanOrEqual(4.0);
 
     // 3. Compute risk score movement after trip completion & violation trigger
     const newTripCount = initialTripCount + 1;
     const currentEventTime = baseTime + 5000;
 
     // Severity for overspeed is 'high' (penalty 18)
-    const eventSeverity: 'low' | 'medium' | 'high' | 'critical' = violations[0].maxSpeedKmH > 110 ? 'critical' : 'high';
+    const maxSpd = violations[0]?.maxSpeedKmH ?? 0;
+    const eventSeverity: 'low' | 'medium' | 'high' | 'critical' = maxSpd > 110 ? 'critical' : 'high';
     const riskEvents = [{ severity: eventSeverity, timestamp: currentEventTime }];
 
     const { riskScore: newRiskScore, riskTier } = calculateVehicleRiskScore(

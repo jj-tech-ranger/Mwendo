@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -7,6 +7,11 @@ import { Dialog } from '../../components/ui/Dialog';
 import { useTripStore } from '../../store/useTripStore';
 import { tripRepository } from '../../repositories';
 import { offlineStorage } from '../../services/offlineStorage';
+import { storageService } from '../../services/storageService';
+import { useAuthStore } from '../../store/useAuthStore';
+import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
+import { remoteConfigService } from '../../services/remoteConfigService';
+import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 
 export const ActiveTripScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -17,7 +22,6 @@ export const ActiveTripScreen: React.FC = () => {
     currentSpeed,
     maxSpeed,
     durationSeconds,
-    overspeedCount,
     startTrip,
     updateTelemetry,
     pauseTrip,
@@ -31,6 +35,11 @@ export const ActiveTripScreen: React.FC = () => {
   const [setupRoute, setSetupRoute] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
   const [summaryData, setSummaryData] = useState<any>(null);
+
+  // Ref to hold SpeedSmoother instance per active trip
+  const speedSmootherRef = useRef<SpeedSmoother>(new SpeedSmoother(0.35, 30));
+  // Ref array to buffer accepted GPSSamples for the duration of the trip
+  const gpsSamplesBufferRef = useRef<GPSSample[]>([]);
 
   // Timer for duration counter
   useEffect(() => {
@@ -48,32 +57,47 @@ export const ActiveTripScreen: React.FC = () => {
   // Real Geolocation Watcher
   useEffect(() => {
     if (!isTracking || isPaused) return;
+    if (!('geolocation' in navigator)) return;
 
-    if ('geolocation' in navigator) {
-      const watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const rawSpeedMs = pos.coords.speed;
-          const speedKmH = rawSpeedMs !== null && rawSpeedMs >= 0 ? Math.round(rawSpeedMs * 3.6) : currentSpeed;
-          updateTelemetry(speedKmH, {
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const rawSpeedMs = pos.coords.speed;
+        const rawSpeedKmH = rawSpeedMs !== null && rawSpeedMs >= 0 ? Math.round(rawSpeedMs * 3.6) : currentSpeed;
+        
+        const sample: GPSSample = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          speedKmH: rawSpeedKmH,
+          accuracy: pos.coords.accuracy,
+          timestamp: new Date().toISOString(),
+        };
+
+        const { isValid, smoothedSpeedKmH } = speedSmootherRef.current.processSample(sample);
+
+        if (isValid) {
+          gpsSamplesBufferRef.current.push(sample);
+          updateTelemetry(smoothedSpeedKmH, {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
-            timestamp: new Date().toISOString(),
-            speedKmH,
+            timestamp: typeof sample.timestamp === 'string' ? sample.timestamp : new Date(sample.timestamp).toISOString(),
+            speedKmH: smoothedSpeedKmH,
           });
-        },
-        (err) => {
-          console.warn('Geolocation position error:', err);
-        },
-        { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
-      );
+        }
+      },
+      (err) => {
+        console.warn('Geolocation position error:', err);
+      },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
+    );
 
-      return () => navigator.geolocation.clearWatch(watchId);
-    }
+    return () => navigator.geolocation.clearWatch(watchId);
   }, [isTracking, isPaused]);
 
   // Initial Auto Start if coming from Dashboard
   useEffect(() => {
     if (!isTracking && !summaryData) {
+      speedSmootherRef.current.reset();
+      gpsSamplesBufferRef.current = [];
       if (setupPlate) {
         startTrip({
           plateNumber: setupPlate,
@@ -94,20 +118,45 @@ export const ActiveTripScreen: React.FC = () => {
   };
 
   const handleConfirmEndTrip = async () => {
+    const routeCoords = useTripStore.getState().routeCoordinates;
+    const currentUser = useAuthStore.getState().user;
+
+    // Detect authoritative violations using detectOverspeedViolations
+    const speedLimit = remoteConfigService.getFlag('overspeedLimitDisplayed') || 80;
+    const detectedViolations = detectOverspeedViolations(gpsSamplesBufferRef.current, speedLimit);
+    const calculatedOverspeedCount = detectedViolations.length;
+
     const completed = endTrip();
-    const result = completed || {
-      id: `trip_${Date.now()}`,
-      tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
-      plateNumber: activeTrip?.plateNumber || setupPlate,
-      saccoName: activeTrip?.saccoName || setupSacco,
-      routeName: activeTrip?.routeName || setupRoute,
-      maxSpeedKmH: maxSpeed,
-      durationSeconds,
-      overspeedEventsCount: overspeedCount,
-      status: 'completed',
-      startTime: new Date().toISOString(),
-      endTime: new Date().toISOString(),
-    };
+    const result: any = completed
+      ? { ...completed, overspeedEventsCount: calculatedOverspeedCount, violationsCount: calculatedOverspeedCount }
+      : {
+          id: `trip_${Date.now()}`,
+          tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
+          plateNumber: activeTrip?.plateNumber || setupPlate,
+          saccoName: activeTrip?.saccoName || setupSacco,
+          routeName: activeTrip?.routeName || setupRoute,
+          maxSpeedKmH: maxSpeed,
+          durationSeconds,
+          overspeedEventsCount: calculatedOverspeedCount,
+          violationsCount: calculatedOverspeedCount,
+          status: 'completed',
+          startTime: new Date().toISOString(),
+          endTime: new Date().toISOString(),
+        };
+
+    // Upload single compressed telemetry blob to Cloud Storage if samples were collected
+    if (routeCoords && routeCoords.length > 0 && currentUser?.uid && navigator.onLine) {
+      try {
+        const path = await storageService.uploadTelemetryBlob(
+          { tripId: result.id, samples: routeCoords, count: routeCoords.length },
+          currentUser.uid,
+          result.id
+        );
+        result.telemetryStoragePath = path;
+      } catch (err) {
+        console.warn('Telemetry blob upload skipped or failed:', err);
+      }
+    }
 
     setSummaryData(result);
     setShowEndModal(false);
@@ -365,27 +414,26 @@ export const ActiveTripScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Interactive Speed Simulator Controls */}
-        <div className="bg-emerald-950/60 border border-emerald-800/40 p-3 rounded-2xl max-w-xs mx-auto space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-mono text-emerald-300">
-            <span>Simulate Telemetry Speed:</span>
-            <span className="font-bold">{currentSpeed} km/h</span>
+        {/* Simulate Telemetry Speed (Development Only) */}
+        {SHOW_DEV_TOOLS && (
+          <div className="bg-emerald-950/90 border border-emerald-700/50 p-3 rounded-xl max-w-sm mx-auto space-y-2 text-xs font-mono text-left">
+            <div className="flex justify-between items-center text-emerald-300 font-bold">
+              <span>Simulate Telemetry Speed</span>
+              <span>{currentSpeed} km/h</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="120"
+              value={currentSpeed}
+              onChange={(e) => updateTelemetry(Number(e.target.value))}
+              className="w-full accent-emerald-500 cursor-pointer"
+            />
+            <p className="text-[10px] text-emerald-400/70 font-sans">
+              Dev-only simulation slider. In production, speed updates automatically via device GPS location.
+            </p>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="120"
-            step="2"
-            value={currentSpeed}
-            onChange={(e) => updateTelemetry(Number(e.target.value))}
-            className="w-full accent-emerald-500 h-1.5 bg-emerald-900 rounded-lg appearance-none cursor-pointer"
-          />
-          <div className="flex justify-between text-[9px] font-mono text-emerald-400/60">
-            <span>0 Safe</span>
-            <span>80 Limit</span>
-            <span>90+ Overspeed</span>
-          </div>
-        </div>
+        )}
 
         {/* Alert Cards Feed */}
         <div className="space-y-2 max-w-sm mx-auto text-left">

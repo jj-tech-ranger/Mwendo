@@ -20,6 +20,10 @@
         "./*"
       ]
     },
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
     "allowImportingTsExtensions": true,
     "noEmit": true
   }

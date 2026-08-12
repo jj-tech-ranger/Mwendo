@@ -35,12 +35,12 @@ export const storageService = {
   /**
    * Upload complaint evidence image or video (5MB limit)
    */
-  async uploadComplaintEvidence(file: File, complaintId: string): Promise<string> {
+  async uploadComplaintEvidence(file: File, saccoId: string, complaintId: string): Promise<string> {
     if (file.size > 5 * 1024 * 1024) {
       throw new Error('Complaint evidence must be under 5MB');
     }
     const ext = file.name.split('.').pop() || 'jpg';
-    const storageRef = ref(storage, `evidence/${complaintId}/evidence_${Date.now()}.${ext}`);
+    const storageRef = ref(storage, `evidence/${saccoId}/${complaintId}/evidence_${Date.now()}.${ext}`);
     const uploadTask = await uploadBytesResumable(storageRef, file, {
       contentType: file.type || 'image/jpeg',
     });

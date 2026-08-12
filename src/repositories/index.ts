@@ -73,12 +73,6 @@ export class InspectionReportRepository extends BaseRepository<InspectionReport>
   }
 }
 
-export class TelemetryRepository extends BaseRepository<{ id: string; vehicleRegNumber: string; data: any; timestamp: string }> {
-  constructor() {
-    super('telemetry');
-  }
-}
-
 export class ProcessedEventRepository extends BaseRepository<{ id: string; eventId: string; handler: string; processedAt: string }> {
   constructor() {
     super('processedEvents');
@@ -109,7 +103,6 @@ export const complaintRepository = new ComplaintRepository();
 export const auditLogRepository = new AuditLogRepository();
 export const teamUserRepository = new TeamUserRepository();
 export const inspectionReportRepository = new InspectionReportRepository();
-export const telemetryRepository = new TelemetryRepository();
 export const processedEventRepository = new ProcessedEventRepository();
 export const analyticsRepository = new AnalyticsRepository();
 export const publicPinRepository = new PublicPinRepository();

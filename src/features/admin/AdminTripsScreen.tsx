@@ -259,29 +259,67 @@ export const AdminTripsScreen: React.FC = () => {
             </div>
 
             <div className="bg-[#0A0A0A] p-md rounded-xl border border-emerald-900/40 max-h-80 overflow-y-auto">
-              <pre className="text-[11px] leading-relaxed text-emerald-300">
-                {JSON.stringify(
-                  {
-                    tripId: selectedTrip.id,
-                    vehicleRegNumber: selectedTrip.vehicleRegNumber,
-                    saccoId: selectedTrip.saccoId,
-                    traceId: `trc-${Date.now()}`,
-                    telemetryStoragePath: `telemetry/${selectedTrip.id}.json`,
-                    sampleGPS: [
+              {(() => {
+                const sampleGPS = [];
+                if (selectedTrip.startLocation) {
+                  sampleGPS.push({
+                    point: 'startLocation',
+                    lat: selectedTrip.startLocation.latitude,
+                    lng: selectedTrip.startLocation.longitude,
+                    timestamp: selectedTrip.startTime,
+                  });
+                }
+                if (selectedTrip.lastGpsUpdate) {
+                  sampleGPS.push({
+                    point: 'lastGpsUpdate',
+                    lat: selectedTrip.lastGpsUpdate.latitude,
+                    lng: selectedTrip.lastGpsUpdate.longitude,
+                    speedKmH: selectedTrip.lastGpsUpdate.speedKmH,
+                    heading: selectedTrip.lastGpsUpdate.heading,
+                    timestamp: selectedTrip.lastGpsUpdate.timestamp,
+                  });
+                }
+                if (selectedTrip.endLocation) {
+                  sampleGPS.push({
+                    point: 'endLocation',
+                    lat: selectedTrip.endLocation.latitude,
+                    lng: selectedTrip.endLocation.longitude,
+                    timestamp: selectedTrip.endTime || selectedTrip.updatedAt || selectedTrip.startTime,
+                  });
+                }
+
+                if (sampleGPS.length === 0) {
+                  return (
+                    <div className="p-lg text-center text-slate-400 font-body-sm space-y-1">
+                      <span className="material-symbols-outlined text-3xl text-slate-500 block mb-1">
+                        location_off
+                      </span>
+                      <p className="font-bold text-slate-300">No telemetry sample available</p>
+                      <p className="text-[11px] text-slate-500">
+                        This trip record has no stored GPS location coordinates.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <pre className="text-[11px] leading-relaxed text-emerald-300">
+                    {JSON.stringify(
                       {
-                        lat: -1.286389,
-                        lng: 36.817223,
-                        speedKmH: selectedTrip.currentSpeedKmH,
-                        accuracy: 4.2,
-                        heading: 180,
-                        timestamp: selectedTrip.startTime,
+                        tripId: selectedTrip.id,
+                        vehicleRegNumber: selectedTrip.vehicleRegNumber,
+                        saccoId: selectedTrip.saccoId,
+                        traceId: selectedTrip.traceId || `trc-${selectedTrip.id}`,
+                        telemetryStoragePath:
+                          selectedTrip.telemetryStoragePath || `telemetry/${selectedTrip.id}.json`,
+                        sampleGPS,
                       },
-                    ],
-                  },
-                  null,
-                  2
-                )}
-              </pre>
+                      null,
+                      2
+                    )}
+                  </pre>
+                );
+              })()}
             </div>
 
             <div className="flex justify-end pt-2">

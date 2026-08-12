@@ -169,9 +169,10 @@ export const AdminAuthoritiesScreen: React.FC = () => {
                   </td>
 
                   <td className="p-md">
-                    <span className="inline-flex items-center gap-1 font-label-mono text-[10px] text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                      <span className="material-symbols-outlined text-xs">verified_user</span>
-                      MFA Enabled
+                    {/* TODO: Implement Google Cloud Identity Platform TOTP mandatory MFA for admin/authority per master-architecture.md §5.5 */}
+                    <span className="inline-flex items-center gap-1 font-label-mono text-[10px] text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      <span className="material-symbols-outlined text-xs">gpp_maybe</span>
+                      MFA: Not Configured
                     </span>
                   </td>
 

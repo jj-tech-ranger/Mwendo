@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
 import { blackSpotRepository } from '../../repositories';
 import { BlackSpot } from '../../types';
+import { useToast } from '../../components/ui/Toast';
 
 interface HazardPin {
   id: string;
@@ -20,6 +22,8 @@ interface HazardPin {
 }
 
 export const SafetyMapScreen: React.FC = () => {
+  const { t } = useTranslation();
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const [hazards, setHazards] = useState<HazardPin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,21 +73,21 @@ export const SafetyMapScreen: React.FC = () => {
       {/* Search Header Bar */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-black text-on-surface">Safety Map</h1>
+          <h1 className="text-xl font-black text-on-surface">{t('passenger.map.title')}</h1>
           <Button
             size="sm"
             onClick={() => navigate('/passenger/report-blackspot')}
             className="text-xs font-bold flex items-center gap-1"
           >
             <span className="material-symbols-outlined text-base">add_location_alt</span>
-            Report Hazard
+            {t('passenger.map.reportHazard')}
           </Button>
         </div>
 
         <Input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search routes, black spots, or emergency services..."
+          placeholder={t('passenger.map.searchPlaceholder')}
           className="text-xs bg-surface shadow-sm"
         />
       </div>
@@ -98,7 +102,7 @@ export const SafetyMapScreen: React.FC = () => {
               : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
           }`}
         >
-          All Locations
+          {t('passenger.map.catAll')}
         </button>
         <button
           onClick={() => setActiveCategory('hazards')}
@@ -108,7 +112,7 @@ export const SafetyMapScreen: React.FC = () => {
               : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
           }`}
         >
-          Danger & Black Spots
+          {t('passenger.map.catHazards')}
         </button>
         <button
           onClick={() => setActiveCategory('emergency')}
@@ -118,7 +122,7 @@ export const SafetyMapScreen: React.FC = () => {
               : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
           }`}
         >
-          Emergency (Hospitals / Police)
+          {t('passenger.map.catEmergency')}
         </button>
       </div>
 
@@ -173,56 +177,66 @@ export const SafetyMapScreen: React.FC = () => {
           Nearby Road Hazards & Services
         </h2>
 
-        {filteredHazards.map((item) => (
-          <Card
-            key={item.id}
-            onClick={() => setSelectedHazard(item)}
-            className="p-4 cursor-pointer hover:bg-surface-container-high/50 transition-colors space-y-2 border border-outline-variant/30"
-          >
-            <div className="flex items-start justify-between">
-              <div className="space-y-1">
-                <div className="text-sm font-bold text-on-surface flex items-center gap-2">
-                  <span
-                    className={`p-1 rounded-md text-white text-xs ${
-                      item.type === 'hospital'
-                        ? 'bg-blue-600'
-                        : item.type === 'police'
-                        ? 'bg-indigo-600'
-                        : item.severity === 'high'
-                        ? 'bg-error'
-                        : 'bg-amber-500 text-slate-950'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-sm block">
-                      {item.type === 'hospital'
-                        ? 'local_hospital'
-                        : item.type === 'police'
-                        ? 'local_police'
-                        : 'warning'}
+        {isLoading ? (
+          <div className="p-8 text-center text-xs text-on-surface-variant font-mono">
+            {t('passenger.map.loading')}
+          </div>
+        ) : filteredHazards.length === 0 ? (
+          <div className="p-8 text-center text-xs text-on-surface-variant font-mono">
+            {t('passenger.map.noHazardsFound')}
+          </div>
+        ) : (
+          filteredHazards.map((item) => (
+            <Card
+              key={item.id}
+              onClick={() => setSelectedHazard(item)}
+              className="p-4 cursor-pointer hover:bg-surface-container-high/50 transition-colors space-y-2 border border-outline-variant/30"
+            >
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <div className="text-sm font-bold text-on-surface flex items-center gap-2">
+                    <span
+                      className={`p-1 rounded-md text-white text-xs ${
+                        item.type === 'hospital'
+                          ? 'bg-blue-600'
+                          : item.type === 'police'
+                          ? 'bg-indigo-600'
+                          : item.severity === 'high'
+                          ? 'bg-error'
+                          : 'bg-amber-500 text-slate-950'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-sm block">
+                        {item.type === 'hospital'
+                          ? 'local_hospital'
+                          : item.type === 'police'
+                          ? 'local_police'
+                          : 'warning'}
+                      </span>
                     </span>
-                  </span>
-                  <span>{item.title}</span>
+                    <span>{item.title}</span>
+                  </div>
+                  <p className="text-xs text-on-surface-variant">{item.locationName}</p>
                 </div>
-                <p className="text-xs text-on-surface-variant">{item.locationName}</p>
+
+                <Badge
+                  variant={
+                    item.type === 'hospital' || item.type === 'police'
+                      ? 'neutral'
+                      : item.severity === 'high'
+                      ? 'danger'
+                      : 'warning'
+                  }
+                  className="text-[10px] font-bold"
+                >
+                  {t('passenger.map.distanceAway', { distance: item.distanceKm })}
+                </Badge>
               </div>
 
-              <Badge
-                variant={
-                  item.type === 'hospital' || item.type === 'police'
-                    ? 'neutral'
-                    : item.severity === 'high'
-                    ? 'danger'
-                    : 'warning'
-                }
-                className="text-[10px] font-bold"
-              >
-                {item.distanceKm} km away
-              </Badge>
-            </div>
-
-            <p className="text-xs text-on-surface-variant line-clamp-2">{item.description}</p>
-          </Card>
-        ))}
+              <p className="text-xs text-on-surface-variant line-clamp-2">{item.description}</p>
+            </Card>
+          ))
+        )}
       </div>
 
       {/* Hazard / Service Inspector Dialog */}
@@ -236,7 +250,7 @@ export const SafetyMapScreen: React.FC = () => {
             <div className="bg-surface-container p-3 rounded-xl space-y-1">
               <div className="font-bold text-sm text-primary">{selectedHazard.locationName}</div>
               <div className="text-on-surface-variant text-[11px]">
-                Distance: {selectedHazard.distanceKm} km away
+                {t('passenger.map.distanceAway', { distance: selectedHazard.distanceKm })}
               </div>
             </div>
 
@@ -245,7 +259,7 @@ export const SafetyMapScreen: React.FC = () => {
             {selectedHazard.corroborationCount > 0 && (
               <div className="flex items-center gap-2 p-2 bg-emerald-500/10 rounded-lg text-emerald-800 font-medium">
                 <span className="material-symbols-outlined text-base">verified</span>
-                Confirmed by {selectedHazard.corroborationCount} passengers
+                {t('passenger.map.corroborations')}: {selectedHazard.corroborationCount}
               </div>
             )}
 
@@ -255,16 +269,16 @@ export const SafetyMapScreen: React.FC = () => {
                 className="flex-1 text-xs"
                 onClick={() => setSelectedHazard(null)}
               >
-                Close
+                {t('passenger.map.close')}
               </Button>
               <Button
                 className="flex-1 text-xs font-bold"
                 onClick={() => {
-                  alert(`Navigating to ${selectedHazard.title}`);
+                  showToast('info', 'Route Guidance', `Navigating to ${selectedHazard.title}`);
                   setSelectedHazard(null);
                 }}
               >
-                Get Directions
+                {t('passenger.map.routeGuidance')}
               </Button>
             </div>
           </div>

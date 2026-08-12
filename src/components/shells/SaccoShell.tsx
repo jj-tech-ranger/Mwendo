@@ -84,6 +84,7 @@ export const SaccoShell: React.FC = () => {
             </div>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container"
             >
               <span className="material-symbols-outlined text-xl">
@@ -102,6 +103,7 @@ export const SaccoShell: React.FC = () => {
               <select
                 value={currentSaccoId}
                 onChange={(e) => handleSwitchSacco(e.target.value)}
+                aria-label="Switch Active SACCO"
                 className="text-[10px] bg-surface text-on-surface border border-outline-variant/40 rounded px-1 py-0.5 cursor-pointer font-mono"
               >
                 <option value="sacco_metrolink">MetroLink</option>

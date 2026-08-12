@@ -366,7 +366,7 @@ const router = createBrowserRouter([
 
   // SACCO Shell & Routes
   {
-    element: <RoleGuard allowedRoles={['sacco_official', 'sacco_manager']} />,
+    element: <RoleGuard allowedRoles={['sacco_manager']} />,
     children: [
       {
         path: '/sacco',

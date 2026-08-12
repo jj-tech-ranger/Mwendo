@@ -2,9 +2,9 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  isLoading?: boolean;
+  variant?: ('primary' | 'secondary' | 'outline' | 'ghost' | 'danger') | undefined;
+  size?: ('sm' | 'md' | 'lg') | undefined;
+  isLoading?: boolean | undefined;
 }
 
 export const Button: React.FC<ButtonProps> = ({

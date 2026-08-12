@@ -44,7 +44,7 @@ const CHART_COLORS = {
 export interface LineChartProps extends CommonChartProps {
   data: Array<Record<string, any>>;
   xKey: string;
-  lines: Array<{ key: string; name?: string; color?: string }>;
+  lines: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }
 
 export const LineChartWrapper: React.FC<LineChartProps> = ({
@@ -82,19 +82,22 @@ export const LineChartWrapper: React.FC<LineChartProps> = ({
             }}
           />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-          {lines.map((l, i) => (
-            <Line
-              key={l.key}
-              type="monotone"
-              dataKey={l.key}
-              name={l.name || l.key}
-              stroke={l.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length]}
-              strokeWidth={2.5}
-              dot={{ r: 3 }}
-              activeDot={{ r: 6 }}
-              isAnimationActive
-            />
-          ))}
+          {lines.map((l, i) => {
+            const strokeColor = l.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length] || '#1A5C2E';
+            return (
+              <Line
+                key={l.key}
+                type="monotone"
+                dataKey={l.key}
+                name={l.name || l.key}
+                stroke={strokeColor}
+                strokeWidth={2.5}
+                dot={{ r: 3 }}
+                activeDot={{ r: 6 }}
+                isAnimationActive
+              />
+            );
+          })}
         </ReLineChart>
       </ResponsiveContainer>
     </div>
@@ -107,7 +110,7 @@ export const LineChartWrapper: React.FC<LineChartProps> = ({
 export interface AreaChartProps extends CommonChartProps {
   data: Array<Record<string, any>>;
   xKey: string;
-  areas: Array<{ key: string; name?: string; color?: string }>;
+  areas: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }
 
 export const AreaChartWrapper: React.FC<AreaChartProps> = ({
@@ -134,7 +137,7 @@ export const AreaChartWrapper: React.FC<AreaChartProps> = ({
         <ReAreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
           <defs>
             {areas.map((a, i) => {
-              const color = a.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length];
+              const color = a.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length] || '#1A5C2E';
               return (
                 <linearGradient key={a.key} id={`grad-${a.key}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={color} stopOpacity={0.4} />
@@ -157,7 +160,7 @@ export const AreaChartWrapper: React.FC<AreaChartProps> = ({
           />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
           {areas.map((a, i) => {
-            const color = a.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length];
+            const color = a.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length] || '#1A5C2E';
             return (
               <Area
                 key={a.key}
@@ -184,7 +187,7 @@ export const AreaChartWrapper: React.FC<AreaChartProps> = ({
 export interface BarChartProps extends CommonChartProps {
   data: Array<Record<string, any>>;
   xKey: string;
-  bars: Array<{ key: string; name?: string; color?: string }>;
+  bars: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }
 
 export const BarChartWrapper: React.FC<BarChartProps> = ({
@@ -242,7 +245,7 @@ export const BarChartWrapper: React.FC<BarChartProps> = ({
  * 4. DonutChartWrapper / PieChartWrapper
  * ========================================== */
 export interface DonutChartProps extends CommonChartProps {
-  data: Array<{ name: string; value: number; color?: string }>;
+  data: Array<{ name: string; value: number; color?: string | undefined }>;
 }
 
 export const DonutChartWrapper: React.FC<DonutChartProps> = ({
@@ -278,7 +281,7 @@ export const DonutChartWrapper: React.FC<DonutChartProps> = ({
             {data.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.color || CHART_COLORS.pieColors[index % CHART_COLORS.pieColors.length]}
+                fill={entry.color || CHART_COLORS.pieColors[index % CHART_COLORS.pieColors.length] || '#1A5C2E'}
               />
             ))}
           </Pie>

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
@@ -7,29 +9,53 @@ import { useAuthStore } from '../../store/useAuthStore';
 export const AdminMaintenanceScreen: React.FC = () => {
   const { user: currentAdmin } = useAuthStore();
 
-  const [isMaintenanceActive, setIsMaintenanceActive] = useState<boolean>(() => {
-    return localStorage.getItem('mwendo_maintenance_mode') === 'true';
-  });
-
+  const [isMaintenanceActive, setIsMaintenanceActive] = useState<boolean>(false);
   const [customMessage, setCustomMessage] = useState(
     'Mwendo Salama is undergoing scheduled infrastructure upgrades. Live GPS tracking remains active.'
   );
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('mwendo_maintenance_mode', String(isMaintenanceActive));
-  }, [isMaintenanceActive]);
+    const unsub = onSnapshot(
+      doc(db, 'system_config', 'maintenance'),
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          setIsMaintenanceActive(!!data.active);
+          if (data.message) {
+            setCustomMessage(data.message);
+          }
+        }
+        setIsLoading(false);
+      },
+      (err) => {
+        console.error('[AdminMaintenanceScreen] Error fetching maintenance status:', err);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, []);
 
   async function handleToggleMaintenanceMode() {
     setIsSubmitting(true);
     const nextState = !isMaintenanceActive;
 
     try {
-      // Save state to local storage and log audit
-      localStorage.setItem('mwendo_maintenance_mode', String(nextState));
-      setIsMaintenanceActive(nextState);
+      // Save state to Firestore system_config/maintenance
+      await setDoc(
+        doc(db, 'system_config', 'maintenance'),
+        {
+          active: nextState,
+          message: customMessage,
+          updatedAt: new Date().toISOString(),
+          updatedBy: currentAdmin?.displayName || currentAdmin?.email || 'System Admin',
+        },
+        { merge: true }
+      );
 
       await auditLogRepository.save({
         id: `audit-${Date.now()}`,
@@ -48,6 +74,7 @@ export const AdminMaintenanceScreen: React.FC = () => {
       );
     } catch (err) {
       console.error('Failed to toggle maintenance mode:', err);
+      setToastMsg('Failed to update maintenance mode. Check database permissions.');
     } finally {
       setIsSubmitting(false);
     }
@@ -80,14 +107,16 @@ export const AdminMaintenanceScreen: React.FC = () => {
           <div>
             <p className="font-bold text-sm text-on-surface">Global Maintenance Status</p>
             <p className="font-body-sm text-xs text-on-surface-variant">
-              {isMaintenanceActive
+              {isLoading
+                ? 'Loading status...'
+                : isMaintenanceActive
                 ? 'Maintenance layout is currently serving users.'
                 : 'All systems live and operational.'}
             </p>
           </div>
 
           <Badge variant={isMaintenanceActive ? 'danger' : 'success'}>
-            {isMaintenanceActive ? 'MAINTENANCE ON' : 'SYSTEM LIVE'}
+            {isLoading ? 'LOADING' : isMaintenanceActive ? 'MAINTENANCE ON' : 'SYSTEM LIVE'}
           </Badge>
         </div>
 
@@ -117,7 +146,7 @@ export const AdminMaintenanceScreen: React.FC = () => {
         <Button
           variant={isMaintenanceActive ? 'primary' : 'secondary'}
           onClick={handleToggleMaintenanceMode}
-          disabled={isSubmitting}
+          disabled={isSubmitting || isLoading}
           className={`w-full justify-center ${
             !isMaintenanceActive ? 'bg-amber-600 hover:bg-amber-700 text-white border-none' : ''
           }`}

@@ -108,9 +108,14 @@ export const AuthorityReportsScreen: React.FC = () => {
       {/* Header */}
       <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md sm:p-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-md">
         <div>
-          <h2 className="font-headline-lg-mobile text-lg text-on-surface">
-            NTSA Regulatory Reports & Analytical Intelligence
-          </h2>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="font-headline-lg-mobile text-lg text-on-surface">
+              NTSA Regulatory Reports & Analytical Intelligence
+            </h2>
+            <Badge variant="warning" className="text-[10px]">
+              Provisional Analytics (Cloud Functions Gen2 Pending)
+            </Badge>
+          </div>
           <p className="font-body-sm text-xs text-on-surface-variant">
             Official PSV compliance indices, speed violation digests, and printable authority exports
           </p>

@@ -9,69 +9,91 @@ service cloud.firestore {
     }
 
     // Helper functions
+    function isNotSuspended() {
+      return request.auth.token.get('isSuspended', false) != true;
+    }
+
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && isNotSuspended();
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // Authorization reads ONLY request.auth.token.activeRole (the custom claim)
     function getActiveRole() {
-      return isSignedIn() ? (
-        request.auth.token.activeRole != null
-          ? request.auth.token.activeRole
-          : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeRole
-      ) : null;
+      return isSignedIn() && request.auth.token.activeRole != null
+        ? request.auth.token.activeRole
+        : null;
+    }
+
+    function hasActiveRole(role) {
+      return getActiveRole() == role;
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        getActiveRole() == 'admin' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeRole == 'admin'
-      );
+      return getActiveRole() == 'admin';
     }
 
     function isAuthority() {
-      return isSignedIn() && (
-        getActiveRole() == 'authority' ||
-        isAdmin()
-      );
+      return hasActiveRole('authority') || isAdmin();
     }
 
-    function isSaccoManager() {
-      return isSignedIn() && (
-        getActiveRole() == 'sacco_manager' ||
-        getActiveRole() == 'sacco_official' ||
-        isAdmin()
+    function isSaccoManager(saccoId) {
+      return isAdmin() || (
+        hasActiveRole('sacco_manager') &&
+        saccoId != null &&
+        request.auth.token.saccoId == saccoId
       );
     }
 
     function isDriver() {
-      return isSignedIn() && getActiveRole() == 'driver';
+      return hasActiveRole('driver');
     }
 
-    // Flat Analytics Wildcard Rule (§7.1)
+    // Flat Analytics Wildcard Rule
     match /analytics/{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isAuthority() || isAdmin();
+      allow read: if isAdmin() || hasActiveRole('authority') || (
+        hasActiveRole('sacco_manager') &&
+        resource.data.saccoId == request.auth.token.saccoId
+      );
+      allow write: if false;
     }
 
     // Users Collection
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      allow update: if (
+        isAdmin() || (
+          isOwner(userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName',
+            'phoneNumber',
+            'notificationPreferences',
+            'theme',
+            'language',
+            'photoURL',
+            'updatedAt'
+          ])
+        )
+      );
       allow delete: if isAdmin();
     }
 
     // Trips Collection
     match /trips/{tripId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+        isAdmin() ||
+        hasActiveRole('authority')
+      );
       allow create: if isSignedIn();
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
-        isSaccoManager() ||
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
         isAuthority()
       );
       allow delete: if isAdmin();
@@ -80,14 +102,20 @@ service cloud.firestore {
     // Vehicles Collection
     match /vehicles/{vehicleId} {
       allow read: if isSignedIn();
-      allow create, update: if isSaccoManager() || isAuthority();
+      allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
+      // Disallow client updates modifying riskScore or riskTier (must be computed by server Cloud Functions Gen2)
+      allow update: if (isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId))
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore', 'riskTier']);
       allow delete: if isAdmin();
     }
 
     // SACCOs Collection
     match /saccos/{saccoId} {
       allow read: if isSignedIn();
-      allow create, update: if isSaccoManager() || isAuthority();
+      allow create: if isAuthority() || isAdmin();
+      // Disallow client updates modifying safetyScore (must be computed by server Cloud Functions Gen2)
+      allow update: if (isAuthority() || isAdmin() || isSaccoManager(saccoId))
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['safetyScore']);
       allow delete: if isAdmin();
     }
 
@@ -109,17 +137,31 @@ service cloud.firestore {
 
     // Safety Alerts Collection
     match /safety_alerts/{alertId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+        isAdmin() ||
+        hasActiveRole('authority')
+      );
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+        isAuthority()
+      );
       allow delete: if isAdmin();
     }
 
     // Violations Collection
     match /violations/{violationId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+        isAdmin() ||
+        hasActiveRole('authority')
+      );
       allow create: if isSignedIn();
-      allow update: if isSaccoManager() || isAuthority();
+      allow update: if (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority();
       allow delete: if isAdmin();
     }
 
@@ -134,7 +176,9 @@ service cloud.firestore {
     // Drivers Collection
     match /drivers/{driverId} {
       allow read: if isSignedIn();
-      allow write: if isSaccoManager() || isAuthority();
+      allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
+      allow update: if isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId);
+      allow delete: if isAdmin();
     }
 
     // Inspections Collection
@@ -143,16 +187,9 @@ service cloud.firestore {
       allow write: if isAuthority();
     }
 
-    // Telemetry Collection
-    match /telemetry/{telemetryId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
-    }
-
     // Audit Logs Collection
     match /audit_logs/{logId} {
-      allow read: if isSaccoManager() || isAuthority();
+      allow read: if isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId);
       allow create: if isSignedIn();
       allow update, delete: if isAdmin();
     }
@@ -170,6 +207,12 @@ service cloud.firestore {
 
     // Feature Flags
     match /feature_flags/{flagId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // System Config (e.g. system_config/maintenance)
+    match /system_config/{configId} {
       allow read: if true;
       allow write: if isAdmin();
     }

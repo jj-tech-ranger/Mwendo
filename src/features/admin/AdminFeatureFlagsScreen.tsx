@@ -3,8 +3,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AdminFeatureFlagsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
 
   // Side A: Client Feature Flags
@@ -70,7 +72,7 @@ export const AdminFeatureFlagsScreen: React.FC = () => {
 
       setToastMsg('system_config/ Backend Panel parameters updated.');
     } catch (err) {
-      alert('Invalid JSON structure in Risk Weights configuration.');
+      showToast('error', 'Configuration Error', 'Invalid JSON structure in Risk Weights configuration.');
     } finally {
       setIsSubmitting(false);
     }

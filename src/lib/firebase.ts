@@ -11,16 +11,18 @@ import { getRemoteConfig, RemoteConfig } from 'firebase/remote-config';
 import { getMessaging, Messaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 import { getAnalytics, Analytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
-import firebaseConfigJson from '../../firebase-applet-config.json';
-
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || firebaseConfigJson.apiKey,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || firebaseConfigJson.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || firebaseConfigJson.projectId,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || firebaseConfigJson.storageBucket,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || firebaseConfigJson.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || firebaseConfigJson.appId,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
+
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error('[Firebase] Missing required Firebase environment variables! Check your .env file.');
+}
 
 let app: FirebaseApp;
 if (!getApps().length) {
@@ -31,7 +33,7 @@ if (!getApps().length) {
 
 export const auth: Auth = getAuth(app);
 
-const databaseId = firebaseConfigJson.firestoreDatabaseId;
+const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
 export const db: Firestore = databaseId && databaseId !== '(default)'
   ? getFirestore(app, databaseId)
   : getFirestore(app);
@@ -78,9 +80,9 @@ isAnalyticsSupported().then((supported) => {
 export const getAnalyticsInstance = () => analyticsInstance;
 
 let appCheckInstance: AppCheck | null = null;
-if (import.meta.env.VITE_RECAPTCHA_SITE_KEY || firebaseConfigJson.recaptchaSiteKey) {
+if (import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
   try {
-    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || firebaseConfigJson.recaptchaSiteKey;
+    const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
     appCheckInstance = initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(siteKey),
       isTokenAutoRefreshEnabled: true,

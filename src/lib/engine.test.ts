@@ -139,8 +139,8 @@ describe('5. Overspeed Violation Detection Engine', () => {
 
     const violations = detectOverspeedViolations(samples, 80);
     expect(violations.length).toBe(1);
-    expect(violations[0].maxSpeedKmH).toBe(95);
-    expect(violations[0].speedLimitKmH).toBe(80);
-    expect(violations[0].durationSec).toBeGreaterThanOrEqual(4.0);
+    expect(violations[0]?.maxSpeedKmH).toBe(95);
+    expect(violations[0]?.speedLimitKmH).toBe(80);
+    expect(violations[0]?.durationSec).toBeGreaterThanOrEqual(4.0);
   });
 });

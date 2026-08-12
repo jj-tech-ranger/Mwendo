@@ -2,11 +2,11 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
-  name?: string;
-  src?: string;
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-  isVerified?: boolean;
-  status?: 'online' | 'offline' | 'busy' | 'away';
+  name?: string | undefined;
+  src?: string | undefined;
+  size?: ('xs' | 'sm' | 'md' | 'lg' | 'xl') | undefined;
+  isVerified?: boolean | undefined;
+  status?: ('online' | 'offline' | 'busy' | 'away') | undefined;
 }
 
 /**

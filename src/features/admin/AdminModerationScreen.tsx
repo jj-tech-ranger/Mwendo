@@ -3,8 +3,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository, userRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AdminModerationScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'queue' | 'review' | 'trust'>('queue');
 
@@ -18,7 +20,7 @@ export const AdminModerationScreen: React.FC = () => {
   async function handleOverrideTrustScore(e: React.FormEvent) {
     e.preventDefault();
     if (!targetUserId || !overrideReason) {
-      alert('Please enter a User ID and a mandatory override reason.');
+      showToast('warning', 'Missing Details', 'Please enter a User ID and a mandatory override reason.');
       return;
     }
     setIsSubmitting(true);
@@ -46,7 +48,7 @@ export const AdminModerationScreen: React.FC = () => {
       setOverrideReason('');
     } catch (err) {
       console.error('Failed to override trust score:', err);
-      alert('Error updating trust score. Ensure the user exists.');
+      showToast('error', 'Update Failed', 'Error updating trust score. Ensure the user exists.');
     } finally {
       setIsSubmitting(false);
     }

@@ -12,6 +12,20 @@ import {
   RiskEvent,
 } from '../lib/engine';
 
+/**
+ * ====================================================================================
+ * TEMPORARY CLIENT-SIDE IMPLEMENTATION
+ * ====================================================================================
+ * These functions simulate Cloud Functions for prototyping only. They MUST be migrated
+ * to Firebase Cloud Functions Gen2 (callable/Pub-Sub triggered) before production,
+ * per master-architecture.md section 9.
+ *
+ * DO NOT treat their output as trustworthy or tamper-proof in the current client-side state.
+ * Direct Firestore write access to /vehicles.riskScore, /saccos.safetyScore, and /analytics/**
+ * is intentionally disabled in firestore.rules to enforce server-authoritative score calculation.
+ * ====================================================================================
+ */
+
 export interface VehicleRiskEvent {
   eventId: string;
   vehicleRegNumber: string;
@@ -86,11 +100,16 @@ export const functionsService = {
     // Compute exact risk score using 30-day decay formula & sub-100 regularization
     const { riskScore, riskTier } = calculateVehicleRiskScore(eventsList, totalTripCount);
 
-    await updateDoc(vehicleRef, {
-      riskScore,
-      riskTier,
-      updatedAt: new Date().toISOString(),
-    });
+    try {
+      await updateDoc(vehicleRef, {
+        riskScore,
+        riskTier,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      // TODO: Migrate to Cloud Functions Gen2. Client-side update of vehicle riskScore/riskTier is intentionally restricted in firestore.rules.
+      console.warn('[functionsService] Client update of vehicle risk score blocked by security rules (pending Cloud Functions Gen2 migration):', err);
+    }
 
     // Record audit log
     await setDoc(doc(collection(db, 'audit_logs')), {
@@ -292,7 +311,12 @@ export const functionsService = {
       updatedAt: new Date().toISOString(),
     };
 
-    await setDoc(analyticsRef, payload, { merge: true });
+    try {
+      await setDoc(analyticsRef, payload, { merge: true });
+    } catch (err) {
+      // TODO: Migrate to Cloud Functions Gen2. Direct client writes to /analytics/** are restricted in firestore.rules.
+      console.warn('[functionsService] Client update of analytics doc blocked by security rules (pending Cloud Functions Gen2 migration):', err);
+    }
     return payload;
   },
 
@@ -320,11 +344,16 @@ export const functionsService = {
     const saccoRef = doc(db, 'saccos', saccoId);
     const saccoSnap = await getDoc(saccoRef);
     if (saccoSnap.exists()) {
-      await updateDoc(saccoRef, {
-        safetyScore: saccoSafetyScore,
-        fleetCount: vehiclesSnap.size,
-        updatedAt: new Date().toISOString(),
-      });
+      try {
+        await updateDoc(saccoRef, {
+          safetyScore: saccoSafetyScore,
+          fleetCount: vehiclesSnap.size,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        // TODO: Migrate to Cloud Functions Gen2. Direct client writes to sacco safetyScore are restricted in firestore.rules.
+        console.warn('[functionsService] Client update of SACCO safetyScore blocked by security rules (pending Cloud Functions Gen2 migration):', err);
+      }
     }
 
     const docId = `sacco_${saccoId}`;
@@ -338,7 +367,12 @@ export const functionsService = {
       updatedAt: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, 'analytics', docId), payload, { merge: true });
+    try {
+      await setDoc(doc(db, 'analytics', docId), payload, { merge: true });
+    } catch (err) {
+      // TODO: Migrate to Cloud Functions Gen2. Direct client writes to /analytics/** are restricted in firestore.rules.
+      console.warn('[functionsService] Client update of SACCO analytics doc blocked by security rules (pending Cloud Functions Gen2 migration):', err);
+    }
     return payload;
   },
 

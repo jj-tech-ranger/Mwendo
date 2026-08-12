@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -11,6 +12,7 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 
 export const PassengerProfileScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
   const { mode, toggleDarkMode } = useThemeStore();
@@ -65,14 +67,14 @@ export const PassengerProfileScreen: React.FC = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center font-black text-xl shadow-md border-2 border-emerald-400">
-            {editName.charAt(0)}
+            {editName ? editName.charAt(0) : 'P'}
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-on-surface">{editName}</h1>
+              <h1 className="text-lg font-black text-on-surface">{editName || 'Passenger'}</h1>
               <Badge variant="success" className="text-[10px] font-bold">
-                Verified
+                {t('passenger.profile.verified')}
               </Badge>
             </div>
             <p className="text-xs text-on-surface-variant font-mono">{editPhone}</p>
@@ -86,15 +88,21 @@ export const PassengerProfileScreen: React.FC = () => {
       <Card className="p-4 grid grid-cols-3 divide-x divide-outline-variant/20 text-center font-mono">
         <div>
           <div className="text-xl font-black text-on-surface">0</div>
-          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Trips</div>
+          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+            {t('passenger.profile.tripsCount')}
+          </div>
         </div>
         <div>
           <div className="text-xl font-black text-emerald-700">--</div>
-          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Trust Score</div>
+          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+            {t('passenger.profile.trustScore')}
+          </div>
         </div>
         <div>
           <div className="text-xl font-black text-on-surface">0</div>
-          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">Reports</div>
+          <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
+            {t('passenger.profile.reportsCount')}
+          </div>
         </div>
       </Card>
 
@@ -103,7 +111,7 @@ export const PassengerProfileScreen: React.FC = () => {
         {/* Account Settings */}
         <div className="space-y-2">
           <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
-            Account & Security
+            {t('passenger.profile.accountSecurity')}
           </h2>
           <Card className="divide-y divide-outline-variant/20 text-xs font-medium overflow-hidden">
             <button
@@ -112,7 +120,7 @@ export const PassengerProfileScreen: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">person</span>
-                <span>Edit Profile</span>
+                <span>{t('passenger.profile.editProfile')}</span>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
             </button>
@@ -123,7 +131,7 @@ export const PassengerProfileScreen: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">lock</span>
-                <span>Change Password</span>
+                <span>{t('passenger.profile.changePassword')}</span>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
             </button>
@@ -133,7 +141,7 @@ export const PassengerProfileScreen: React.FC = () => {
         {/* Appearance & Language */}
         <div className="space-y-2">
           <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
-            Preferences & Language
+            {t('passenger.profile.preferencesLanguage')}
           </h2>
           <Card className="p-4 space-y-4 text-xs">
             {/* Theme Toggle */}
@@ -141,9 +149,9 @@ export const PassengerProfileScreen: React.FC = () => {
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">contrast</span>
                 <div>
-                  <div className="font-bold">Dark Theme</div>
+                  <div className="font-bold">{t('passenger.profile.darkTheme')}</div>
                   <div className="text-[11px] text-on-surface-variant">
-                    Night-friendly speed readout
+                    {t('passenger.profile.darkThemeDesc')}
                   </div>
                 </div>
               </div>
@@ -167,7 +175,7 @@ export const PassengerProfileScreen: React.FC = () => {
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">translate</span>
                 <div>
-                  <div className="font-bold">Language</div>
+                  <div className="font-bold">{t('passenger.profile.language')}</div>
                   <div className="text-[11px] text-on-surface-variant">English / Kiswahili</div>
                 </div>
               </div>
@@ -197,7 +205,7 @@ export const PassengerProfileScreen: React.FC = () => {
         {/* Data & Privacy */}
         <div className="space-y-2">
           <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
-            Privacy & Permissions
+            {t('passenger.profile.privacyPermissions')}
           </h2>
           <Card className="divide-y divide-outline-variant/20 text-xs font-medium overflow-hidden">
             <button
@@ -206,7 +214,7 @@ export const PassengerProfileScreen: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">security</span>
-                <span>Data & Privacy</span>
+                <span>{t('passenger.profile.dataPrivacy')}</span>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
             </button>
@@ -217,7 +225,7 @@ export const PassengerProfileScreen: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-primary">tune</span>
-                <span>App Permissions</span>
+                <span>{t('passenger.profile.appPermissions')}</span>
               </div>
               <span className="material-symbols-outlined text-on-surface-variant">chevron_right</span>
             </button>
@@ -234,14 +242,14 @@ export const PassengerProfileScreen: React.FC = () => {
               navigate('/auth/login');
             }}
           >
-            Sign Out
+            {t('passenger.profile.signOut')}
           </Button>
 
           <button
             onClick={() => setActiveModal('deleteAccount')}
             className="w-full text-center text-xs text-error/80 hover:text-error hover:underline py-1"
           >
-            Delete Account
+            {t('passenger.profile.deleteAccount')}
           </button>
         </div>
       </div>
@@ -250,11 +258,11 @@ export const PassengerProfileScreen: React.FC = () => {
       <Dialog
         isOpen={activeModal === 'editProfile'}
         onClose={() => setActiveModal(null)}
-        title="Edit Profile"
+        title={t('passenger.profile.editProfile')}
       >
         <div className="space-y-3 text-xs">
           <div>
-            <label className="font-bold block mb-1">Display Name</label>
+            <label className="font-bold block mb-1">{t('passenger.profile.displayName')}</label>
             <input
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
@@ -262,7 +270,7 @@ export const PassengerProfileScreen: React.FC = () => {
             />
           </div>
           <div>
-            <label className="font-bold block mb-1">Phone Number</label>
+            <label className="font-bold block mb-1">{t('passenger.profile.phoneNumber')}</label>
             <input
               value={editPhone}
               onChange={(e) => setEditPhone(e.target.value)}
@@ -270,7 +278,7 @@ export const PassengerProfileScreen: React.FC = () => {
             />
           </div>
           <Button className="w-full mt-2" isLoading={isSavingProfile} onClick={handleSaveProfile}>
-            Save Profile
+            {t('passenger.profile.saveProfile')}
           </Button>
         </div>
       </Dialog>
@@ -279,11 +287,11 @@ export const PassengerProfileScreen: React.FC = () => {
       <Dialog
         isOpen={activeModal === 'changePassword'}
         onClose={() => setActiveModal(null)}
-        title="Change Password"
+        title={t('passenger.profile.changePassword')}
       >
         <div className="space-y-3 text-xs">
           <div>
-            <label className="font-bold block mb-1">Current Password</label>
+            <label className="font-bold block mb-1">{t('passenger.profile.currentPassword')}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -291,7 +299,7 @@ export const PassengerProfileScreen: React.FC = () => {
             />
           </div>
           <div>
-            <label className="font-bold block mb-1">New Password</label>
+            <label className="font-bold block mb-1">{t('passenger.profile.newPassword')}</label>
             <input
               type="password"
               placeholder="••••••••"
@@ -299,7 +307,7 @@ export const PassengerProfileScreen: React.FC = () => {
             />
           </div>
           <Button className="w-full mt-2" onClick={() => setActiveModal(null)}>
-            Update Password
+            {t('passenger.profile.updatePassword')}
           </Button>
         </div>
       </Dialog>
@@ -308,20 +316,19 @@ export const PassengerProfileScreen: React.FC = () => {
       <Dialog
         isOpen={activeModal === 'privacy'}
         onClose={() => setActiveModal(null)}
-        title="Data & Privacy"
+        title={t('passenger.profile.dataPrivacy')}
       >
         <div className="space-y-3 text-xs text-on-surface-variant">
-          <p>
-            Mwendo Salama complies with Kenya Data Protection Act (DPA) 2019. Raw GPS telemetry is compressed and stored securely for safety verification.
-          </p>
+          <p>{t('passenger.profile.dpaNotice')}</p>
           <div className="p-3 bg-surface-container rounded-xl font-mono text-[11px] text-on-surface">
-            ✓ Anonymized Trip Telemetry
+            {t('passenger.profile.anonymizedTelemetry')}
             <br />
-            ✓ Encrypted Emergency SMS
-            <br />✓ Right to Erasure Available
+            {t('passenger.profile.encryptedSms')}
+            <br />
+            {t('passenger.profile.rightToErasure')}
           </div>
           <Button className="w-full mt-2" onClick={() => setActiveModal(null)}>
-            Close
+            {t('passenger.profile.done')}
           </Button>
         </div>
       </Dialog>
@@ -330,14 +337,14 @@ export const PassengerProfileScreen: React.FC = () => {
       <Dialog
         isOpen={activeModal === 'permissions'}
         onClose={() => setActiveModal(null)}
-        title="App Permissions"
+        title={t('passenger.profile.appPermissions')}
       >
         <div className="space-y-2 text-xs">
           {[
-            { name: 'Location (GPS)', status: 'Allowed' },
-            { name: 'Notifications', status: 'Allowed' },
-            { name: 'SMS (SOS Alert)', status: 'Allowed' },
-            { name: 'Camera', status: 'Allowed' },
+            { name: t('passenger.profile.locationGps'), status: t('passenger.profile.allowed') },
+            { name: t('passenger.profile.notifications'), status: t('passenger.profile.allowed') },
+            { name: t('passenger.profile.smsAlert'), status: t('passenger.profile.allowed') },
+            { name: t('passenger.profile.camera'), status: t('passenger.profile.allowed') },
           ].map((p, i) => (
             <div key={i} className="flex justify-between p-2 bg-surface-container rounded-lg font-mono">
               <span>{p.name}</span>
@@ -345,7 +352,7 @@ export const PassengerProfileScreen: React.FC = () => {
             </div>
           ))}
           <Button className="w-full mt-3" onClick={() => setActiveModal(null)}>
-            Done
+            {t('passenger.profile.done')}
           </Button>
         </div>
       </Dialog>
@@ -354,15 +361,15 @@ export const PassengerProfileScreen: React.FC = () => {
       <Dialog
         isOpen={activeModal === 'deleteAccount'}
         onClose={() => setActiveModal(null)}
-        title="Permanently Delete Account?"
+        title={t('passenger.profile.deleteAccount')}
       >
         <div className="space-y-3 text-xs text-on-surface">
           <p className="text-error font-semibold">
-            Warning: This action cannot be undone. All your trip history, trust score, and reports will be deleted.
+            {t('passenger.profile.deleteWarning')}
           </p>
           <div>
             <label className="font-mono text-[11px] block mb-1 text-on-surface-variant">
-              Type <span className="font-bold text-error">DELETE</span> to confirm:
+              {t('passenger.profile.typeDeleteToConfirm')}
             </label>
             <input
               value={deleteConfirmText}
@@ -374,14 +381,14 @@ export const PassengerProfileScreen: React.FC = () => {
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
-              Cancel
+              {t('passenger.profile.cancel')}
             </Button>
             <Button
               disabled={deleteConfirmText.toUpperCase() !== 'DELETE'}
               className="flex-1 bg-error text-on-error font-bold"
               onClick={handleConfirmDelete}
             >
-              Delete Account
+              {t('passenger.profile.deleteAccount')}
             </Button>
           </div>
         </div>

@@ -4,8 +4,10 @@ import { Violation, SeverityLevel } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AuthorityComplianceScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [violations, setViolations] = useState<Violation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +80,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
       setTimeout(() => setActionSuccessMsg(null), 4000);
     } catch (err) {
       console.error('Failed to process enforcement action:', err);
-      alert('Error updating violation enforcement status.');
+      showToast('error', 'Enforcement Failed', 'Error updating violation enforcement status.');
     }
   };
 

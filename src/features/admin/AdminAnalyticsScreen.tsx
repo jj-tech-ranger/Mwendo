@@ -36,7 +36,11 @@ export const AdminAnalyticsScreen: React.FC = () => {
 
   const roleDistribution = [
     { name: 'Passengers', value: roleCounts['passenger'] || 0, color: '#185FA5' },
-    { name: 'SACCO Officials', value: roleCounts['sacco_official'] || 0, color: '#1A5C2E' },
+    {
+      name: 'SACCO Managers',
+      value: (roleCounts['sacco_manager'] || 0) + (roleCounts['sacco_official'] || 0),
+      color: '#1A5C2E',
+    },
     { name: 'Authorities', value: roleCounts['authority'] || 0, color: '#D97706' },
     { name: 'System Admins', value: roleCounts['admin'] || 0, color: '#DC2626' },
   ].filter((r) => r.value > 0);
@@ -53,7 +57,12 @@ export const AdminAnalyticsScreen: React.FC = () => {
           </p>
         </div>
 
-        <Badge variant="info">Live Database Metrics</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="warning" className="text-[10px]">
+            Provisional Client-Side Metrics (Pending Cloud Functions Gen2 Migration)
+          </Badge>
+          <Badge variant="info">Live Database Metrics</Badge>
+        </div>
       </div>
 
       {/* Main Grid: User Roles & SACCO Performance */}

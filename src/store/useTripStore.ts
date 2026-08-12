@@ -79,8 +79,6 @@ export const useTripStore = create<TripState>((set, get) => ({
     if (!state.isTracking || state.isPaused) return;
 
     const newMaxSpeed = Math.max(state.maxSpeed, speed);
-    const isOverspeed = speed > 80;
-    const newOverspeedCount = isOverspeed ? state.overspeedCount + 1 : state.overspeedCount;
 
     const updatedCoords = gps
       ? [...state.routeCoordinates, gps]
@@ -89,14 +87,12 @@ export const useTripStore = create<TripState>((set, get) => ({
     set((s) => ({
       currentSpeed: speed,
       maxSpeed: newMaxSpeed,
-      overspeedCount: newOverspeedCount,
       routeCoordinates: updatedCoords,
       activeTrip: s.activeTrip
         ? {
             ...s.activeTrip,
             currentSpeedKmH: speed,
             maxSpeedKmH: newMaxSpeed,
-            overspeedEventsCount: newOverspeedCount,
           }
         : null,
     }));

@@ -92,12 +92,18 @@ export const AdminSecurityScreen: React.FC = () => {
             </h3>
 
             <div className="space-y-md text-xs font-body-sm">
-              <div className="flex items-center justify-between p-md rounded-xl bg-surface-container-low">
+              {/* TODO: Implement Google Cloud Identity Platform TOTP mandatory MFA for admin/authority per master-architecture.md §5.5 */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-md rounded-xl bg-surface-container-low gap-2">
                 <div>
                   <p className="font-bold text-on-surface">Mandatory MFA for System Admins</p>
                   <p className="text-[11px] text-on-surface-variant">Requires TOTP or SMS verification for /admin access.</p>
                 </div>
-                <Badge variant="success">Enforced</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="warning">MFA: Not yet configured</Badge>
+                  <Button size="sm" variant="outline" disabled className="text-[10px] py-1 px-2">
+                    Set up MFA
+                  </Button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between p-md rounded-xl bg-surface-container-low">

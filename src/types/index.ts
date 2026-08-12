@@ -1,28 +1,35 @@
-export type UserRole = 'passenger' | 'sacco_official' | 'sacco_manager' | 'authority' | 'admin';
+/**
+ * Source of Truth: Canonical Platform User Roles
+ * - 'passenger': Commuters using the app for trip safety monitoring, SOS alerts, hazard reporting, and trip history. Used in /passenger shell.
+ * - 'sacco_manager': SACCO administrators managing fleet vehicles, drivers, speed violations, and compliance. Used in /sacco shell.
+ * - 'authority': NTSA / Traffic Police inspectors conducting vehicle inspections, reviewing complaints, and monitoring black spots. Used in /authority shell.
+ * - 'admin': System administrators managing platform users, SACCO registrations, security policies, and system health. Used in /admin shell.
+ */
+export type UserRole = 'passenger' | 'sacco_manager' | 'authority' | 'admin';
 
 export interface UserProfile {
   id: string;
   uid: string;
   email: string;
   displayName: string;
-  phoneNumber?: string;
+  phoneNumber?: string | undefined;
   role: UserRole;
-  activeRole?: UserRole;
-  saccoId?: string;
-  authorityId?: string;
-  authorityScope?: 'national' | 'county';
-  county?: string;
-  badgeNumber?: string;
+  activeRole?: UserRole | undefined;
+  saccoId?: string | undefined;
+  authorityId?: string | undefined;
+  authorityScope?: ('national' | 'county') | undefined;
+  county?: string | undefined;
+  badgeNumber?: string | undefined;
   isVerified: boolean;
   isActive: boolean;
-  isAnonymous?: boolean;
-  trustScore?: number;
-  emergencyContacts?: Array<{ name: string; phone: string; relationship: string }>;
+  isAnonymous?: boolean | undefined;
+  trustScore?: number | undefined;
+  emergencyContacts?: Array<{ name: string; phone: string; relationship: string }> | undefined;
   notificationPreferences?: {
     overspeedAlerts: boolean;
     blackspotWarnings: boolean;
     weeklyDigest: boolean;
-  };
+  } | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -221,7 +228,7 @@ export interface InspectionReport {
   id: string;
   vehicleRegNumber: string;
   saccoId: string;
-  saccoName?: string;
+  saccoName?: string | undefined;
   inspectorId: string;
   inspectorName: string;
   county: string;
@@ -230,9 +237,9 @@ export interface InspectionReport {
   brakeStatus: 'pass' | 'fail';
   tireStatus: 'pass' | 'fail';
   overallResult: 'passed' | 'failed' | 'impounded' | 'suspended';
-  certificateNumber?: string;
-  expiryDate?: string;
-  notes?: string;
+  certificateNumber?: string | undefined;
+  expiryDate?: string | undefined;
+  notes?: string | undefined;
   createdAt: string;
 }
 

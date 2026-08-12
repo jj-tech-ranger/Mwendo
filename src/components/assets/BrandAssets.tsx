@@ -36,10 +36,10 @@ export const BRAND_ASSETS = {
 
 // Reusable SVG Shield + Speedometer Mark
 export const ShieldSpeedometerMark: React.FC<{
-  className?: string;
-  color?: string;
-  bgColor?: string;
-  isSquare?: boolean;
+  className?: string | undefined;
+  color?: string | undefined;
+  bgColor?: string | undefined;
+  isSquare?: boolean | undefined;
 }> = ({ className = 'w-10 h-10', color = '#1b4d2e', bgColor, isSquare = false }) => {
   return (
     <svg

@@ -1,7 +1,11 @@
 import React from 'react';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 
-export const MaintenanceModeScreen: React.FC = () => {
+interface MaintenanceModeScreenProps {
+  message?: string | undefined;
+}
+
+export const MaintenanceModeScreen: React.FC<MaintenanceModeScreenProps> = ({ message }) => {
   return (
     <main className="min-h-screen bg-[#00431b] text-on-primary flex flex-col items-center justify-center p-md relative overflow-hidden font-body-md text-center">
       <div className="relative z-10 max-w-md w-full space-y-lg">
@@ -20,15 +24,15 @@ export const MaintenanceModeScreen: React.FC = () => {
               We're making things safer
             </h1>
             <p className="font-body-md text-on-primary/80 leading-relaxed">
-              Mwendo Salama is temporarily unavailable while we perform system upgrades. We'll be back shortly to help you travel safer.
+              {message || "Mwendo Salama is temporarily unavailable while we perform system upgrades. We'll be back shortly to help you travel safer."}
             </p>
           </div>
         </div>
 
         <div className="pt-xl w-full space-y-3">
           <button
-            disabled
-            className="w-full bg-on-primary/10 border border-on-primary/20 text-on-primary/40 font-label-bold text-xs py-4 rounded-xl cursor-not-allowed flex items-center justify-center gap-2"
+            onClick={() => window.location.reload()}
+            className="w-full bg-on-primary/10 border border-on-primary/20 text-on-primary font-label-bold text-xs py-4 rounded-xl flex items-center justify-center gap-2 hover:bg-on-primary/20 transition-colors"
           >
             <span className="material-symbols-outlined text-lg">refresh</span>
             Check Again

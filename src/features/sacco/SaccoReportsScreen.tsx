@@ -4,8 +4,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/useAuthStore';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
+import { useToast } from '../../components/ui/Toast';
 
 export const SaccoReportsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const saccoId = user?.saccoId || 'sacco_metrolink';
   const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
@@ -103,7 +105,10 @@ export const SaccoReportsScreen: React.FC = () => {
           {/* Download Action Bar */}
           <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-800">
             <span className="text-xs font-mono text-slate-500">File: {saccoId}_safety_report_{Date.now()}.pdf</span>
-            <Button className="font-bold text-xs" onClick={() => alert('PDF export downloaded successfully!')}>
+            <Button
+              className="font-bold text-xs"
+              onClick={() => showToast('success', 'PDF Downloaded', 'PDF export downloaded successfully!')}
+            >
               <span className="material-symbols-outlined text-base mr-1">download</span> Download PDF Export
             </Button>
           </div>

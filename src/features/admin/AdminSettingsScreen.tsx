@@ -130,9 +130,15 @@ export const AdminSettingsScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2 text-xs font-body-sm">
-            <div className="p-md rounded-xl bg-surface-container-low flex justify-between">
-              <span>Security Status</span>
-              <span className="font-label-mono text-emerald-600 font-bold">MFA Hardware Token Verified</span>
+            {/* TODO: Implement Google Cloud Identity Platform TOTP mandatory MFA for admin/authority per master-architecture.md §5.5 */}
+            <div className="p-md rounded-xl bg-surface-container-low flex items-center justify-between">
+              <div>
+                <span className="block font-bold">Security Status</span>
+                <span className="text-[10px] text-on-surface-variant font-mono">MFA: Not yet configured</span>
+              </div>
+              <Button size="sm" variant="outline" disabled className="text-[10px] py-1 px-2">
+                Set up MFA
+              </Button>
             </div>
           </div>
         </div>

@@ -64,7 +64,10 @@ export const SaccoDashboard: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 font-mono text-xs">
+        <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
+          <Badge variant="warning" className="font-bold py-1 px-3 text-[10px]">
+            Provisional Scores (Cloud Functions Gen2 Pending)
+          </Badge>
           <Badge variant="success" className="font-bold py-1 px-3">
             Tenant ID: {saccoId}
           </Badge>

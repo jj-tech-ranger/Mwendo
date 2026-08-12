@@ -5,8 +5,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AuthorityEmergencyScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,7 +82,7 @@ export const AuthorityEmergencyScreen: React.FC = () => {
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       console.error('Failed to dispatch police:', err);
-      alert('Error updating emergency status.');
+      showToast('error', 'Update Failed', 'Error updating emergency status.');
     }
   };
 

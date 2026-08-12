@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { where } from 'firebase/firestore';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { tripRepository } from '../../repositories';
+import { useAuthStore } from '../../store/useAuthStore';
 import { Trip } from '../../types';
 
 export const TripHistoryScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -18,7 +23,8 @@ export const TripHistoryScreen: React.FC = () => {
   useEffect(() => {
     async function loadTrips() {
       try {
-        const docs = await tripRepository.getAll();
+        const constraints = user?.uid ? [where('userId', '==', user.uid)] : [];
+        const docs = await tripRepository.getAll(constraints);
         setTrips(docs);
       } catch (err) {
         console.warn('Failed to load trips:', err);
@@ -27,7 +33,7 @@ export const TripHistoryScreen: React.FC = () => {
       }
     }
     loadTrips();
-  }, []);
+  }, [user?.uid]);
 
   const filteredTrips = trips.filter((t) => {
     if (filterSacco !== 'all' && t.saccoName !== filterSacco) return false;
@@ -39,9 +45,9 @@ export const TripHistoryScreen: React.FC = () => {
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-black text-on-surface">Trip History</h1>
+          <h1 className="text-xl font-black text-on-surface">{t('passenger.trips.title')}</h1>
           <p className="text-xs text-on-surface-variant">
-            Verified GPS telemetry logs & safety reports
+            {t('passenger.trips.subtitle')}
           </p>
         </div>
       </div>
@@ -49,7 +55,7 @@ export const TripHistoryScreen: React.FC = () => {
       {/* Filter Row */}
       {trips.length > 0 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-          <span className="text-on-surface-variant font-medium">Filter SACCO:</span>
+          <span className="text-on-surface-variant font-medium">{t('passenger.trips.filterSacco')}</span>
           <button
             onClick={() => setFilterSacco('all')}
             className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
@@ -58,7 +64,7 @@ export const TripHistoryScreen: React.FC = () => {
                 : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'
             }`}
           >
-            All SACCOs
+            {t('passenger.trips.allSaccos')}
           </button>
         </div>
       )}
@@ -66,13 +72,13 @@ export const TripHistoryScreen: React.FC = () => {
       {/* Trip List or Empty State */}
       {loading ? (
         <div className="p-8 text-center text-xs text-on-surface-variant font-mono">
-          Loading trip history...
+          {t('passenger.trips.loading')}
         </div>
       ) : filteredTrips.length === 0 ? (
         <EmptyState
-          title="No Trips Recorded Yet"
-          description="Start tracking your PSV journeys to build your safety score and help monitor Kenya's roads."
-          primaryCtaLabel="Start Your First Trip"
+          title={t('passenger.trips.emptyTitle')}
+          description={t('passenger.trips.emptyDesc')}
+          primaryCtaLabel={t('passenger.trips.startFirstTrip')}
           onPrimaryCta={() => navigate('/passenger')}
         />
       ) : (
@@ -99,22 +105,22 @@ export const TripHistoryScreen: React.FC = () => {
 
                   <Badge
                     variant={
-                      trip.violationsCount === 0
+                      (trip.violationsCount || 0) === 0
                         ? 'success'
-                        : trip.violationsCount <= 2
+                        : (trip.violationsCount || 0) <= 2
                         ? 'warning'
                         : 'danger'
                     }
                     className="font-bold font-mono text-xs"
                   >
-                    Violations: {trip.violationsCount || 0}
+                    {t('passenger.trips.violations')}: {trip.violationsCount || 0}
                   </Badge>
                 </div>
 
                 <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant border-t border-outline-variant/20 pt-2">
                   <div className="flex items-center gap-3">
-                    <span>Max Speed: {trip.maxSpeedKmH || 0} km/h</span>
-                    <span>Avg: {trip.avgSpeedKmH || 0} km/h</span>
+                    <span>{t('passenger.trips.maxSpeed')}: {trip.maxSpeedKmH || 0} km/h</span>
+                    <span>{t('passenger.trips.avgSpeed')}: {trip.avgSpeedKmH || 0} km/h</span>
                   </div>
                   <span className="material-symbols-outlined text-base">chevron_right</span>
                 </div>
@@ -128,7 +134,7 @@ export const TripHistoryScreen: React.FC = () => {
       <Dialog
         isOpen={!!selectedTrip}
         onClose={() => setSelectedTrip(null)}
-        title={selectedTrip?.routeName || 'Trip Details'}
+        title={selectedTrip?.routeName || t('passenger.trips.tripDetails')}
       >
         {selectedTrip && (
           <div className="space-y-4 text-xs text-on-surface">
@@ -143,11 +149,11 @@ export const TripHistoryScreen: React.FC = () => {
 
             <div className="grid grid-cols-2 gap-2 font-mono">
               <div className="p-3 bg-surface-container-low rounded-xl">
-                <span className="text-[10px] text-on-surface-variant block uppercase">Max Speed</span>
+                <span className="text-[10px] text-on-surface-variant block uppercase">{t('passenger.trips.maxSpeed')}</span>
                 <span className="text-base font-bold text-on-surface">{selectedTrip.maxSpeedKmH || 0} km/h</span>
               </div>
               <div className="p-3 bg-surface-container-low rounded-xl">
-                <span className="text-[10px] text-on-surface-variant block uppercase">Avg Speed</span>
+                <span className="text-[10px] text-on-surface-variant block uppercase">{t('passenger.trips.avgSpeed')}</span>
                 <span className="text-base font-bold text-on-surface">{selectedTrip.avgSpeedKmH || 0} km/h</span>
               </div>
             </div>
@@ -156,12 +162,12 @@ export const TripHistoryScreen: React.FC = () => {
               <div className="p-3 bg-error/10 border border-error/20 text-error rounded-xl space-y-1">
                 <div className="font-bold flex items-center gap-1">
                   <span className="material-symbols-outlined text-base">warning</span>
-                  {selectedTrip.violationsCount} Violation(s) Recorded
+                  {t('passenger.trips.violationsRecorded', { count: selectedTrip.violationsCount })}
                 </div>
               </div>
             ) : (
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 rounded-xl font-medium">
-                ✓ Perfect Safety Score! No speed violations detected.
+                {t('passenger.trips.perfectSafety')}
               </div>
             )}
 
@@ -171,7 +177,7 @@ export const TripHistoryScreen: React.FC = () => {
                 className="w-full text-xs text-on-surface-variant"
                 onClick={() => setSelectedTrip(null)}
               >
-                Close
+                {t('passenger.trips.close')}
               </Button>
             </div>
           </div>

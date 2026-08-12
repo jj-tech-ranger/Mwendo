@@ -6,11 +6,13 @@ import {
   blackSpotRepository,
   alertRepository,
   vehicleRepository,
+  saccoRepository,
 } from '../../repositories';
-import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle } from '../../types';
+import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 
@@ -44,19 +46,21 @@ export const AuthorityDashboard: React.FC = () => {
   const [blackSpots, setBlackSpots] = useState<BlackSpot[]>([]);
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [saccos, setSaccos] = useState<SACCO[]>([]);
 
   useEffect(() => {
     let isMounted = true;
     async function loadAuthorityData() {
       setIsLoading(true);
       try {
-        const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedAlerts, fetchedVehicles] =
+        const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedAlerts, fetchedVehicles, fetchedSaccos] =
           await Promise.all([
             tripRepository.getAll(),
             violationRepository.getAll(),
             blackSpotRepository.getAll(),
             alertRepository.getAll(),
             vehicleRepository.getAll(),
+            saccoRepository.getAll(),
           ]);
 
         if (isMounted) {
@@ -65,6 +69,7 @@ export const AuthorityDashboard: React.FC = () => {
           setBlackSpots(fetchedSpots);
           setAlerts(fetchedAlerts);
           setVehicles(fetchedVehicles);
+          setSaccos(fetchedSaccos);
         }
       } catch (err) {
         console.error('Failed to load authority dashboard data:', err);
@@ -78,6 +83,11 @@ export const AuthorityDashboard: React.FC = () => {
       isMounted = false;
     };
   }, []);
+
+  // Sort SACCOs by safetyScore ascending (lowest safety score = highest audit priority)
+  const auditPrioritySaccos = useMemo(() => {
+    return [...saccos].sort((a, b) => (a.safetyScore ?? 100) - (b.safetyScore ?? 100));
+  }, [saccos]);
 
   // Filtered dataset by County selection
   const filteredSpots = useMemo(() => {
@@ -475,51 +485,59 @@ export const AuthorityDashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-              <tr className="hover:bg-surface-container-low/50">
-                <td className="py-3 px-3 font-bold text-on-surface">MetroLink Express</td>
-                <td className="py-3 px-3 font-label-mono text-on-surface-variant">SAC-082</td>
-                <td className="py-3 px-3">68 Vehicles</td>
-                <td className="py-3 px-3 font-bold text-rose-600">62 / 100</td>
-                <td className="py-3 px-3 font-label-mono text-amber-600">42 today</td>
-                <td className="py-3 px-3">
-                  <Badge variant="danger">UNDER AUDIT</Badge>
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <Button size="sm" variant="secondary">
-                    Inspect Fleet
-                  </Button>
-                </td>
-              </tr>
-              <tr className="hover:bg-surface-container-low/50">
-                <td className="py-3 px-3 font-bold text-on-surface">2NK Sacco</td>
-                <td className="py-3 px-3 font-label-mono text-on-surface-variant">SAC-014</td>
-                <td className="py-3 px-3">142 Vehicles</td>
-                <td className="py-3 px-3 font-bold text-amber-600">74 / 100</td>
-                <td className="py-3 px-3 font-label-mono text-amber-600">18 today</td>
-                <td className="py-3 px-3">
-                  <Badge variant="warning">WARNING ISSUED</Badge>
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <Button size="sm" variant="secondary">
-                    Inspect Fleet
-                  </Button>
-                </td>
-              </tr>
-              <tr className="hover:bg-surface-container-low/50">
-                <td className="py-3 px-3 font-bold text-on-surface">Super Metro Sacco</td>
-                <td className="py-3 px-3 font-label-mono text-on-surface-variant">SAC-001</td>
-                <td className="py-3 px-3">320 Vehicles</td>
-                <td className="py-3 px-3 font-bold text-emerald-600">92 / 100</td>
-                <td className="py-3 px-3 font-label-mono text-emerald-600">3 today</td>
-                <td className="py-3 px-3">
-                  <Badge variant="success">COMPLIANT</Badge>
-                </td>
-                <td className="py-3 px-3 text-right">
-                  <Button size="sm" variant="outline">
-                    View Profile
-                  </Button>
-                </td>
-              </tr>
+              {auditPrioritySaccos.length >= 3 ? (
+                auditPrioritySaccos.map((sacco) => (
+                  <tr key={sacco.id} className="hover:bg-surface-container-low/50">
+                    <td className="py-3 px-3 font-bold text-on-surface">{sacco.name}</td>
+                    <td className="py-3 px-3 font-label-mono text-on-surface-variant">
+                      {sacco.registrationCode || sacco.id}
+                    </td>
+                    <td className="py-3 px-3">{sacco.fleetCount || 0} Vehicles</td>
+                    <td
+                      className={`py-3 px-3 font-bold ${
+                        (sacco.safetyScore ?? 100) < 70
+                          ? 'text-rose-600'
+                          : (sacco.safetyScore ?? 100) < 85
+                          ? 'text-amber-600'
+                          : 'text-emerald-600'
+                      }`}
+                    >
+                      {sacco.safetyScore ?? 100} / 100
+                    </td>
+                    <td className="py-3 px-3 font-label-mono text-on-surface-variant">
+                      {sacco.contactPhone || 'N/A'}
+                    </td>
+                    <td className="py-3 px-3">
+                      <Badge
+                        variant={
+                          sacco.status === 'suspended'
+                            ? 'danger'
+                            : sacco.status === 'under_review'
+                            ? 'warning'
+                            : 'success'
+                        }
+                      >
+                        {sacco.status.toUpperCase()}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <Button size="sm" variant="secondary">
+                        Inspect Fleet
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr key="empty">
+                  <td colSpan={7} className="py-8">
+                    <EmptyState
+                      title="Insufficient SACCO Data"
+                      description="At least 3 SACCO records are required to generate the Regulatory Audit Priority Queue."
+                      icon="verified"
+                    />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

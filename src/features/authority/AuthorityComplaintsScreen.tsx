@@ -3,9 +3,12 @@ import { complaintRepository, auditLogRepository } from '../../repositories';
 import { Complaint } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AuthorityComplaintsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -68,7 +71,7 @@ export const AuthorityComplaintsScreen: React.FC = () => {
       setTimeout(() => setSuccessMsg(null), 4000);
     } catch (err) {
       console.error('Failed to process complaint action:', err);
-      alert('Error updating complaint status.');
+      showToast('error', 'Update Failed', 'Error updating complaint status.');
     }
   };
 
@@ -183,52 +186,15 @@ export const AuthorityComplaintsScreen: React.FC = () => {
                   </tr>
                 ))
               ) : (
-                [
-                  {
-                    id: 'c-101',
-                    saccoId: 'MetroLink Express',
-                    vehicleRegNumber: 'KCG 482B',
-                    passengerName: 'Jane Wambui',
-                    title: 'Severe Overspeeding & Loud Music',
-                    description: 'Driver exceeding 100km/h on Waiyaki way and refused to lower volume when asked.',
-                    status: 'open' as const,
-                    createdAt: new Date().toISOString(),
-                  },
-                  {
-                    id: 'c-102',
-                    saccoId: '2NK Sacco',
-                    vehicleRegNumber: 'KDA 912Z',
-                    passengerName: 'David Omondi',
-                    title: 'Overloading & Improper Seating',
-                    description: 'Bus carrying 18 passengers in 14-seater matatu.',
-                    status: 'investigating' as const,
-                    createdAt: new Date().toISOString(),
-                  },
-                ].map((c) => (
-                  <tr key={c.id} className="hover:bg-surface-container-low/50">
-                    <td className="py-3 px-3 font-bold text-on-surface">{c.title}</td>
-                    <td className="py-3 px-3 text-on-surface-variant">{c.saccoId}</td>
-                    <td className="py-3 px-3 font-label-mono">{c.vehicleRegNumber}</td>
-                    <td className="py-3 px-3">{c.passengerName}</td>
-                    <td className="py-3 px-3 font-label-mono text-outline">
-                      {new Date(c.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-3">
-                      <Badge variant={c.status === 'investigating' ? 'warning' : 'danger'}>
-                        {c.status.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setSelectedComplaint(c as any)}
-                      >
-                        Verify
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                <tr key="empty">
+                  <td colSpan={7} className="py-8">
+                    <EmptyState
+                      title="No Complaints Logged"
+                      description="No passenger complaints logged yet."
+                      icon="rate_review"
+                    />
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>

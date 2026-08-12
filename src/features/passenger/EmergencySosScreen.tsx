@@ -23,24 +23,15 @@ export const EmergencySosScreen: React.FC = () => {
   const [newContactPhone, setNewContactPhone] = useState('');
   const [newContactRel, setNewContactRel] = useState('Family');
 
-  // SOS Countdown Timer
-  useEffect(() => {
-    if (countdown === null) return;
-    if (countdown <= 0) {
-      setCountdown(null);
-      setSosSent(true);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      setCountdown(countdown - 1);
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
-  const handleTriggerSos = async () => {
-    // 1. Immediately trigger local SMS deep link fallback per architecture §12
+  /**
+   * SAFETY-CRITICAL SOS DESIGN PATTERN:
+   * Hold-to-confirm-then-fire (3-second buffer before dispatch).
+   * We NEVER fire SMS or write to Firestore immediately on tap and offer to cancel later.
+   * Emergency alerts trigger external dispatch and SMS deep-links; fire-then-cancel leaves false
+   * alerts in flight. Holding first ensures only verified, non-cancelled SOS alerts are dispatched.
+   */
+  const dispatchSosAlert = async () => {
+    // 1. Trigger local SMS deep link fallback per architecture §12
     const sosMessage = encodeURIComponent('EMERGENCY SOS: I need immediate assistance on my PSV journey! Live GPS location active.');
     window.location.href = `sms:999?body=${sosMessage}`;
 
@@ -61,6 +52,26 @@ export const EmergencySosScreen: React.FC = () => {
       console.warn('Firestore SOS record error (offline fallback active):', err);
     }
 
+    setSosSent(true);
+  };
+
+  // SOS Countdown Timer
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      dispatchSosAlert();
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleTriggerSos = () => {
     setCountdown(3);
   };
 
@@ -136,7 +147,7 @@ export const EmergencySosScreen: React.FC = () => {
           {countdown !== null ? (
             <Card className="p-8 bg-error/10 border-2 border-error space-y-4 animate-pulse">
               <div className="text-6xl font-black font-mono text-error">{countdown}</div>
-              <h2 className="text-lg font-bold text-error">Sending Emergency SOS Alert...</h2>
+              <h2 className="text-lg font-bold text-error">Sending alert in {countdown}...</h2>
               <p className="text-xs text-on-surface-variant">
                 SMS with your GPS location will be sent to emergency contacts and NTSA safety hotline.
               </p>

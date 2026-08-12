@@ -102,7 +102,7 @@ export const AdminNotificationsScreen: React.FC = () => {
               >
                 <option value="all">All Registered Users</option>
                 <option value="passengers">Passengers Only</option>
-                <option value="sacco_officials">SACCO Officials & Managers</option>
+                <option value="sacco_managers">SACCO Managers</option>
                 <option value="authorities">NTSA & County Inspectors</option>
               </select>
             </div>

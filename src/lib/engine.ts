@@ -99,8 +99,11 @@ export const ConfidenceScorer = {
     const totalGaps = samples.length - 1;
     if (totalGaps > 0) {
       for (let i = 1; i < samples.length; i++) {
-        const t1 = new Date(samples[i - 1].timestamp).getTime();
-        const t2 = new Date(samples[i].timestamp).getTime();
+        const prev = samples[i - 1];
+        const curr = samples[i];
+        if (!prev || !curr) continue;
+        const t1 = new Date(prev.timestamp).getTime();
+        const t2 = new Date(curr.timestamp).getTime();
         const gapSec = (t2 - t1) / 1000;
         if (gapSec > 0 && gapSec <= expectedIntervalSec * 2.5) {
           continuityCount++;
@@ -280,6 +283,7 @@ export const detectOverspeedViolations = (
 
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
+    if (!s) continue;
     const sampleTimeMs = new Date(s.timestamp).getTime();
     const { isValid, smoothedSpeedKmH } = smoother.processSample(s);
 

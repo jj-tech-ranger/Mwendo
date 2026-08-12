@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -7,13 +8,21 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
+import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 
 export const PassengerDashboard: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { startTrip, activeTrip } = useTripStore();
 
-  const [isGuestMode, setIsGuestMode] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(() => !!user?.isAnonymous);
+
+  useEffect(() => {
+    if (user) {
+      setIsGuestMode(!!user.isAnonymous);
+    }
+  }, [user]);
   const [plateNumber, setPlateNumber] = useState('');
   const [sacco, setSacco] = useState('');
   const [route, setRoute] = useState('');
@@ -31,31 +40,33 @@ export const PassengerDashboard: React.FC = () => {
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
       {/* Dev Mode Switcher for Guest vs Registered View */}
-      <div className="flex items-center justify-between bg-surface-container-low p-2 px-3 rounded-xl border border-outline-variant/30 text-xs">
-        <span className="font-mono text-on-surface-variant">View Mode:</span>
-        <div className="flex gap-1">
-          <button
-            onClick={() => setIsGuestMode(false)}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-              !isGuestMode
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            Registered
-          </button>
-          <button
-            onClick={() => setIsGuestMode(true)}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-              isGuestMode
-                ? 'bg-primary text-on-primary shadow-sm'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            Guest
-          </button>
+      {SHOW_DEV_TOOLS && (
+        <div className="flex items-center justify-between bg-surface-container-low p-2 px-3 rounded-xl border border-outline-variant/30 text-xs">
+          <span className="font-mono text-on-surface-variant">View Mode (Dev Only):</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setIsGuestMode(false)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                !isGuestMode
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Registered
+            </button>
+            <button
+              onClick={() => setIsGuestMode(true)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                isGuestMode
+                  ? 'bg-primary text-on-primary shadow-sm'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              Guest
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Header Bar */}
       <div className="flex items-center justify-between pt-1">
@@ -63,17 +74,21 @@ export const PassengerDashboard: React.FC = () => {
           <BrandMark className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-black tracking-tight text-on-surface">
-              {isGuestMode ? 'Welcome, Guest' : `Good evening, ${user?.displayName || 'Passenger'}`}
+              {isGuestMode
+                ? t('passenger.dashboard.welcomeGuest')
+                : t('passenger.dashboard.welcomePassenger', { name: user?.displayName || 'Passenger' })}
             </h1>
             <p className="text-xs text-on-surface-variant font-medium">
-              {isGuestMode ? 'Civic Road Safety Monitor' : 'Mwendo Salama Passenger'}
+              {isGuestMode
+                ? t('passenger.dashboard.civicMonitor')
+                : t('passenger.dashboard.passengerApp')}
             </p>
           </div>
         </div>
 
         {isGuestMode ? (
           <Button size="sm" variant="outline" onClick={() => navigate('/auth/register')}>
-            Sign Up
+            {t('passenger.dashboard.signUp')}
           </Button>
         ) : (
           <button
@@ -92,12 +107,14 @@ export const PassengerDashboard: React.FC = () => {
           <div className="flex items-start gap-3">
             <span className="material-symbols-outlined text-emerald-700 text-2xl">info</span>
             <div className="space-y-1">
-              <h3 className="text-sm font-bold text-on-surface">Create a free account</h3>
+              <h3 className="text-sm font-bold text-on-surface">
+                {t('passenger.dashboard.createFreeAccount')}
+              </h3>
               <p className="text-xs text-on-surface-variant">
-                Save your trips, build your trust score, and receive personalized route safety alerts.
+                {t('passenger.dashboard.guestBannerDesc')}
               </p>
               <Button size="sm" className="mt-2 text-xs" onClick={() => navigate('/auth/register')}>
-                Sign Up Now
+                {t('passenger.dashboard.signUpNow')}
               </Button>
             </div>
           </div>
@@ -108,37 +125,39 @@ export const PassengerDashboard: React.FC = () => {
       <Card className="p-5 space-y-4 shadow-sm border border-outline-variant/30">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
-            Quick Trip Setup
+            {t('passenger.dashboard.quickTripSetup')}
           </span>
           <Badge variant="neutral" className="text-[10px]">
-            Live GPS Ready
+            {t('passenger.dashboard.liveGpsReady')}
           </Badge>
         </div>
 
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-bold text-on-surface mb-1 block">
-              Enter PSV Plate Number
+            <label htmlFor="psv-plate-input" className="text-xs font-bold text-on-surface mb-1 block">
+              {t('passenger.dashboard.enterPsvPlate')}
             </label>
             <Input
+              id="psv-plate-input"
               value={plateNumber}
               onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-              placeholder="e.g. KDA 123A"
+              placeholder={t('passenger.dashboard.platePlaceholder')}
               className="font-mono text-base font-bold uppercase tracking-wider"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-on-surface-variant mb-1 block">
-                SACCO Organization
+              <label htmlFor="sacco-org-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
+                {t('passenger.dashboard.saccoOrg')}
               </label>
               <select
+                id="sacco-org-select"
                 value={sacco}
                 onChange={(e) => setSacco(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
               >
-                <option value="">-- Select SACCO --</option>
+                <option value="">{t('passenger.dashboard.selectSacco')}</option>
                 <option value="MetroLink SACCO">MetroLink SACCO</option>
                 <option value="GreenLine SACCO">GreenLine SACCO</option>
                 <option value="TransitStar SACCO">TransitStar SACCO</option>
@@ -147,15 +166,16 @@ export const PassengerDashboard: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-on-surface-variant mb-1 block">
-                Route Corridor
+              <label htmlFor="route-corridor-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
+                {t('passenger.dashboard.routeCorridor')}
               </label>
               <select
+                id="route-corridor-select"
                 value={route}
                 onChange={(e) => setRoute(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
               >
-                <option value="">-- Select Route --</option>
+                <option value="">{t('passenger.dashboard.selectRoute')}</option>
                 <option value="Thika Road – Nairobi CBD">Thika Road – Nairobi CBD</option>
                 <option value="Waiyaki Way – Westlands">Waiyaki Way – Westlands</option>
                 <option value="Mombasa Road – Syokimau">Mombasa Road – Syokimau</option>
@@ -173,7 +193,7 @@ export const PassengerDashboard: React.FC = () => {
             className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-lg">speed</span>
-            Start Trip
+            {t('passenger.dashboard.startTrip')}
           </Button>
 
           <Button
@@ -182,7 +202,7 @@ export const PassengerDashboard: React.FC = () => {
             className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2 border-warning text-warning hover:bg-warning/10"
           >
             <span className="material-symbols-outlined text-lg">warning</span>
-            Report Black Spot
+            {t('passenger.dashboard.reportBlackSpot')}
           </Button>
         </div>
 
@@ -192,7 +212,7 @@ export const PassengerDashboard: React.FC = () => {
           className="w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-base">map</span>
-          View Live Safety Map
+          {t('passenger.dashboard.viewLiveMap')}
         </Button>
       </Card>
 
@@ -201,53 +221,59 @@ export const PassengerDashboard: React.FC = () => {
         {/* Stat 1: Trips Completed */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
-            <span className="text-xs font-medium">Trips Tracked</span>
+            <span className="text-xs font-medium">{t('passenger.dashboard.tripsTracked')}</span>
             <span className="material-symbols-outlined text-primary text-xl">directions_bus</span>
           </div>
           <div className="text-2xl font-black font-mono text-on-surface">{activeTrip ? 1 : 0}</div>
           <p className="text-[11px] text-on-surface-variant font-medium">
-            {activeTrip ? '1 Trip Active' : 'No trips logged'}
+            {activeTrip ? t('passenger.dashboard.activeTrip') : t('passenger.dashboard.noTripsLogged')}
           </p>
         </Card>
 
         {/* Stat 2: Recent Alerts */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
-            <span className="text-xs font-medium">Recent Alerts</span>
+            <span className="text-xs font-medium">{t('passenger.dashboard.recentAlerts')}</span>
             <span className="material-symbols-outlined text-warning text-xl">notifications_active</span>
           </div>
           <div className="text-2xl font-black font-mono text-on-surface">0</div>
-          <p className="text-[11px] text-on-surface-variant font-medium">No alerts</p>
+          <p className="text-[11px] text-on-surface-variant font-medium">
+            {t('passenger.dashboard.noAlerts')}
+          </p>
         </Card>
 
         {/* Stat 3: Safety Score */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
-            <span className="text-xs font-medium">Safety Score</span>
+            <span className="text-xs font-medium">{t('passenger.dashboard.safetyScore')}</span>
             <span className="material-symbols-outlined text-emerald-600 text-xl">verified_user</span>
           </div>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-black font-mono text-emerald-800">--</span>
             <span className="text-xs text-on-surface-variant font-mono">/100</span>
           </div>
-          <p className="text-[11px] text-on-surface-variant font-medium">No safety data yet</p>
+          <p className="text-[11px] text-on-surface-variant font-medium">
+            {t('passenger.dashboard.noSafetyData')}
+          </p>
         </Card>
 
         {/* Stat 4: Nearby Danger Zones */}
         <Card className="p-4 space-y-1 border-outline-variant/30 bg-surface-container-low">
           <div className="flex items-center justify-between text-on-surface-variant">
-            <span className="text-xs font-medium">Danger Zones</span>
+            <span className="text-xs font-medium">{t('passenger.dashboard.dangerZones')}</span>
             <span className="material-symbols-outlined text-outline text-xl">report</span>
           </div>
           <div className="text-2xl font-black font-mono text-on-surface">0</div>
-          <p className="text-[11px] text-on-surface-variant font-medium">No reported spots</p>
+          <p className="text-[11px] text-on-surface-variant font-medium">
+            {t('passenger.dashboard.noReportedSpots')}
+          </p>
         </Card>
       </div>
 
       {/* Quick Access List */}
       <div className="space-y-2">
         <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase tracking-wider">
-          Quick Tools
+          {t('passenger.dashboard.quickTools')}
         </h2>
         <div className="grid grid-cols-2 gap-2 text-xs font-medium">
           <button
@@ -255,14 +281,14 @@ export const PassengerDashboard: React.FC = () => {
             className="flex items-center gap-2 p-3 rounded-xl bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors text-left font-bold"
           >
             <span className="material-symbols-outlined text-lg">sos</span>
-            Emergency SOS
+            {t('passenger.dashboard.emergencySos')}
           </button>
           <button
             onClick={() => navigate('/passenger/trips')}
             className="flex items-center gap-2 p-3 rounded-xl bg-surface-container border border-outline-variant/30 hover:bg-surface-container-high transition-colors text-left"
           >
             <span className="material-symbols-outlined text-lg">history</span>
-            Trip Logs
+            {t('passenger.dashboard.tripLogs')}
           </button>
         </div>
       </div>

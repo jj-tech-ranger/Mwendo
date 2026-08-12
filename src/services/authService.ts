@@ -196,6 +196,7 @@ export const authService = {
       window.localStorage.removeItem('emailForSignIn');
       return await this.fetchOrInitUserProfile(cred.user);
     }
+    return null;
   },
 
   async sendPasswordReset(email: string) {
@@ -215,9 +216,22 @@ export const authService = {
       await updateProfile(currentUser, { displayName: data.displayName });
     }
 
+    // Strip out privileged fields so client-side updates match firestore.rules owner update restriction
+    const {
+      role,
+      activeRole,
+      roles,
+      saccoId,
+      authorityId,
+      authorityScope,
+      isActive,
+      trustScore,
+      ...safeProfileData
+    } = data as any;
+
     const userRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userRef, {
-      ...data,
+      ...safeProfileData,
       updatedAt: new Date().toISOString(),
     });
 
@@ -225,53 +239,29 @@ export const authService = {
     if (existingUser) {
       useAuthStore.getState().setUser({
         ...existingUser,
-        ...data,
+        ...safeProfileData,
       });
     }
   },
 
-  // /v1/setActiveRole implementation (§5.2)
+  /**
+   * TODO: Server-Side Role Switching Callable (/v1/setActiveRole)
+   * Direct client-side updates to activeRole/role in Firestore are strictly blocked by firestore.rules.
+   * Role switching MUST be processed by a backend Cloud Function callable (e.g. httpsCallable(functions, 'setActiveRole')).
+   * The Cloud Function will:
+   * 1. Validate targetRole against user's assigned roles[] in Firestore.
+   * 2. Set custom user claims via Firebase Admin SDK (admin.auth().setCustomUserClaims(uid, { activeRole: targetRole })).
+   * 3. Update activeRole in user's Firestore document.
+   * 4. Instruct client to force refresh token context (`getIdToken(true)`).
+   */
   async setActiveRole(targetRole: UserRole) {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('Unauthenticated user cannot change active role');
-    }
-
-    // Verify live state in Firestore
-    const userRef = doc(db, 'users', currentUser.uid);
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) {
-      throw new Error('User profile not found');
-    }
-
-    const userData = snap.data();
-    if (userData.isActive === false) {
-      throw new Error('Account suspended');
-    }
-
-    const allowedRoles: UserRole[] = userData.roles || [userData.role || 'passenger'];
-    if (!allowedRoles.includes(targetRole) && targetRole !== 'passenger') {
-      throw new Error(`Role ${targetRole} is not in user's assigned roles`);
-    }
-
-    // Update activeRole in Firestore document
-    await updateDoc(userRef, {
-      activeRole: targetRole,
-      role: targetRole,
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Force ID token refresh to update token context
-    await currentUser.getIdToken(true);
-
-    const existingUser = useAuthStore.getState().user;
-    if (existingUser) {
-      useAuthStore.getState().setUser({
-        ...existingUser,
-        role: targetRole,
-        activeRole: targetRole,
-      });
-    }
+    console.warn(
+      `[authService] Client-side write to activeRole ('${targetRole}') is disabled. ` +
+      `Role switching requires the backend Cloud Function callable (/v1/setActiveRole).`
+    );
+    throw new Error(
+      'Role switching is disabled on the client. Role updates must be performed via a secure server-side Cloud Function.'
+    );
   },
 
   // High-stakes admin live status check (§5.6)

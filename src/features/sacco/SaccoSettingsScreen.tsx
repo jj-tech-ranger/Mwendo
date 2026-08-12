@@ -7,8 +7,10 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { auditLogRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { AuditLog } from '../../types';
+import { useToast } from '../../components/ui/Toast';
 
 export const SaccoSettingsScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user } = useAuthStore();
   const saccoId = user?.saccoId || 'sacco_metrolink';
   const saccoName = saccoId === 'sacco_greenline' ? 'GreenLine SACCO' : 'MetroLink SACCO';
@@ -118,7 +120,10 @@ export const SaccoSettingsScreen: React.FC = () => {
               <Input defaultValue={`info@${saccoId}.co.ke`} />
             </div>
 
-            <Button className="mt-2 font-bold" onClick={() => alert('Organization profile saved.')}>
+            <Button
+              className="mt-2 font-bold"
+              onClick={() => showToast('success', 'Profile Saved', 'Organization profile saved successfully.')}
+            >
               Save Profile Changes
             </Button>
           </div>
@@ -195,7 +200,10 @@ export const SaccoSettingsScreen: React.FC = () => {
               <div className="font-bold text-primary">Account Manager Contact</div>
               <div className="text-on-surface-variant">support@mwendosalama.go.ke</div>
             </div>
-            <Button size="sm" onClick={() => alert('Support ticket initiated.')}>
+            <Button
+              size="sm"
+              onClick={() => showToast('info', 'Support Initiated', 'Support ticket initiated. Our desk will contact you.')}
+            >
               Contact NTSA Support
             </Button>
           </div>

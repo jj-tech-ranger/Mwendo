@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../lib/utils';
 import { BRAND_ASSETS } from '../assets/BrandAssets';
 import { OfflineBanner } from '../common/OfflineBanner';
+import { LanguageToggle } from '../common/LanguageToggle';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
@@ -159,7 +160,7 @@ export const AdminShell: React.FC = () => {
                     <NavLink
                       key={item.path}
                       to={item.path}
-                      end={item.end}
+                      end={item.end ?? false}
                       className={({ isActive }) =>
                         cn(
                           'flex items-center gap-3 px-3 py-2 rounded-xl font-label-mono text-xs uppercase tracking-wider transition-all duration-150',
@@ -178,8 +179,9 @@ export const AdminShell: React.FC = () => {
             </nav>
           </div>
 
-          {/* User Snippet at Sidebar Bottom */}
-          <div className="p-md border-t border-emerald-800/40 bg-[#142414] space-y-2">
+          {/* User Snippet & Footer Controls at Sidebar Bottom */}
+          {/* Note: Admin Ops Console is intentionally permanently dark per system design specs for 24/7 high-contrast operational monitoring */}
+          <div className="p-md border-t border-emerald-800/40 bg-[#142414] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-emerald-600/40 border border-emerald-400/30 text-emerald-200 font-bold flex items-center justify-center text-xs">
@@ -198,6 +200,13 @@ export const AdminShell: React.FC = () => {
 
               <span className="bg-emerald-900/80 text-emerald-300 border border-emerald-700/50 px-2 py-0.5 rounded font-label-mono text-[9px] uppercase">
                 PROD
+              </span>
+            </div>
+
+            <div className="pt-1 border-t border-emerald-800/30 flex items-center justify-between">
+              <LanguageToggle />
+              <span className="font-label-mono text-[9px] text-emerald-400/60 uppercase">
+                24/7 OPS
               </span>
             </div>
           </div>

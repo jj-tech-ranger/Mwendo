@@ -4,8 +4,10 @@ import { Button } from '../../components/ui/Button';
 import { userRepository, auditLogRepository } from '../../repositories';
 import { UserProfile, UserRole } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AdminUsersScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,6 +50,12 @@ export const AdminUsersScreen: React.FC = () => {
     const newStatus = !isSuspending;
 
     try {
+      // ARCHITECTURE NOTE: Token-based custom claims (e.g., `isSuspended: true` set via Firebase Admin SDK)
+      // can lag up to ~1 hour behind the Firestore document write due to client-side ID token caching.
+      // In a production backend, this client-side `userRepository.update` should also trigger a Cloud Function
+      // (e.g., `adminSuspendUser`) that sets the custom claim (`isSuspended: true`) and calls
+      // `admin.auth().revokeRefreshTokens(uid)` to immediately invalidate the suspended user's active session.
+      //
       // 1. Live Firestore Update (updates real state)
       await userRepository.update(userToSuspend.id, {
         isActive: newStatus,
@@ -80,7 +88,7 @@ export const AdminUsersScreen: React.FC = () => {
       setUserToSuspend(null);
     } catch (err) {
       console.error('Failed to toggle user suspension:', err);
-      alert('Error updating user status. Please check connection.');
+      showToast('error', 'Status Update Failed', 'Error updating user status. Please check connection.');
     } finally {
       setIsSubmitting(false);
     }
@@ -160,7 +168,6 @@ export const AdminUsersScreen: React.FC = () => {
           >
             <option value="all">All Roles</option>
             <option value="passenger">Passengers</option>
-            <option value="sacco_official">SACCO Officials</option>
             <option value="sacco_manager">SACCO Managers</option>
             <option value="authority">Authorities (NTSA/County)</option>
             <option value="admin">System Admins</option>

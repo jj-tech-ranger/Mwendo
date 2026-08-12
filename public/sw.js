@@ -1,0 +1,87 @@
+// Mwendo Salama PWA Service Worker - Offline Resilient Cache Shell
+const CACHE_NAME = 'mwendo-salama-v1';
+
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icon.svg'
+];
+
+// Install event: Pre-cache core app shell
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      console.log('[SW] Pre-caching app shell assets');
+      return cache.addAll(PRECACHE_URLS).catch((err) => {
+        console.warn('[SW] Cache addAll warning:', err);
+      });
+    }).then(() => self.skipWaiting())
+  );
+});
+
+// Activate event: Cleanup stale caches
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cache);
+            return caches.delete(cache);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Fetch event: Network-first with offline SPA fallback
+self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Exclude non-http or external API domain calls if needed
+  if (!url.protocol.startsWith('http')) return;
+
+  // SPA navigation handling (HTML pages)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return response;
+        })
+        .catch(() => {
+          // Serve cached index.html when offline
+          return caches.match('/index.html').then((cachedIndex) => {
+            return cachedIndex || caches.match('/');
+          });
+        })
+    );
+    return;
+  }
+
+  // Static assets (scripts, styles, images, fonts)
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
+    })
+  );
+});

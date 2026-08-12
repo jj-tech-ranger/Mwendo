@@ -4,8 +4,10 @@ import { Button } from '../../components/ui/Button';
 import { saccoRepository, auditLogRepository } from '../../repositories';
 import { SACCO } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useToast } from '../../components/ui/Toast';
 
 export const AdminSaccosScreen: React.FC = () => {
+  const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
   const [saccos, setSaccos] = useState<SACCO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,7 +81,7 @@ export const AdminSaccosScreen: React.FC = () => {
       setToastMsg(`Successfully registered ${created.name}.`);
     } catch (err) {
       console.error('Failed to register SACCO:', err);
-      alert('Error registering SACCO.');
+      showToast('error', 'Registration Failed', 'Error registering SACCO.');
     } finally {
       setIsSubmitting(false);
     }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <rect width="512" height="512" rx="96" fill="#1A5C2E"/>
+  <!-- Shield Outline -->
+  <path d="M 256 80 C 338 111, 410 121, 410 213 C 410 331, 312 403, 256 429 C 200 403, 102 331, 102 213 C 102 121, 174 111, 256 80 Z" fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Speedometer Arch -->
+  <path d="M 184 312 A 82 82 0 1 1 328 312" fill="none" stroke="#FFFFFF" stroke-width="26" stroke-linecap="round"/>
+  <!-- Speedometer Center Hub -->
+  <circle cx="256" cy="276" r="22" fill="none" stroke="#FFFFFF" stroke-width="14"/>
+  <!-- Speedometer Needle -->
+  <path d="M 263 263 L 322 204" stroke="#4AE175" stroke-width="26" stroke-linecap="round"/>
+</svg>
