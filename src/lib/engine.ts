@@ -39,6 +39,13 @@ export class SpeedSmoother {
       };
     }
 
+    if (!Number.isFinite(sample.speedKmH)) {
+      return {
+        isValid: false,
+        smoothedSpeedKmH: this.currentSmoothedSpeed ?? 0,
+      };
+    }
+
     const rawSpeed = Math.max(0, sample.speedKmH);
 
     if (this.currentSmoothedSpeed === null) {
@@ -200,6 +207,8 @@ export const getTrustBadgeLevel = (trustScore: number): 'bronze' | 'silver' | 'g
 export interface RiskEvent {
   severity: 'low' | 'medium' | 'high' | 'critical';
   timestamp: string | number;
+  /** Telemetry/violation confidence score on a 0.0 - 1.0 scale. Defaults to 1.0 for backward compatibility. */
+  confidenceScore?: number;
 }
 
 export const calculateVehicleRiskScore = (
@@ -213,8 +222,11 @@ export const calculateVehicleRiskScore = (
 
   for (const ev of events) {
     const eventTimeMs = new Date(ev.timestamp).getTime();
-    const ageDays = Math.max(0, (currentTimeMs - eventTimeMs) / (1000 * 60 * 60 * 24));
-    const decayFactor = Math.exp(-lambda * ageDays);
+    if (!Number.isFinite(eventTimeMs)) {
+      continue;
+    }
+    const ageDays = Math.max(0, (currentTimeMs - eventTimeMs) / 86400000);
+    const decayFactor = Math.min(1.0, Math.exp(-lambda * ageDays));
 
     let basePenalty = 5;
     switch (ev.severity) {
@@ -224,7 +236,8 @@ export const calculateVehicleRiskScore = (
       case 'critical': basePenalty = 30; break;
     }
 
-    totalPenalties += basePenalty * decayFactor;
+    const confidenceWeight = ev.confidenceScore ?? 1.0;
+    totalPenalties += basePenalty * decayFactor * confidenceWeight;
   }
 
   // Base raw risk starting from perfect 100
@@ -235,13 +248,14 @@ export const calculateVehicleRiskScore = (
   const BASELINE_SCORE = 85;
   const tripFactor = Math.min(1.0, totalTripCount / 100);
   const finalScore = Math.round(rawScore * tripFactor + BASELINE_SCORE * (1 - tripFactor));
+  const safeFinalScore = Number.isFinite(finalScore) ? finalScore : BASELINE_SCORE;
 
   let riskTier: 'low' | 'medium' | 'high' | 'critical' = 'low';
-  if (finalScore < 45) riskTier = 'critical';
-  else if (finalScore < 65) riskTier = 'high';
-  else if (finalScore < 80) riskTier = 'medium';
+  if (safeFinalScore < 45) riskTier = 'critical';
+  else if (safeFinalScore < 65) riskTier = 'high';
+  else if (safeFinalScore < 80) riskTier = 'medium';
 
-  return { riskScore: finalScore, riskTier };
+  return { riskScore: safeFinalScore, riskTier };
 };
 
 export const calculateSaccoSafetyScore = (

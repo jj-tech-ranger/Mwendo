@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { AreaChartWrapper } from '../../components/charts/Charts';
-import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository } from '../../repositories';
-import { AuditLog, Complaint } from '../../types';
+import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
+import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
 
 export const AdminDashboard: React.FC = () => {
@@ -22,20 +22,31 @@ export const AdminDashboard: React.FC = () => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [fetchedLogs, fetchedUsers, fetchedSaccos, fetchedTrips, fetchedComplaints] = await Promise.all([
+        const todayStr = new Date().toISOString().split('T')[0];
+        const [fetchedLogs, fetchedUsers, fetchedSaccos, precomputedDoc, fetchedComplaints] = await Promise.all([
           auditLogRepository.getAll(),
           userRepository.getAll(),
           saccoRepository.getAll(),
-          tripRepository.getAll(),
+          analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
           complaintRepository.getAll(),
         ]);
+
         if (isMounted) {
           setLogs(fetchedLogs);
           setComplaints(fetchedComplaints.filter((c) => c.status === 'open' || c.status === 'investigating'));
+
+          let tripCount = 0;
+          if (precomputedDoc && 'totalTrips' in precomputedDoc && typeof (precomputedDoc as PlatformAnalyticsDaily).totalTrips === 'number') {
+            tripCount = (precomputedDoc as PlatformAnalyticsDaily).totalTrips;
+          } else {
+            const fallbackTrips = await tripRepository.getAll();
+            tripCount = fallbackTrips.length;
+          }
+
           setStats({
             userCount: fetchedUsers.length,
             saccoCount: fetchedSaccos.length,
-            tripCount: fetchedTrips.length,
+            tripCount,
           });
         }
       } catch (err) {

@@ -1,8 +1,9 @@
 "use strict";
 /**
- * Core Algorithmic Engine for Mwendosalama
+ * Core Algorithmic Engine for Mwendo Salama Functions
  * Implements GPS smoothing, confidence scoring, vehicle risk calculation,
  * reporter trust engine, and violation detection rules.
+ * Functions-local package copy for isolated Firebase Functions deployment.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.detectOverspeedViolations = exports.calculateSaccoSafetyScore = exports.calculateVehicleRiskScore = exports.getTrustBadgeLevel = exports.calculateReporterTrustScore = exports.ConfidenceScorer = exports.SpeedSmoother = void 0;
@@ -24,6 +25,12 @@ class SpeedSmoother {
     }
     processSample(sample) {
         if (sample.accuracy > this.maxAllowedAccuracy || sample.accuracy <= 0 || isNaN(sample.accuracy)) {
+            return {
+                isValid: false,
+                smoothedSpeedKmH: this.currentSmoothedSpeed ?? 0,
+            };
+        }
+        if (!Number.isFinite(sample.speedKmH)) {
             return {
                 isValid: false,
                 smoothedSpeedKmH: this.currentSmoothedSpeed ?? 0,
@@ -156,6 +163,9 @@ const calculateVehicleRiskScore = (events, totalTripCount, currentTimeMs = Date.
     let totalPenalties = 0;
     for (const ev of events) {
         const eventTimeMs = new Date(ev.timestamp).getTime();
+        if (!Number.isFinite(eventTimeMs)) {
+            continue;
+        }
         const ageDays = Math.max(0, (currentTimeMs - eventTimeMs) / (1000 * 60 * 60 * 24));
         const decayFactor = Math.exp(-lambda * ageDays);
         let basePenalty = 5;
@@ -173,7 +183,8 @@ const calculateVehicleRiskScore = (events, totalTripCount, currentTimeMs = Date.
                 basePenalty = 30;
                 break;
         }
-        totalPenalties += basePenalty * decayFactor;
+        const confidenceWeight = ev.confidenceScore ?? 1.0;
+        totalPenalties += basePenalty * decayFactor * confidenceWeight;
     }
     // Base raw risk starting from perfect 100
     const rawScore = Math.max(0, 100 - totalPenalties);
@@ -182,14 +193,15 @@ const calculateVehicleRiskScore = (events, totalTripCount, currentTimeMs = Date.
     const BASELINE_SCORE = 85;
     const tripFactor = Math.min(1.0, totalTripCount / 100);
     const finalScore = Math.round(rawScore * tripFactor + BASELINE_SCORE * (1 - tripFactor));
+    const safeFinalScore = Number.isFinite(finalScore) ? finalScore : BASELINE_SCORE;
     let riskTier = 'low';
-    if (finalScore < 45)
+    if (safeFinalScore < 45)
         riskTier = 'critical';
-    else if (finalScore < 65)
+    else if (safeFinalScore < 65)
         riskTier = 'high';
-    else if (finalScore < 80)
+    else if (safeFinalScore < 80)
         riskTier = 'medium';
-    return { riskScore: finalScore, riskTier };
+    return { riskScore: safeFinalScore, riskTier };
 };
 exports.calculateVehicleRiskScore = calculateVehicleRiskScore;
 const calculateSaccoSafetyScore = (fleetVehicleScores, unresolvedComplaintsCount = 0) => {

@@ -35,91 +35,107 @@ async function verifyAdminCaller(auth: any): Promise<{ uid: string; displayName:
   };
 }
 
-export const suspendUser = onCall(async (request) => {
-  const caller = await verifyAdminCaller(request.auth);
-  const targetUid = request.data?.targetUid;
-  const reason = request.data?.reason || 'Administrative action';
+export const suspendUser = onCall(
+  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  async (request) => {
+    const caller = await verifyAdminCaller(request.auth);
+    const targetUid = request.data?.targetUid;
+    const reason = request.data?.reason || 'Administrative action';
 
-  if (!targetUid || typeof targetUid !== 'string') {
-    throw new HttpsError('invalid-argument', 'The targetUid string parameter must be provided.');
+    if (!targetUid || typeof targetUid !== 'string') {
+      throw new HttpsError('invalid-argument', 'The targetUid string parameter must be provided.');
+    }
+
+    const db = getFirestore();
+    const authAdmin = getAuth();
+
+    try {
+      console.log(`[suspendUser] Step 1: Setting isActive=false on users/${targetUid}`);
+      const targetRef = db.collection('users').doc(targetUid);
+      await targetRef.set(
+        {
+          isActive: false,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      console.log(`[suspendUser] Step 2: Setting isSuspended custom claim on auth uid ${targetUid}`);
+      const userRecord = await authAdmin.getUser(targetUid);
+      const existingClaims = userRecord.customClaims || {};
+      await authAdmin.setCustomUserClaims(targetUid, {
+        ...existingClaims,
+        isSuspended: true,
+      });
+
+      console.log(`[suspendUser] Step 3: Revoking refresh tokens for uid ${targetUid}`);
+      await authAdmin.revokeRefreshTokens(targetUid);
+
+      console.log(`[suspendUser] Step 4: Recording audit log for suspension`);
+      await db.collection('audit_logs').add({
+        action: `SUSPEND_USER (${reason})`,
+        actorName: caller.displayName,
+        actorRole: 'admin',
+        target: `User ID: ${targetUid}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      return { success: true, targetUid, isSuspended: true };
+    } catch (err: any) {
+      console.error(`[suspendUser] Error suspending user ${targetUid}:`, err);
+      throw new HttpsError('internal', err.message || 'Failed to complete user suspension sequence.');
+    }
   }
+);
 
-  const db = getFirestore();
-  const authAdmin = getAuth();
+export const reactivateUser = onCall(
+  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  async (request) => {
+    const caller = await verifyAdminCaller(request.auth);
+    const targetUid = request.data?.targetUid;
 
-  // 1. Write Firestore isActive = false
-  const targetRef = db.collection('users').doc(targetUid);
-  await targetRef.set(
-    {
-      isActive: false,
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
+    if (!targetUid || typeof targetUid !== 'string') {
+      throw new HttpsError('invalid-argument', 'The targetUid string parameter must be provided.');
+    }
 
-  // 2. Set custom claim isSuspended: true
-  const userRecord = await authAdmin.getUser(targetUid);
-  const existingClaims = userRecord.customClaims || {};
-  await authAdmin.setCustomUserClaims(targetUid, {
-    ...existingClaims,
-    isSuspended: true,
-  });
+    const db = getFirestore();
+    const authAdmin = getAuth();
 
-  // 3. Revoke active refresh tokens
-  await authAdmin.revokeRefreshTokens(targetUid);
+    try {
+      console.log(`[reactivateUser] Step 1: Setting isActive=true on users/${targetUid}`);
+      const targetRef = db.collection('users').doc(targetUid);
+      await targetRef.set(
+        {
+          isActive: true,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
 
-  // 4. Record audit log
-  await db.collection('audit_logs').add({
-    action: `SUSPEND_USER (${reason})`,
-    actorName: caller.displayName,
-    actorRole: 'admin',
-    target: `User ID: ${targetUid}`,
-    timestamp: new Date().toISOString(),
-  });
+      console.log(`[reactivateUser] Step 2: Clearing isSuspended custom claim on auth uid ${targetUid}`);
+      const userRecord = await authAdmin.getUser(targetUid);
+      const existingClaims = userRecord.customClaims || {};
+      await authAdmin.setCustomUserClaims(targetUid, {
+        ...existingClaims,
+        isSuspended: false,
+      });
 
-  return { success: true, targetUid, isSuspended: true };
-});
+      console.log(`[reactivateUser] Step 3: Revoking refresh tokens for uid ${targetUid}`);
+      await authAdmin.revokeRefreshTokens(targetUid);
 
-export const reactivateUser = onCall(async (request) => {
-  const caller = await verifyAdminCaller(request.auth);
-  const targetUid = request.data?.targetUid;
+      console.log(`[reactivateUser] Step 4: Recording audit log for reactivation`);
+      await db.collection('audit_logs').add({
+        action: 'UNSUSPEND_USER',
+        actorName: caller.displayName,
+        actorRole: 'admin',
+        target: `User ID: ${targetUid}`,
+        timestamp: new Date().toISOString(),
+      });
 
-  if (!targetUid || typeof targetUid !== 'string') {
-    throw new HttpsError('invalid-argument', 'The targetUid string parameter must be provided.');
+      return { success: true, targetUid, isSuspended: false };
+    } catch (err: any) {
+      console.error(`[reactivateUser] Error reactivating user ${targetUid}:`, err);
+      throw new HttpsError('internal', err.message || 'Failed to complete user reactivation sequence.');
+    }
   }
-
-  const db = getFirestore();
-  const authAdmin = getAuth();
-
-  // 1. Write Firestore isActive = true
-  const targetRef = db.collection('users').doc(targetUid);
-  await targetRef.set(
-    {
-      isActive: true,
-      updatedAt: new Date().toISOString(),
-    },
-    { merge: true }
-  );
-
-  // 2. Set custom claim isSuspended: false
-  const userRecord = await authAdmin.getUser(targetUid);
-  const existingClaims = userRecord.customClaims || {};
-  await authAdmin.setCustomUserClaims(targetUid, {
-    ...existingClaims,
-    isSuspended: false,
-  });
-
-  // 3. Revoke active refresh tokens
-  await authAdmin.revokeRefreshTokens(targetUid);
-
-  // 4. Record audit log
-  await db.collection('audit_logs').add({
-    action: 'UNSUSPEND_USER',
-    actorName: caller.displayName,
-    actorRole: 'admin',
-    target: `User ID: ${targetUid}`,
-    timestamp: new Date().toISOString(),
-  });
-
-  return { success: true, targetUid, isSuspended: false };
-});
+);

@@ -40,10 +40,16 @@ export const useTripStore = create<TripState>((set, get) => ({
   plateNumber: '',
 
   startTrip: ({ plateNumber, saccoName, routeName }) => {
+    const state = get();
+    if (state.activeTrip && state.isTracking) {
+      throw new Error('TRIP001: An active trip is already in progress.');
+    }
+
     const currentUser = useAuthStore.getState().user;
     const userId = currentUser?.uid || currentUser?.id;
+    const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const newTrip: Trip = {
-      id: `trip_${Date.now()}`,
+      id: `trip_${uuid}`,
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
       ...(userId ? { userId } : {}),
       vehicleRegNumber: plateNumber.toUpperCase(),

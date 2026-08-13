@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { calculateSaccoSafetyScore } from '../../../../src/lib/engine';
+import { calculateSaccoSafetyScore } from '../lib/engine';
 
 export async function processRebuildSaccoAnalyticsLogic(
   db: Firestore,
@@ -35,6 +35,7 @@ export async function processRebuildSaccoAnalyticsLogic(
   const docId = `sacco_${saccoId}`;
   const payload = {
     id: docId,
+    docId,
     saccoId,
     type: 'sacco',
     safetyScore: saccoSafetyScore,
@@ -49,14 +50,32 @@ export async function processRebuildSaccoAnalyticsLogic(
   return payload;
 }
 
-export const rebuildSaccoAnalytics = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+export const rebuildSaccoAnalytics = onCall(
+  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const saccoId = request.data?.saccoId;
+    if (!saccoId || typeof saccoId !== 'string') {
+      throw new HttpsError('invalid-argument', 'The saccoId string parameter must be provided.');
+    }
+
+    // Role-based multi-tenancy access check
+    const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger') as string;
+    const userSaccoId = request.auth.token?.saccoId as string | undefined;
+
+    const isPrivileged = role === 'admin' || role === 'authority';
+    const isMatchingSaccoManager = role === 'sacco_manager' && userSaccoId === saccoId;
+
+    if (!isPrivileged && !isMatchingSaccoManager) {
+      throw new HttpsError(
+        'permission-denied',
+        'Insufficient permissions to view or rebuild analytics for this SACCO.'
+      );
+    }
+
+    const db = getFirestore();
+    return await processRebuildSaccoAnalyticsLogic(db, saccoId);
   }
-  const saccoId = request.data?.saccoId;
-  if (!saccoId || typeof saccoId !== 'string') {
-    throw new HttpsError('invalid-argument', 'The saccoId string parameter must be provided.');
-  }
-  const db = getFirestore();
-  return await processRebuildSaccoAnalyticsLogic(db, saccoId);
-});
+);

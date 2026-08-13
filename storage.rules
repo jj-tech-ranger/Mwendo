@@ -8,9 +8,11 @@ service firebase.storage {
       allow read, write: if false;
     }
 
-    // Telemetry storage (owner-scoped)
+    // Telemetry storage (owner-scoped, 5MB limit per VT-005)
     match /telemetry/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024;
     }
 
     // User avatars (2MB limit, image only)

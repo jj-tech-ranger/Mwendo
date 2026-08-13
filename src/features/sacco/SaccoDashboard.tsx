@@ -3,7 +3,8 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
-import { tripRepository, violationRepository, vehicleRepository } from '../../repositories';
+import { tripRepository, violationRepository, vehicleRepository, complaintRepository, analyticsRepository } from '../../repositories';
+import { calculateSaccoSafetyScore } from '../../lib/engine';
 import { where } from 'firebase/firestore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
@@ -17,7 +18,7 @@ export const SaccoDashboard: React.FC = () => {
     totalViolations: 0,
     highRiskVehicles: 0,
     activePilots: 0,
-    safetyScore: 100,
+    safetyScore: 85,
   });
 
   const [recentReports] = useState<any[]>([]);
@@ -29,18 +30,32 @@ export const SaccoDashboard: React.FC = () => {
       if (!saccoId) return;
       setLoading(true);
       try {
-        const [trips, vehicles, violations] = await Promise.all([
+        const [trips, vehicles, violations, complaints, precomputedDoc] = await Promise.all([
           tripRepository.getAll([where('saccoId', '==', saccoId)]),
           vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
           violationRepository.getAll([where('saccoId', '==', saccoId)]),
+          complaintRepository.getAll([where('saccoId', '==', saccoId)]),
+          analyticsRepository.getById(`sacco_${saccoId}`).catch(() => null),
         ]);
+
+        const vehicleScores = vehicles.map((v) =>
+          typeof v.riskScore === 'number' ? v.riskScore : 85
+        );
+        const unresolvedComplaintsCount = complaints.filter(
+          (c) => c.status !== 'resolved'
+        ).length;
+
+        const calculatedSafetyScore =
+          precomputedDoc && 'safetyScore' in precomputedDoc && typeof precomputedDoc.safetyScore === 'number'
+            ? precomputedDoc.safetyScore
+            : calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount);
 
         setStats({
           totalTrips: trips.length,
           totalViolations: violations.length,
           highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length,
           activePilots: vehicles.filter((v) => v.status === 'active').length,
-          safetyScore: violations.length === 0 ? 100 : Math.max(50, 100 - violations.length * 5),
+          safetyScore: calculatedSafetyScore,
         });
       } catch (err) {
         console.warn('Error fetching Firestore sacco data:', err);
@@ -189,11 +204,30 @@ export const SaccoDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <Badge variant="success" className="font-bold">
-              Grade A - Preferred SACCO
+            <Badge
+              variant={
+                stats.safetyScore >= 80
+                  ? 'success'
+                  : stats.safetyScore >= 65
+                  ? 'warning'
+                  : 'danger'
+              }
+              className="font-bold"
+            >
+              {stats.safetyScore >= 80
+                ? 'Grade A - Preferred SACCO'
+                : stats.safetyScore >= 65
+                ? 'Grade B - Standard SACCO'
+                : stats.safetyScore >= 50
+                ? 'Grade C - Probationary SACCO'
+                : 'Grade D - High Risk SACCO'}
             </Badge>
             <p className="text-[11px] text-on-surface-variant max-w-xs mx-auto">
-              Eligible for NTSA Express Lane Corridor privileges
+              {stats.safetyScore >= 80
+                ? 'Eligible for NTSA Express Lane Corridor privileges'
+                : stats.safetyScore >= 65
+                ? 'Standard commercial operating compliance status'
+                : 'Subject to enhanced NTSA roadside compliance checks'}
             </p>
           </div>
         </Card>

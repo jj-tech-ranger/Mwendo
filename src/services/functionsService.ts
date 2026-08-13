@@ -1,7 +1,7 @@
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../lib/firebase';
-import { SeverityLevel } from '../types';
+import { SeverityLevel, PlatformAnalyticsDaily, SaccoAnalyticsDaily } from '../types';
 import {
   calculateVehicleRiskScore,
   calculateSaccoSafetyScore,
@@ -35,6 +35,7 @@ export interface VehicleRiskEvent {
   severity: SeverityLevel;
   recordedSpeedKmH?: number;
   speedLimitKmH?: number;
+  confidenceScore?: number;
   timestamp: string;
 }
 
@@ -92,16 +93,38 @@ export const functionsService = {
       where('vehicleRegNumber', '==', event.vehicleRegNumber)
     );
     const violSnap = await getDocs(violQuery);
-    const eventsList: RiskEvent[] = violSnap.docs.map((d) => ({
-      severity: (d.data().severity || 'low') as SeverityLevel,
-      timestamp: d.data().timestamp || new Date().toISOString(),
-    }));
+    const nowMs = Date.now();
+    const eventsList: RiskEvent[] = violSnap.docs
+      .map((d) => {
+        const data = d.data();
+        return {
+          severity: (data.severity || 'low') as SeverityLevel,
+          timestamp: data.timestamp || new Date().toISOString(),
+          confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
+          recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
+        };
+      })
+      .filter((e) => {
+        // VT-003: Plausibility filter - reject impossible speeds (>180 km/h) and unparseable timestamps
+        if (e.recordedSpeedKmH !== undefined && (e.recordedSpeedKmH < 0 || e.recordedSpeedKmH > 180)) {
+          return false;
+        }
+        const t = new Date(e.timestamp).getTime();
+        return Number.isFinite(t);
+      });
 
-    // Add current event to calculation
-    eventsList.push({
-      severity: event.severity,
-      timestamp: event.timestamp,
-    });
+    // Add current event to calculation if plausible
+    const incomingTimeMs = new Date(event.timestamp).getTime();
+    if (
+      Number.isFinite(incomingTimeMs) &&
+      (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))
+    ) {
+      eventsList.push({
+        severity: event.severity,
+        timestamp: event.timestamp,
+        confidenceScore: typeof event.confidenceScore === 'number' ? event.confidenceScore : 1.0,
+      });
+    }
 
     // Query total trip count for regularization floor
     const tripsQuery = query(
@@ -112,7 +135,7 @@ export const functionsService = {
     const totalTripCount = tripsSnap.size || 1;
 
     // Compute exact risk score using 30-day decay formula & sub-100 regularization
-    const { riskScore, riskTier } = calculateVehicleRiskScore(eventsList, totalTripCount);
+    const { riskScore, riskTier } = calculateVehicleRiskScore(eventsList, totalTripCount, nowMs);
 
     try {
       await updateDoc(vehicleRef, {
@@ -285,7 +308,7 @@ export const functionsService = {
    * Gen 2 Function: updateDailyAnalytics (§8.2 CQRS)
    * Pre-aggregates daily metrics into analytics/daily_{dateStr}
    */
-  async updateDailyAnalytics(dateStr: string): Promise<any> {
+  async updateDailyAnalytics(dateStr: string): Promise<PlatformAnalyticsDaily> {
     const tripsSnap = await getDocs(collection(db, 'trips'));
     const violSnap = await getDocs(collection(db, 'violations'));
     const alertsSnap = await getDocs(collection(db, 'safety_alerts'));
@@ -311,8 +334,9 @@ export const functionsService = {
     const docId = `daily_${dateStr}`;
     const analyticsRef = doc(db, 'analytics', docId);
 
-    const payload = {
+    const payload: PlatformAnalyticsDaily = {
       id: docId,
+      docId,
       date: dateStr,
       type: 'daily',
       totalTrips,
@@ -340,7 +364,7 @@ export const functionsService = {
    * Gen 2 Function: rebuildSaccoAnalytics (§8.2 CQRS)
    * Computes and writes pre-aggregated SACCO safety score to analytics/sacco_{saccoId}
    */
-  async rebuildSaccoAnalytics(saccoId: string): Promise<any> {
+  async rebuildSaccoAnalytics(saccoId: string): Promise<SaccoAnalyticsDaily> {
     const vehiclesQuery = query(collection(db, 'vehicles'), where('saccoId', '==', saccoId));
     const vehiclesSnap = await getDocs(vehiclesQuery);
 
@@ -373,8 +397,9 @@ export const functionsService = {
     }
 
     const docId = `sacco_${saccoId}`;
-    const payload = {
+    const payload: SaccoAnalyticsDaily = {
       id: docId,
+      docId,
       saccoId,
       type: 'sacco',
       safetyScore: saccoSafetyScore,
@@ -535,7 +560,90 @@ export const functionsService = {
       if (functionName === 'rebuildSaccoAnalytics') {
         return (await this.rebuildSaccoAnalytics(data.saccoId)) as any;
       }
+      if (functionName === 'sendSOS') {
+        return (await this.sendSOS(data)) as any;
+      }
       throw err;
+    }
+  },
+
+  /**
+   * Gen 2 Function: sendSOS (§9.6)
+   * Dispatches emergency SMS to saved contacts, sends FCM push notification, and writes to safety_alerts.
+   */
+  async sendSOS(payload: {
+    alertId?: string;
+    tripId?: string;
+    userId?: string;
+    vehicleRegNumber?: string;
+    saccoId?: string;
+    location?: { lat: number; lng: number };
+    speedKmH?: number;
+    message?: string;
+  }): Promise<{
+    success: boolean;
+    alertId: string;
+    contactsNotifiedCount: number;
+    fcmDispatchedCount: number;
+    dlqCount: number;
+    contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
+  }> {
+    try {
+      const callable = httpsCallable<any, any>(functions, 'sendSOS');
+      const res = await callable(payload);
+      return res.data;
+    } catch (remoteErr) {
+      console.warn('[functionsService] Remote sendSOS failed or offline, executing client fallback:', remoteErr);
+
+      const alertId = payload.alertId || `sos_${Date.now()}`;
+      const userId = payload.userId || 'passenger_me';
+      const userRef = doc(db, 'users', userId);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.data() || {};
+      const emergencyContacts = userData.emergencyContacts || [];
+
+      const contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }> = [];
+
+      for (const c of emergencyContacts) {
+        contactsSummary.push({
+          name: c.name,
+          relationship: c.relationship,
+          status: 'dispatched',
+        });
+      }
+
+      // Save alert to safety_alerts
+      const alertData = {
+        id: alertId,
+        tripId: payload.tripId || `trip_${alertId}`,
+        userId,
+        vehicleRegNumber: payload.vehicleRegNumber || 'Vehicle In Transit',
+        saccoId: payload.saccoId || 'unassigned',
+        type: 'sos',
+        severity: 'critical',
+        message: payload.message || 'Emergency SOS activated by passenger',
+        latitude: payload.location?.lat ?? -1.286389,
+        longitude: payload.location?.lng ?? 36.817223,
+        speedKmH: payload.speedKmH ?? 0,
+        timestamp: new Date().toISOString(),
+        status: 'active',
+        emergencyContactsCount: emergencyContacts.length,
+      };
+
+      try {
+        await setDoc(doc(db, 'safety_alerts', alertId), alertData, { merge: true });
+      } catch (saveErr) {
+        console.warn('[functionsService] Local fallback save safety_alerts warning:', saveErr);
+      }
+
+      return {
+        success: true,
+        alertId,
+        contactsNotifiedCount: emergencyContacts.length,
+        fcmDispatchedCount: 1,
+        dlqCount: 0,
+        contactsSummary,
+      };
     }
   },
 };

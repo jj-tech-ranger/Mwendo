@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { calculateVehicleRiskScore, RiskEvent } from '../../../../src/lib/engine';
+import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
 
 export interface VehicleRiskEventPayload {
   eventId: string;
@@ -11,6 +11,7 @@ export interface VehicleRiskEventPayload {
   severity: 'low' | 'medium' | 'high' | 'critical';
   recordedSpeedKmH?: number;
   speedLimitKmH?: number;
+  confidenceScore?: number;
   timestamp: string;
 }
 
@@ -19,19 +20,25 @@ export async function processVehicleRiskLogic(
   event: VehicleRiskEventPayload
 ): Promise<{ processed: boolean; riskScore: number; riskTier: string }> {
   const ledgerRef = db.collection('processedEvents').doc(event.eventId);
-  const ledgerSnap = await ledgerRef.get();
 
-  if (ledgerSnap.exists) {
+  // Use a Firestore transaction for atomic idempotency check and write
+  const shouldProcess = await db.runTransaction(async (transaction) => {
+    const ledgerSnap = await transaction.get(ledgerRef);
+    if (ledgerSnap.exists) {
+      return false;
+    }
+    transaction.set(ledgerRef, {
+      eventId: event.eventId,
+      handler: 'computeVehicleRisk',
+      vehicleRegNumber: event.vehicleRegNumber,
+      processedAt: new Date().toISOString(),
+    });
+    return true;
+  });
+
+  if (!shouldProcess) {
     return { processed: false, riskScore: 0, riskTier: 'existing' };
   }
-
-  // Mark event as processed in ledger
-  await ledgerRef.set({
-    eventId: event.eventId,
-    handler: 'computeVehicleRisk',
-    vehicleRegNumber: event.vehicleRegNumber,
-    processedAt: new Date().toISOString(),
-  });
 
   const vehicleId = event.vehicleId || event.vehicleRegNumber.replace(/\s+/g, '_');
   const vehicleRef = db.collection('vehicles').doc(vehicleId);
@@ -53,31 +60,56 @@ export async function processVehicleRiskLogic(
     });
   }
 
-  // Query violations
+  // Query violations with bounded limit to prevent unbounded collection scans
   const violSnap = await db
     .collection('violations')
     .where('vehicleRegNumber', '==', event.vehicleRegNumber)
+    .limit(200)
     .get();
 
-  const eventsList: RiskEvent[] = violSnap.docs.map((d: any) => ({
-    severity: (d.data().severity || 'low') as any,
-    timestamp: d.data().timestamp || new Date().toISOString(),
-  }));
+  const nowMs = Date.now();
+  const eventsList: RiskEvent[] = violSnap.docs
+    .map((d: any) => {
+      const data = d.data();
+      return {
+        severity: (data.severity || 'low') as any,
+        timestamp: data.timestamp || new Date().toISOString(),
+        confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
+        recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
+      };
+    })
+    .filter((e: any) => {
+      // VT-003: Plausibility checks - discard physically impossible speeds (>180 km/h) or invalid timestamps
+      if (e.recordedSpeedKmH !== undefined && (e.recordedSpeedKmH < 0 || e.recordedSpeedKmH > 180)) {
+        return false;
+      }
+      const t = new Date(e.timestamp).getTime();
+      return Number.isFinite(t);
+    });
 
-  eventsList.push({
-    severity: event.severity as any,
-    timestamp: event.timestamp,
-  });
+  // Validate incoming event plausibility
+  const incomingTimeMs = new Date(event.timestamp).getTime();
+  if (
+    Number.isFinite(incomingTimeMs) &&
+    (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))
+  ) {
+    eventsList.push({
+      severity: event.severity as any,
+      timestamp: event.timestamp,
+      confidenceScore: typeof event.confidenceScore === 'number' ? event.confidenceScore : 1.0,
+    });
+  }
 
-  // Query trips count
+  // Query trips count with limit
   const tripsSnap = await db
     .collection('trips')
     .where('vehicleRegNumber', '==', event.vehicleRegNumber)
+    .limit(100)
     .get();
 
   const totalTripCount = tripsSnap.size || 1;
 
-  const { riskScore, riskTier } = calculateVehicleRiskScore(eventsList, totalTripCount);
+  const { riskScore, riskTier } = calculateVehicleRiskScore(eventsList, totalTripCount, nowMs);
 
   // Update vehicle score (Admin SDK bypasses Security Rules)
   await vehicleRef.set(
@@ -103,14 +135,26 @@ export async function processVehicleRiskLogic(
   return { processed: true, riskScore, riskTier };
 }
 
-export const computeVehicleRisk = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+export const computeVehicleRisk = onCall(
+  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const event = request.data as VehicleRiskEventPayload;
+    if (!event || !event.eventId || !event.vehicleRegNumber) {
+      throw new HttpsError('invalid-argument', 'Missing required event fields.');
+    }
+
+    // Role and tenancy authorization check
+    const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger') as string;
+    const userSaccoId = request.auth.token?.saccoId as string | undefined;
+
+    if (role === 'sacco_manager' && userSaccoId && event.saccoId && userSaccoId !== event.saccoId) {
+      throw new HttpsError('permission-denied', 'Cannot compute risk for a different SACCO.');
+    }
+
+    const db = getFirestore();
+    return await processVehicleRiskLogic(db, event);
   }
-  const event = request.data as VehicleRiskEventPayload;
-  if (!event || !event.eventId || !event.vehicleRegNumber) {
-    throw new HttpsError('invalid-argument', 'Missing required event fields.');
-  }
-  const db = getFirestore();
-  return await processVehicleRiskLogic(db, event);
-});
+);

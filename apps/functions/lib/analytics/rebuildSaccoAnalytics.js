@@ -4,7 +4,7 @@ exports.rebuildSaccoAnalytics = void 0;
 exports.processRebuildSaccoAnalyticsLogic = processRebuildSaccoAnalyticsLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
-const engine_1 = require("../../../../src/lib/engine");
+const engine_1 = require("../lib/engine");
 async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     const vehiclesSnap = await db.collection('vehicles').where('saccoId', '==', saccoId).get();
     const scores = vehiclesSnap.docs.map((d) => d.data().riskScore ?? 85);

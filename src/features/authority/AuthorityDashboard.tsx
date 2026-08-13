@@ -7,8 +7,9 @@ import {
   alertRepository,
   vehicleRepository,
   saccoRepository,
+  analyticsRepository,
 } from '../../repositories';
-import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO } from '../../types';
+import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO, PlatformAnalyticsDaily } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -53,7 +54,8 @@ export const AuthorityDashboard: React.FC = () => {
     async function loadAuthorityData() {
       setIsLoading(true);
       try {
-        const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedAlerts, fetchedVehicles, fetchedSaccos] =
+        const todayStr = new Date().toISOString().split('T')[0];
+        const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedAlerts, fetchedVehicles, fetchedSaccos, _precomputedDoc] =
           await Promise.all([
             tripRepository.getAll(),
             violationRepository.getAll(),
@@ -61,6 +63,7 @@ export const AuthorityDashboard: React.FC = () => {
             alertRepository.getAll(),
             vehicleRepository.getAll(),
             saccoRepository.getAll(),
+            analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
           ]);
 
         if (isMounted) {

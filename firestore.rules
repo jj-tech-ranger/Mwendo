@@ -56,6 +56,49 @@ service cloud.firestore {
       return hasActiveRole('driver');
     }
 
+    // VT-003: Kenya geographic bounds (approx lat -4.7 to 5.5, lon 33.5 to 41.9 with generous margin to avoid edge rejections)
+    function isWithinKenyaBounds(lat, lon) {
+      return (lat is int || lat is float || lat is number) &&
+             (lon is int || lon is float || lon is number) &&
+             lat >= -5.5 && lat <= 6.0 &&
+             lon >= 33.0 && lon <= 43.5;
+    }
+
+    // VT-003: Physically plausible speed bounds for matatus/vehicles (0 - 180 km/h)
+    function isPlausibleSpeed(speed) {
+      return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180;
+    }
+
+    // VT-003: Temporal plausibility bounds (reject >5m future timestamps, or >24h past for live events)
+    function isPlausibleTimestamp(ts) {
+      return (
+        (ts is timestamp && ts <= request.time + duration.value(5, 'm') && ts >= request.time - duration.value(24, 'h')) ||
+        (ts is string && ts.size() >= 10 && ts.size() <= 40)
+      );
+    }
+
+    function isValidTripData(data) {
+      return (!('latitude' in data) || !('longitude' in data) || isWithinKenyaBounds(data.latitude, data.longitude)) &&
+             (!('startLocation' in data) || data.startLocation == null || isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude)) &&
+             (!('endLocation' in data) || data.endLocation == null || isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude)) &&
+             (!('lastGpsUpdate' in data) || data.lastGpsUpdate == null || (
+               isWithinKenyaBounds(data.lastGpsUpdate.latitude, data.lastGpsUpdate.longitude) &&
+               (!('speedKmH' in data.lastGpsUpdate) || isPlausibleSpeed(data.lastGpsUpdate.speedKmH))
+             )) &&
+             (!('currentSpeedKmH' in data) || isPlausibleSpeed(data.currentSpeedKmH)) &&
+             (!('maxSpeedKmH' in data) || isPlausibleSpeed(data.maxSpeedKmH)) &&
+             (!('avgSpeedKmH' in data) || isPlausibleSpeed(data.avgSpeedKmH)) &&
+             (!('startTime' in data) || isPlausibleTimestamp(data.startTime)) &&
+             (!('timestamp' in data) || isPlausibleTimestamp(data.timestamp));
+    }
+
+    function isValidViolationData(data) {
+      return (!('latitude' in data) || !('longitude' in data) || isWithinKenyaBounds(data.latitude, data.longitude)) &&
+             (!('recordedSpeedKmH' in data) || isPlausibleSpeed(data.recordedSpeedKmH)) &&
+             (!('speedLimitKmH' in data) || isPlausibleSpeed(data.speedLimitKmH)) &&
+             (!('timestamp' in data) || isPlausibleTimestamp(data.timestamp));
+    }
+
     // Flat Analytics Wildcard Rule
     match /analytics/{document=**} {
       allow read: if isAdmin() || hasActiveRole('authority') || (
@@ -94,6 +137,7 @@ service cloud.firestore {
             'theme',
             'language',
             'photoURL',
+            'emergencyContacts',
             'updatedAt'
           ])
         )
@@ -109,12 +153,12 @@ service cloud.firestore {
         isAdmin() ||
         hasActiveRole('authority')
       );
-      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
+      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data);
       allow update: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
         (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
         isAuthority()
-      );
+      ) && isValidTripData(request.resource.data);
       allow delete: if isAdmin();
     }
 
@@ -179,8 +223,8 @@ service cloud.firestore {
         isAdmin() ||
         hasActiveRole('authority')
       );
-      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
-      allow update: if (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority();
+      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidViolationData(request.resource.data);
+      allow update: if ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()) && isValidViolationData(request.resource.data);
       allow delete: if isAdmin();
     }
 
@@ -232,6 +276,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Dead Letter Queue for Notification Failures
+    match /dlq_notifications/{dlqId} {
+      allow read: if isAdmin() || isAuthority();
+      allow write: if isAdmin();
+    }
+
     // Public Pins Sync
     match /public_pins/{pinId} {
       allow read: if true;
@@ -248,6 +298,15 @@ service cloud.firestore {
     match /system_config/{configId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // Distributed SACCO Sharded Counters (AN-003)
+    match /saccoCounters/{counterId} {
+      allow read: if isAdmin() || isAuthority() || (
+        hasActiveRole('sacco_manager') &&
+        resource.data.saccoId == request.auth.token.saccoId
+      );
+      allow write: if isAdmin() || isAuthority() || hasActiveRole('sacco_manager') || isSignedIn();
     }
   }
 }

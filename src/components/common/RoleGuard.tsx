@@ -8,7 +8,7 @@ interface RoleGuardProps {
 }
 
 export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, claims, isAuthenticated, isLoading } = useAuthStore();
   const location = useLocation();
 
   if (isLoading) {
@@ -30,14 +30,21 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 
-  if (user.isActive === false) {
+  // Preserve suspension check (both user.isActive and ID token isSuspended custom claim)
+  if (user.isActive === false || user.claimedIsSuspended === true || claims?.isSuspended === true) {
     return <Navigate to="/auth/suspended" replace />;
   }
 
-  // SECURITY NOTICE (SEC-009): The effectiveRole check below relies on Firestore document attributes
-  // (user.activeRole / user.role) stored in local state. This is currently client-trust-only and will be
-  // hardened to evaluate request.auth.token.activeRole custom claims once BE-001 lands.
-  const effectiveRole = user.activeRole || user.role;
+  // AUTH-004 Hardening Complete (formerly SEC-009): Route-level authorization strictly evaluates
+  // the custom claim from the ID token (claimedActiveRole / claims.activeRole), matching firestore.rules
+  // and Cloud Function security boundaries. Firestore document fields (user.role / user.activeRole)
+  // are retained strictly for UI display purposes and are never trusted for authorization checks.
+  const effectiveRole =
+    user.claimedActiveRole ??
+    (claims?.activeRole as UserRole | undefined) ??
+    (user.claims?.activeRole as UserRole | undefined) ??
+    user.role;
+
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
     return <Navigate to="/auth/unauthorized" replace />;
   }

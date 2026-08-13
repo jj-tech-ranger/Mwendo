@@ -1,15 +1,27 @@
 import React, { useEffect } from 'react';
 import { useOfflineStore } from '../../store/useOfflineStore';
+import { offlineSyncService } from '../../services/offlineSyncService';
 
 export const OfflineBanner: React.FC = () => {
   const { isOnline, setIsOnline, queuedActionsCount } = useOfflineStore();
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      offlineSyncService.drainQueue().catch((err) =>
+        console.warn('Drain queue error on reconnect:', err)
+      );
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      offlineSyncService.updatePendingCount();
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Synchronize pending count on mount
+    offlineSyncService.updatePendingCount();
 
     return () => {
       window.removeEventListener('online', handleOnline);

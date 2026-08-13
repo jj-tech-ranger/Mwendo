@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { blackSpotRepository } from '../../repositories';
 import { offlineStorage } from '../../services/offlineStorage';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export const ReportBlackSpotScreen: React.FC = () => {
@@ -61,10 +62,12 @@ export const ReportBlackSpotScreen: React.FC = () => {
         await blackSpotRepository.save(newReport as any);
       } else {
         await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
+        await offlineSyncService.updatePendingCount();
       }
     } catch (err) {
       console.warn('Network write failed, saving to offline buffer:', err);
       await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
+      await offlineSyncService.updatePendingCount();
     } finally {
       setIsSubmitting(false);
       setStep(4);

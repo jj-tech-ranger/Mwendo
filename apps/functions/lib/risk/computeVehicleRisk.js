@@ -4,7 +4,7 @@ exports.computeVehicleRisk = void 0;
 exports.processVehicleRiskLogic = processVehicleRiskLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
-const engine_1 = require("../../../../src/lib/engine");
+const engine_1 = require("../lib/engine");
 async function processVehicleRiskLogic(db, event) {
     const ledgerRef = db.collection('processedEvents').doc(event.eventId);
     const ledgerSnap = await ledgerRef.get();
@@ -41,13 +41,18 @@ async function processVehicleRiskLogic(db, event) {
         .collection('violations')
         .where('vehicleRegNumber', '==', event.vehicleRegNumber)
         .get();
-    const eventsList = violSnap.docs.map((d) => ({
-        severity: (d.data().severity || 'low'),
-        timestamp: d.data().timestamp || new Date().toISOString(),
-    }));
+    const eventsList = violSnap.docs.map((d) => {
+        const data = d.data();
+        return {
+            severity: (data.severity || 'low'),
+            timestamp: data.timestamp || new Date().toISOString(),
+            confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
+        };
+    });
     eventsList.push({
         severity: event.severity,
         timestamp: event.timestamp,
+        confidenceScore: typeof event.confidenceScore === 'number' ? event.confidenceScore : 1.0,
     });
     // Query trips count
     const tripsSnap = await db

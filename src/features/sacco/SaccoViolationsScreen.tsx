@@ -150,8 +150,11 @@ export const SaccoViolationsScreen: React.FC = () => {
             <div className="p-3 border border-outline-variant/30 rounded-xl space-y-1">
               <span className="font-bold block">GPS Location Pin</span>
               <p className="text-on-surface-variant">{selectedViolation.locationName}</p>
-              <div className="text-[10px] font-mono text-primary font-bold pt-1">
-                Telemetry Confidence: {Math.round((selectedViolation.confidenceScore || 0.95) * 100)}%
+              <div className="text-[10px] font-mono text-primary font-bold pt-1 flex items-center justify-between">
+                <span>Telemetry Confidence: {Math.round((typeof selectedViolation.confidenceScore === 'number' ? selectedViolation.confidenceScore : 0.95) * 100)}%</span>
+                <span className="text-on-surface-variant text-[9px] font-normal">
+                  (Risk Weight: {(typeof selectedViolation.confidenceScore === 'number' ? selectedViolation.confidenceScore : 0.95).toFixed(2)}x)
+                </span>
               </div>
             </div>
 

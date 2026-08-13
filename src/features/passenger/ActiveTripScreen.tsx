@@ -7,6 +7,7 @@ import { Dialog } from '../../components/ui/Dialog';
 import { useTripStore } from '../../store/useTripStore';
 import { tripRepository } from '../../repositories';
 import { offlineStorage } from '../../services/offlineStorage';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import { storageService } from '../../services/storageService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
@@ -169,10 +170,12 @@ export const ActiveTripScreen: React.FC = () => {
         await tripRepository.save(result as any);
       } else {
         await offlineStorage.setItem(`offline_trip_${result.id}`, result);
+        await offlineSyncService.updatePendingCount();
       }
     } catch (err) {
       console.warn('Error saving trip, saving to offline storage:', err);
       await offlineStorage.setItem(`offline_trip_${result.id}`, result);
+      await offlineSyncService.updatePendingCount();
     }
   };
 

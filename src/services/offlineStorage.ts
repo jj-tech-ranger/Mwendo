@@ -34,6 +34,15 @@ export const offlineStorage = {
     }
   },
 
+  async keys(): Promise<string[]> {
+    try {
+      return await localforage.keys();
+    } catch (err) {
+      console.error('Error getting keys from localforage:', err);
+      return [];
+    }
+  },
+
   async clear(): Promise<void> {
     try {
       await localforage.clear();

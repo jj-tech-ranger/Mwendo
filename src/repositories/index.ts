@@ -1,5 +1,5 @@
 import { BaseRepository } from './baseRepository';
-import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, PreAggregatedAnalytics } from '../types';
+import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, PlatformAnalyticsDaily, SaccoAnalyticsDaily, AnalyticsDocument } from '../types';
 
 export class UserRepository extends BaseRepository<UserProfile> {
   constructor() {
@@ -79,7 +79,7 @@ export class ProcessedEventRepository extends BaseRepository<{ id: string; event
   }
 }
 
-export class AnalyticsRepository extends BaseRepository<PreAggregatedAnalytics> {
+export class AnalyticsRepository extends BaseRepository<AnalyticsDocument> {
   constructor() {
     super('analytics');
   }

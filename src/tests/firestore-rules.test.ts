@@ -6,7 +6,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { describe, beforeAll, afterAll, beforeEach, it, expect } from 'vitest';
+import { describe, beforeAll, afterAll, beforeEach, it } from 'vitest';
 
 let testEnv: RulesTestEnvironment | null = null;
 let isOfflineFallback = false;
@@ -55,7 +55,55 @@ function evaluateFirestoreRules(
       return false;
     }
     if (action === 'create') {
-      return isRegisteredUser && data?.userId === auth.uid;
+      if (!isRegisteredUser || data?.userId !== auth.uid) return false;
+
+      // VT-003: Coordinates bounds check
+      const checkCoords = (lat?: any, lon?: any) => {
+        if (lat !== undefined && lon !== undefined) {
+          if (typeof lat !== 'number' || typeof lon !== 'number') return false;
+          if (lat < -5.5 || lat > 6.0 || lon < 33.0 || lon > 43.5) return false;
+        }
+        return true;
+      };
+
+      if (!checkCoords(data?.latitude, data?.longitude)) return false;
+      if (data?.startLocation && !checkCoords(data.startLocation.latitude, data.startLocation.longitude)) return false;
+      if (data?.endLocation && !checkCoords(data.endLocation.latitude, data.endLocation.longitude)) return false;
+      if (data?.lastGpsUpdate && !checkCoords(data.lastGpsUpdate.latitude, data.lastGpsUpdate.longitude)) return false;
+
+      // VT-003: Speed bounds check (0 - 180 km/h)
+      if (data?.recordedSpeedKmH !== undefined && (data.recordedSpeedKmH < 0 || data.recordedSpeedKmH > 180)) return false;
+      if (data?.maxSpeedKmH !== undefined && (data.maxSpeedKmH < 0 || data.maxSpeedKmH > 180)) return false;
+      if (data?.currentSpeedKmH !== undefined && (data.currentSpeedKmH < 0 || data.currentSpeedKmH > 180)) return false;
+      if (data?.avgSpeedKmH !== undefined && (data.avgSpeedKmH < 0 || data.avgSpeedKmH > 180)) return false;
+      if (data?.lastGpsUpdate?.speedKmH !== undefined && (data.lastGpsUpdate.speedKmH < 0 || data.lastGpsUpdate.speedKmH > 180)) return false;
+
+      // VT-003: Timestamp bounds check (reject >5 min in future, reject >24h in past)
+      const checkTimestamp = (ts?: any) => {
+        if (!ts) return true;
+        let ms: number;
+        if (typeof ts === 'string') {
+          ms = new Date(ts).getTime();
+        } else if (ts && typeof ts.toMillis === 'function') {
+          ms = ts.toMillis();
+        } else if (ts instanceof Date) {
+          ms = ts.getTime();
+        } else if (typeof ts === 'number') {
+          ms = ts;
+        } else {
+          return false;
+        }
+        if (!Number.isFinite(ms)) return false;
+        const now = Date.now();
+        if (ms > now + 5 * 60 * 1000) return false;
+        if (ms < now - 24 * 60 * 60 * 1000) return false;
+        return true;
+      };
+
+      if (data?.timestamp && !checkTimestamp(data.timestamp)) return false;
+      if (data?.startTime && !checkTimestamp(data.startTime)) return false;
+
+      return true;
     }
     if (action === 'update') {
       if (collection === 'violations') {
@@ -900,6 +948,150 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
 
     // 5. SACCO Manager A CANNOT read Passenger B (not in sacco_A)
     await assertFails(saccoManagerA.firestore().collection('users').doc('passenger_B').get());
+  });
+
+  it('VT-003: trips and violations create rules reject implausible coordinates, future timestamps, and excessive speeds', async () => {
+    const passenger = getContext('passenger_vt3', {
+      activeRole: 'passenger',
+      firebase: { sign_in_provider: 'password' },
+    });
+
+    const now = Date.now();
+    const validTime = new Date(now - 60000).toISOString(); // 1 minute ago
+    const futureTime = new Date(now + 3600000).toISOString(); // 1 hour in future
+
+    // 1. Trip with coordinates outside Kenya (e.g. London / lat 51.5, lon -0.12) -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_out_of_kenya').set({
+        id: 'trip_out_of_kenya',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Thika',
+        status: 'active',
+        currentSpeedKmH: 60,
+        maxSpeedKmH: 80,
+        avgSpeedKmH: 50,
+        latitude: 51.5074,
+        longitude: -0.1278,
+        startTime: validTime,
+      })
+    );
+
+    // 2. Trip with startLocation outside Kenya -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_startloc_bad').set({
+        id: 'trip_startloc_bad',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Thika',
+        status: 'active',
+        startLocation: { latitude: -25.0, longitude: 28.0 }, // South Africa
+        startTime: validTime,
+      })
+    );
+
+    // 3. Trip with timestamp 1 hour in the future -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_future_time').set({
+        id: 'trip_future_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Thika',
+        status: 'active',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        startTime: futureTime,
+      })
+    );
+
+    // 4. Violation with coordinates outside Kenya -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_out_of_kenya').set({
+        id: 'viol_out_of_kenya',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 105,
+        speedLimitKmH: 80,
+        severity: 'high',
+        latitude: 40.7128, // New York
+        longitude: -74.006,
+        timestamp: validTime,
+      })
+    );
+
+    // 5. Violation with timestamp 1 hour in the future -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_future_time').set({
+        id: 'viol_future_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 105,
+        speedLimitKmH: 80,
+        severity: 'high',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        timestamp: futureTime,
+      })
+    );
+
+    // 6. Violation with physically impossible speed (> 180 km/h) -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_impossible_speed').set({
+        id: 'viol_impossible_speed',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 260, // Impossible for matatu
+        speedLimitKmH: 80,
+        severity: 'critical',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        timestamp: validTime,
+      })
+    );
+
+    // 7. Legitimate Trip within Kenya bounds and valid time -> SUCCEEDS
+    await assertSucceeds(
+      passenger.firestore().collection('trips').doc('trip_valid_kenya').set({
+        id: 'trip_valid_kenya',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Nakuru',
+        status: 'active',
+        currentSpeedKmH: 75,
+        maxSpeedKmH: 85,
+        avgSpeedKmH: 60,
+        latitude: -1.286389,
+        longitude: 36.817223,
+        startTime: validTime,
+      })
+    );
+
+    // 8. Legitimate Violation within Kenya bounds and valid time -> SUCCEEDS
+    await assertSucceeds(
+      passenger.firestore().collection('violations').doc('viol_valid_kenya').set({
+        id: 'viol_valid_kenya',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 95,
+        speedLimitKmH: 80,
+        severity: 'medium',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        timestamp: validTime,
+      })
+    );
   });
 });
 

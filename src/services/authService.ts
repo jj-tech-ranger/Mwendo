@@ -18,45 +18,74 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole, UserClaims } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 
 export const authService = {
-  // Synchronize Firebase Auth state with Firestore user document
+  // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
   initAuthListener() {
     useAuthStore.getState().setLoading(true);
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        useAuthStore.getState().setUser(null);
+        useAuthStore.getState().setUser(null, null);
         useAuthStore.getState().setLoading(false);
         return;
       }
 
       try {
-        const profile = await this.fetchOrInitUserProfile(firebaseUser);
-        useAuthStore.getState().setUser(profile);
+        // AUTH-004: Authoritative ID Token Custom Claims retrieval
+        const tokenResult = await firebaseUser.getIdTokenResult();
+        const claims = (tokenResult?.claims || {}) as UserClaims;
+
+        const profile = await this.fetchOrInitUserProfile(firebaseUser, 'passenger', claims);
+        useAuthStore.getState().setUser(profile, claims);
       } catch (err) {
-        console.error('Error loading user profile:', err);
-        // Fallback user object if firestore fails temporarily
+        console.error('Error loading user profile or token claims:', err);
+        // Fallback user object if firestore or token fails temporarily
+        const fallbackClaims: UserClaims = { activeRole: 'passenger' };
         useAuthStore.getState().setUser({
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
           email: firebaseUser.email || '',
           displayName: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest Passenger' : 'Commuter'),
           role: 'passenger',
+          activeRole: 'passenger',
+          claimedActiveRole: 'passenger',
+          claims: fallbackClaims,
           isVerified: firebaseUser.emailVerified || false,
           isActive: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           isAnonymous: firebaseUser.isAnonymous,
-        });
+        }, fallbackClaims);
       } finally {
         useAuthStore.getState().setLoading(false);
       }
     });
   },
 
-  async fetchOrInitUserProfile(firebaseUser: FirebaseUser, defaultRole: UserRole = 'passenger'): Promise<UserProfile> {
+  async fetchOrInitUserProfile(
+    firebaseUser: FirebaseUser,
+    defaultRole: UserRole = 'passenger',
+    claims?: UserClaims
+  ): Promise<UserProfile> {
+    // If claims weren't passed in, fetch them from the Firebase Auth user's ID token
+    let tokenClaims = claims;
+    if (!tokenClaims) {
+      try {
+        const tokenResult = await firebaseUser.getIdTokenResult();
+        tokenClaims = (tokenResult?.claims || {}) as UserClaims;
+      } catch (e) {
+        console.warn('[authService] Could not fetch token claims:', e);
+        tokenClaims = {};
+      }
+    }
+
+    const claimedActiveRole = (tokenClaims?.activeRole as UserRole | undefined) || (firebaseUser.isAnonymous ? 'passenger' : undefined);
+    const claimedSaccoId = tokenClaims?.saccoId as string | undefined;
+    const claimedAuthorityScope = tokenClaims?.authorityScope as ('national' | 'county') | undefined;
+    const claimedIsSuspended = tokenClaims?.isSuspended as boolean | undefined;
+
     const userRef = doc(db, 'users', firebaseUser.uid);
     const snap = await getDoc(userRef);
 
@@ -69,10 +98,26 @@ export const authService = {
         displayName: firebaseUser.displayName || data.displayName || (firebaseUser.isAnonymous ? 'Guest Passenger' : 'Commuter'),
         phoneNumber: firebaseUser.phoneNumber || data.phoneNumber || '',
         role: (data.activeRole || data.role || defaultRole) as UserRole,
+        activeRole: (data.activeRole || data.role || defaultRole) as UserRole,
+        // AUTH-004: ID Token Custom Claims for Route & Backend Authorization
+        claimedActiveRole,
+        claimedSaccoId,
+        claimedAuthorityScope,
+        claimedIsSuspended,
+        claims: {
+          activeRole: claimedActiveRole,
+          saccoId: claimedSaccoId,
+          authorityScope: claimedAuthorityScope,
+          isSuspended: claimedIsSuspended,
+          ...tokenClaims,
+        },
         saccoId: data.saccoId,
         authorityId: data.authorityId,
+        authorityScope: data.authorityScope,
+        county: data.county,
+        badgeNumber: data.badgeNumber,
         isVerified: firebaseUser.emailVerified || data.isVerified || false,
-        isActive: data.isActive !== false,
+        isActive: data.isActive !== false && claimedIsSuspended !== true,
         isMfaEnrolled: Boolean(data.isMfaEnrolled),
         isMfaVerified: Boolean(data.isMfaVerified),
         createdAt: data.createdAt || new Date().toISOString(),
@@ -89,8 +134,20 @@ export const authService = {
       email: firebaseUser.email || '',
       displayName: firebaseUser.displayName || (firebaseUser.isAnonymous ? 'Guest Passenger' : 'Commuter'),
       role: defaultRole,
+      activeRole: defaultRole,
+      claimedActiveRole: claimedActiveRole || defaultRole,
+      claimedSaccoId,
+      claimedAuthorityScope,
+      claimedIsSuspended,
+      claims: {
+        activeRole: claimedActiveRole || defaultRole,
+        saccoId: claimedSaccoId,
+        authorityScope: claimedAuthorityScope,
+        isSuspended: claimedIsSuspended,
+        ...tokenClaims,
+      },
       isVerified: firebaseUser.emailVerified || false,
-      isActive: true,
+      isActive: claimedIsSuspended !== true,
       isMfaEnrolled: false,
       isMfaVerified: false,
       createdAt: new Date().toISOString(),

@@ -30,6 +30,7 @@ export async function processUpdateDailyAnalyticsLogic(
   const docId = `daily_${dateStr}`;
   const payload = {
     id: docId,
+    docId,
     date: dateStr,
     type: 'daily',
     totalTrips,
@@ -49,11 +50,23 @@ export async function processUpdateDailyAnalyticsLogic(
   return payload;
 }
 
-export const updateDailyAnalytics = onCall(async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'User must be authenticated.');
+export const updateDailyAnalytics = onCall(
+  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+
+    const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger') as string;
+    if (role !== 'admin' && role !== 'authority') {
+      throw new HttpsError(
+        'permission-denied',
+        'Only administrative or authority users may compute platform-wide daily analytics.'
+      );
+    }
+
+    const dateStr = request.data?.dateStr || new Date().toISOString().split('T')[0];
+    const db = getFirestore();
+    return await processUpdateDailyAnalyticsLogic(db, dateStr);
   }
-  const dateStr = request.data?.dateStr || new Date().toISOString().split('T')[0];
-  const db = getFirestore();
-  return await processUpdateDailyAnalyticsLogic(db, dateStr);
-});
+);

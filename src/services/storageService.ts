@@ -48,14 +48,38 @@ export const storageService = {
   },
 
   /**
-   * Upload owner-scoped trip telemetry JSON blob
+   * Upload owner-scoped trip telemetry JSON blob (gzipped with 5MB cap per VT-005)
    */
   async uploadTelemetryBlob(telemetryData: any, userId: string, tripId: string): Promise<string> {
     const jsonStr = JSON.stringify(telemetryData);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const storageRef = ref(storage, `telemetry/${userId}/trip_${tripId}_${Date.now()}.json`);
+    let blob: Blob;
+    let extension = 'json';
+    let contentType = 'application/json';
+
+    if (typeof CompressionStream !== 'undefined') {
+      try {
+        const stream = new Blob([jsonStr], { type: 'application/json' })
+          .stream()
+          .pipeThrough(new CompressionStream('gzip'));
+        const compressedBlob = await new Response(stream).blob();
+        blob = compressedBlob;
+        extension = 'json.gz';
+        contentType = 'application/gzip';
+      } catch {
+        blob = new Blob([jsonStr], { type: 'application/json' });
+      }
+    } else {
+      blob = new Blob([jsonStr], { type: 'application/json' });
+    }
+
+    if (blob.size > 5 * 1024 * 1024) {
+      throw new Error('Telemetry upload exceeds 5MB size limit.');
+    }
+
+    const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+    const storageRef = ref(storage, `telemetry/${userId}/trip_${tripId}_${uuid}.${extension}`);
     const uploadTask = await uploadBytesResumable(storageRef, blob, {
-      contentType: 'application/json',
+      contentType,
     });
     return await getDownloadURL(uploadTask.ref);
   },

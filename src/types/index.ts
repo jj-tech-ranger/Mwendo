@@ -7,6 +7,14 @@
  */
 export type UserRole = 'passenger' | 'sacco_manager' | 'authority' | 'admin';
 
+export interface UserClaims {
+  activeRole?: UserRole | undefined;
+  saccoId?: string | undefined;
+  authorityScope?: ('national' | 'county') | undefined;
+  isSuspended?: boolean | undefined;
+  [key: string]: any;
+}
+
 export interface UserProfile {
   id: string;
   uid: string;
@@ -15,6 +23,12 @@ export interface UserProfile {
   phoneNumber?: string | undefined;
   role: UserRole;
   activeRole?: UserRole | undefined;
+  // AUTH-004: ID Token Custom Claims (Authoritative Route & Backend Authorization)
+  claimedActiveRole?: UserRole | undefined;
+  claimedSaccoId?: string | undefined;
+  claimedAuthorityScope?: ('national' | 'county') | undefined;
+  claimedIsSuspended?: boolean | undefined;
+  claims?: UserClaims | undefined;
   saccoId?: string | undefined;
   authorityId?: string | undefined;
   authorityScope?: ('national' | 'county') | undefined;
@@ -88,6 +102,8 @@ export interface Vehicle {
   status: 'active' | 'maintenance' | 'suspended';
   insuranceExpiry: string;
   inspectionExpiry: string;
+  riskScore?: number;
+  riskTier?: 'low' | 'medium' | 'high' | 'critical';
 }
 
 export interface SACCO {
@@ -149,17 +165,35 @@ export interface SafetyAlert {
   status?: 'active' | 'resolved' | 'cancelled';
 }
 
-export interface PreAggregatedAnalytics {
+export interface PlatformAnalyticsDaily {
   id: string;
-  saccoId?: string;
+  docId?: string;
   date: string; // YYYY-MM-DD
+  type: 'daily' | 'platform_daily';
   totalTrips: number;
-  totalDistanceKm: number;
-  overspeedEvents: number;
-  blackspotAlertsTriggered: number;
-  avgSafetyScore: number;
+  totalViolations: number;
+  activeAlerts: number;
+  riskDistribution: {
+    low: number;
+    medium: number;
+    high: number;
+    critical: number;
+  };
   updatedAt: string;
 }
+
+export interface SaccoAnalyticsDaily {
+  id: string;
+  docId?: string;
+  saccoId: string;
+  type: 'sacco' | 'sacco_daily';
+  safetyScore: number;
+  fleetCount: number;
+  unresolvedComplaints: number;
+  updatedAt: string;
+}
+
+export type AnalyticsDocument = PlatformAnalyticsDaily | SaccoAnalyticsDaily;
 
 export interface Driver {
   id: string;
