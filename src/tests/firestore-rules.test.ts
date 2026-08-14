@@ -331,17 +331,37 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
 describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   beforeAll(async () => {
     const rules = readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8');
+    const hostPort = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8085';
+    const [host, portStr] = hostPort.split(':');
+    const port = portStr ? parseInt(portStr, 10) : 8085;
+
+    const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+    const allowOfflineFallback = !isCI && (process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true');
+
     try {
       testEnv = await initializeTestEnvironment({
         projectId: 'demo-mwendo-salama-audit',
         firestore: {
           rules,
-          host: '127.0.0.1',
-          port: 8085,
+          host,
+          port,
         },
       });
-    } catch {
-      isOfflineFallback = true;
+      isOfflineFallback = false;
+      console.log(`[firestore-rules.test] Successfully initialized testEnv against Firestore Emulator at ${host}:${port}. isOfflineFallback: false`);
+    } catch (err: any) {
+      if (allowOfflineFallback) {
+        console.warn(`[firestore-rules.test] Warning: Failed to connect to emulator at ${host}:${port}, falling back to offline in-memory mock because ALLOW_RULES_OFFLINE_FALLBACK is enabled for local development.`);
+        isOfflineFallback = true;
+      } else {
+        console.error(`[firestore-rules.test] CRITICAL ERROR: Unable to connect to Firebase Firestore Emulator at ${host}:${port}.`);
+        console.error(`In CI and standard test runs, firestore-rules.test.ts must run against a real emulator executing firestore.rules.`);
+        throw new Error(
+          `Failed to connect to Firebase Firestore Emulator at ${host}:${port}: ${err.message}. ` +
+          `Ensure the emulator is running with 'npx firebase emulators:exec --only firestore --project demo-mwendo-salama-audit "npm test"' ` +
+          `or explicitly set ALLOW_RULES_OFFLINE_FALLBACK=true for offline local development.`
+        );
+      }
     }
   });
 
@@ -412,14 +432,27 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('(c) a user cannot elevate their own activeRole to admin', async () => {
-    offlineStore['users/user_1'] = {
-      uid: 'user_1',
-      displayName: 'John Doe',
-      role: 'passenger',
-      activeRole: 'passenger',
-      roles: ['passenger'],
-      isActive: true,
-    };
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('users').doc('user_1').set({
+          uid: 'user_1',
+          displayName: 'John Doe',
+          role: 'passenger',
+          activeRole: 'passenger',
+          roles: ['passenger'],
+          isActive: true,
+        });
+      });
+    } else {
+      offlineStore['users/user_1'] = {
+        uid: 'user_1',
+        displayName: 'John Doe',
+        role: 'passenger',
+        activeRole: 'passenger',
+        roles: ['passenger'],
+        isActive: true,
+      };
+    }
 
     const user1Context = getContext('user_1', { activeRole: 'passenger' });
 
@@ -468,7 +501,16 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('prevents sacco_manager from reading analytics belonging to a different saccoId', async () => {
-    offlineStore['analytics/sacco_B_stats'] = { saccoId: 'sacco_B', riskScore: 88 };
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('analytics').doc('sacco_B_stats').set({
+          saccoId: 'sacco_B',
+          riskScore: 88,
+        });
+      });
+    } else {
+      offlineStore['analytics/sacco_B_stats'] = { saccoId: 'sacco_B', riskScore: 88 };
+    }
 
     const saccoAContext = getContext('manager_a', {
       activeRole: 'sacco_manager',
@@ -925,9 +967,31 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('PRIV-001: users collection read restrictions enforce privacy (passenger A cannot read passenger B profile)', async () => {
-    offlineStore['users/passenger_A'] = { uid: 'passenger_A', displayName: 'Alice', phoneNumber: '+254711111111', role: 'passenger' };
-    offlineStore['users/passenger_B'] = { uid: 'passenger_B', displayName: 'Bob', phoneNumber: '+254722222222', role: 'passenger' };
-    offlineStore['users/sacco_user_A'] = { uid: 'sacco_user_A', displayName: 'Driver A', saccoId: 'sacco_A' };
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('users').doc('passenger_A').set({
+          uid: 'passenger_A',
+          displayName: 'Alice',
+          phoneNumber: '+254711111111',
+          role: 'passenger',
+        });
+        await context.firestore().collection('users').doc('passenger_B').set({
+          uid: 'passenger_B',
+          displayName: 'Bob',
+          phoneNumber: '+254722222222',
+          role: 'passenger',
+        });
+        await context.firestore().collection('users').doc('sacco_user_A').set({
+          uid: 'sacco_user_A',
+          displayName: 'Driver A',
+          saccoId: 'sacco_A',
+        });
+      });
+    } else {
+      offlineStore['users/passenger_A'] = { uid: 'passenger_A', displayName: 'Alice', phoneNumber: '+254711111111', role: 'passenger' };
+      offlineStore['users/passenger_B'] = { uid: 'passenger_B', displayName: 'Bob', phoneNumber: '+254722222222', role: 'passenger' };
+      offlineStore['users/sacco_user_A'] = { uid: 'sacco_user_A', displayName: 'Driver A', saccoId: 'sacco_A' };
+    }
 
     const passengerA = getContext('passenger_A', { activeRole: 'passenger' });
     const adminUser = getContext('admin_1', { activeRole: 'admin' });

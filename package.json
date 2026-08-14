@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-mwendo-salama-audit \"vitest run\"",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit && eslint ."
   },
@@ -54,6 +56,7 @@
     "esbuild": "^0.25.0",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "firebase-tools": "^15.27.0",
     "jest-axe": "^11.0.0",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4.1.14",

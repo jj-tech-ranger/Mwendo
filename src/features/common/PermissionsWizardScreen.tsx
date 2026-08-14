@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BRAND_ASSETS, PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
+import { useAuthStore } from '../../store/useAuthStore';
+import { authService } from '../../services/authService';
 
 type PermissionStep = 'location' | 'notification' | 'sms' | 'camera' | 'storage';
 
@@ -114,16 +116,41 @@ export const PermissionsWizardScreen: React.FC = () => {
     if (activeStepIndex < steps.length - 1) {
       setActiveStepIndex((i) => i + 1);
     } else {
+      if (!useAuthStore.getState().isAuthenticated) {
+        try {
+          await authService.signInGuest();
+        } catch (e) {
+          console.warn('Guest signin error:', e);
+        }
+      }
       navigate('/passenger');
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     if (activeStepIndex < steps.length - 1) {
       setActiveStepIndex((i) => i + 1);
     } else {
+      if (!useAuthStore.getState().isAuthenticated) {
+        try {
+          await authService.signInGuest();
+        } catch (e) {
+          console.warn('Guest signin error:', e);
+        }
+      }
       navigate('/passenger');
     }
+  };
+
+  const handleSkipAll = async () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      try {
+        await authService.signInGuest();
+      } catch (e) {
+        console.warn('Guest signin error:', e);
+      }
+    }
+    navigate('/passenger');
   };
 
   return (
@@ -131,9 +158,17 @@ export const PermissionsWizardScreen: React.FC = () => {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-margin-mobile py-4 bg-transparent">
         <PrimaryLogo className="h-8 w-auto" />
-        <span className="font-label-mono text-xs text-on-surface-variant uppercase">
-          Step {activeStepIndex + 1} of 5
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-label-mono text-xs text-on-surface-variant uppercase">
+            Step {activeStepIndex + 1} of 5
+          </span>
+          <button
+            onClick={handleSkipAll}
+            className="text-xs font-bold text-primary hover:underline px-2 py-1 cursor-pointer"
+          >
+            Skip All
+          </button>
+        </div>
       </header>
 
       {/* Top 60% Illustration */}

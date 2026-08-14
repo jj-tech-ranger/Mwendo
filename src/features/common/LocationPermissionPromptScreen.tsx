@@ -2,11 +2,20 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BRAND_ASSETS, PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
+import { useAuthStore } from '../../store/useAuthStore';
+import { authService } from '../../services/authService';
 
 export const LocationPermissionPromptScreen: React.FC = () => {
   const navigate = useNavigate();
 
-  const handleAllow = () => {
+  const handleAllow = async () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      try {
+        await authService.signInGuest();
+      } catch (e) {
+        console.warn('Guest signin error:', e);
+      }
+    }
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         () => navigate('/passenger'),
@@ -15,6 +24,17 @@ export const LocationPermissionPromptScreen: React.FC = () => {
     } else {
       navigate('/passenger');
     }
+  };
+
+  const handleNotNow = async () => {
+    if (!useAuthStore.getState().isAuthenticated) {
+      try {
+        await authService.signInGuest();
+      } catch (e) {
+        console.warn('Guest signin error:', e);
+      }
+    }
+    navigate('/passenger');
   };
 
   return (
@@ -45,7 +65,7 @@ export const LocationPermissionPromptScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg mr-2">location_on</span>
             Allow Location Access
           </Button>
-          <Button variant="ghost" className="w-full" onClick={() => navigate('/passenger')}>
+          <Button variant="ghost" className="w-full" onClick={handleNotNow}>
             Not Now
           </Button>
         </div>

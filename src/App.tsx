@@ -6,9 +6,13 @@ import { authService } from './services/authService';
 import { offlineSyncService } from './services/offlineSyncService';
 import { MaintenanceGate } from './components/MaintenanceGate';
 import { ToastProvider } from './components/ui/Toast';
+import { usePwaStore } from './store/usePwaStore';
+import { UpdateAvailableScreen } from './features/common/UpdateAvailableScreen';
 import './services/i18n';
 
 export function App() {
+  const isUpdateAvailable = usePwaStore((s) => s.isUpdateAvailable);
+
   useEffect(() => {
     const unsubscribeAuth = authService.initAuthListener();
     const unsubscribeSync = offlineSyncService.init();
@@ -24,6 +28,7 @@ export function App() {
       <ToastProvider>
         <MaintenanceGate>
           <AppRoutes />
+          {isUpdateAvailable && <UpdateAvailableScreen />}
         </MaintenanceGate>
       </ToastProvider>
     </QueryClientProvider>

@@ -395,11 +395,19 @@ const router = createBrowserRouter([
             element: <SaccoFleetScreen />,
           },
           {
+            path: 'vehicles',
+            element: <SaccoFleetScreen />,
+          },
+          {
             path: 'drivers',
             element: <SaccoDriversScreen />,
           },
           {
             path: 'trips',
+            element: <SaccoLiveTripsScreen />,
+          },
+          {
+            path: 'live-trips',
             element: <SaccoLiveTripsScreen />,
           },
           {
@@ -416,6 +424,10 @@ const router = createBrowserRouter([
           },
           {
             path: 'blackspots',
+            element: <SaccoBlackSpotsScreen />,
+          },
+          {
+            path: 'black-spots',
             element: <SaccoBlackSpotsScreen />,
           },
           {
@@ -457,6 +469,10 @@ const router = createBrowserRouter([
           },
           {
             path: 'black-spots',
+            element: <AuthorityBlackSpotsScreen />,
+          },
+          {
+            path: 'blackspots',
             element: <AuthorityBlackSpotsScreen />,
           },
           {
@@ -541,6 +557,10 @@ const router = createBrowserRouter([
             element: <AdminSystemHealthScreen />,
           },
           {
+            path: 'system-health',
+            element: <AdminSystemHealthScreen />,
+          },
+          {
             path: 'monitoring',
             element: <AdminMonitoringScreen />,
           },
@@ -574,6 +594,10 @@ const router = createBrowserRouter([
           },
           {
             path: 'profile',
+            element: <AdminSettingsScreen />,
+          },
+          {
+            path: 'docs',
             element: <AdminSettingsScreen />,
           },
         ],

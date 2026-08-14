@@ -2,9 +2,25 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
+import { usePwaStore } from '../../store/usePwaStore';
 
-export const UpdateAvailableScreen: React.FC = () => {
+export const UpdateAvailableScreen: React.FC<{ onDismiss?: () => void }> = ({ onDismiss }) => {
   const navigate = useNavigate();
+  const applyUpdate = usePwaStore((s) => s.applyUpdate);
+  const setUpdateAvailable = usePwaStore((s) => s.setUpdateAvailable);
+
+  const handleUpdate = () => {
+    applyUpdate();
+  };
+
+  const handleLater = () => {
+    setUpdateAvailable(false);
+    if (onDismiss) {
+      onDismiss();
+    } else {
+      navigate('/passenger');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-on-background/40 backdrop-blur-xs p-margin-mobile">
@@ -19,10 +35,10 @@ export const UpdateAvailableScreen: React.FC = () => {
         </p>
 
         <div className="space-y-2 pt-2">
-          <Button variant="primary" className="w-full" onClick={() => window.location.reload()}>
+          <Button variant="primary" className="w-full" onClick={handleUpdate}>
             Update Now
           </Button>
-          <Button variant="ghost" className="w-full" onClick={() => navigate('/passenger')}>
+          <Button variant="ghost" className="w-full" onClick={handleLater}>
             Later
           </Button>
         </div>

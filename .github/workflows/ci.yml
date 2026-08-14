@@ -14,6 +14,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Java (for Firebase Emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -26,5 +32,11 @@ jobs:
       - name: Run Linter & Typecheck
         run: npm run lint
 
-      - name: Run Tests
-        run: npm test
+      - name: Run Emulator-Backed Tests
+        run: npx firebase emulators:exec --only firestore --project demo-mwendo-salama-audit "npm test"
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        run: npx playwright test

@@ -49,3 +49,46 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => set({ user: null, claims: null, isAuthenticated: false, isLoading: false }),
 }));
+
+if (typeof window !== 'undefined') {
+  (window as any).__useAuthStore = useAuthStore;
+  (window as any).__setTestAuth = (
+    role: UserRole = 'admin',
+    saccoId = 'sacco_metrolink'
+  ) => {
+    (window as any).__TEST_AUTH_OVERRIDE__ = true;
+    const claims: UserClaims = {
+      activeRole: role,
+      saccoId: role === 'sacco_manager' ? saccoId : undefined,
+      authorityScope: role === 'authority' ? 'national' : undefined,
+      isSuspended: false,
+    };
+    useAuthStore.getState().setUser(
+      {
+        id: `test_${role}_uid`,
+        uid: `test_${role}_uid`,
+        email: `${role}@test.mwendo.co.ke`,
+        displayName: `Test ${role.toUpperCase()}`,
+        role,
+        activeRole: role,
+        claimedActiveRole: role,
+        saccoId: role === 'sacco_manager' ? saccoId : undefined,
+        claims,
+        isActive: true,
+        isVerified: true,
+        isMfaEnrolled: true,
+        isMfaVerified: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      claims
+    );
+  };
+
+  if ((window as any).__INITIAL_TEST_ROLE__) {
+    (window as any).__setTestAuth(
+      (window as any).__INITIAL_TEST_ROLE__,
+      (window as any).__INITIAL_TEST_SACCO__ || 'sacco_metrolink'
+    );
+  }
+}

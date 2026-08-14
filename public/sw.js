@@ -1,5 +1,5 @@
 // Mwendo Salama PWA Service Worker - Offline Resilient Cache Shell
-const CACHE_NAME = 'mwendo-salama-v1';
+const CACHE_NAME = 'mwendo-salama-__BUILD_ID__';
 
 const PRECACHE_URLS = [
   '/',
@@ -12,11 +12,13 @@ const PRECACHE_URLS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching app shell assets');
+      console.log('[SW] Pre-caching app shell assets into', CACHE_NAME);
       return cache.addAll(PRECACHE_URLS).catch((err) => {
         console.warn('[SW] Cache addAll warning:', err);
       });
-    }).then(() => self.skipWaiting())
+    })
+    // Unconditional skipWaiting() removed to prevent silent takeover during active sessions.
+    // The worker remains waiting until client explicitly sends 'SKIP_WAITING' message.
   );
 });
 
@@ -27,13 +29,24 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cache);
+            console.log('[SW] Deleting stale deployment cache:', cache);
             return caches.delete(cache);
           }
         })
       );
     }).then(() => self.clients.claim())
   );
+});
+
+// Message event: Explicit SKIP_WAITING trigger from client UI prompt (PWA-001 & PWA-002)
+self.addEventListener('message', (event) => {
+  if (
+    event.data === 'SKIP_WAITING' ||
+    (typeof event.data === 'object' && event.data !== null && event.data.type === 'SKIP_WAITING')
+  ) {
+    console.log('[SW] User accepted update - calling self.skipWaiting()');
+    self.skipWaiting();
+  }
 });
 
 // Fetch event: Network-first with offline SPA fallback
