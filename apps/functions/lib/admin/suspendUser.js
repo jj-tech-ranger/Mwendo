@@ -30,7 +30,7 @@ async function verifyAdminCaller(auth) {
         displayName: userData.displayName || auth.token?.name || 'System Admin',
     };
 }
-exports.suspendUser = (0, https_1.onCall)(async (request) => {
+exports.suspendUser = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
     const caller = await verifyAdminCaller(request.auth);
     const targetUid = request.data?.targetUid;
     const reason = request.data?.reason || 'Administrative action';
@@ -39,32 +39,38 @@ exports.suspendUser = (0, https_1.onCall)(async (request) => {
     }
     const db = (0, firestore_1.getFirestore)();
     const authAdmin = (0, auth_1.getAuth)();
-    // 1. Write Firestore isActive = false
-    const targetRef = db.collection('users').doc(targetUid);
-    await targetRef.set({
-        isActive: false,
-        updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    // 2. Set custom claim isSuspended: true
-    const userRecord = await authAdmin.getUser(targetUid);
-    const existingClaims = userRecord.customClaims || {};
-    await authAdmin.setCustomUserClaims(targetUid, {
-        ...existingClaims,
-        isSuspended: true,
-    });
-    // 3. Revoke active refresh tokens
-    await authAdmin.revokeRefreshTokens(targetUid);
-    // 4. Record audit log
-    await db.collection('audit_logs').add({
-        action: `SUSPEND_USER (${reason})`,
-        actorName: caller.displayName,
-        actorRole: 'admin',
-        target: `User ID: ${targetUid}`,
-        timestamp: new Date().toISOString(),
-    });
-    return { success: true, targetUid, isSuspended: true };
+    try {
+        console.log(`[suspendUser] Step 1: Setting isActive=false on users/${targetUid}`);
+        const targetRef = db.collection('users').doc(targetUid);
+        await targetRef.set({
+            isActive: false,
+            updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        console.log(`[suspendUser] Step 2: Setting isSuspended custom claim on auth uid ${targetUid}`);
+        const userRecord = await authAdmin.getUser(targetUid);
+        const existingClaims = userRecord.customClaims || {};
+        await authAdmin.setCustomUserClaims(targetUid, {
+            ...existingClaims,
+            isSuspended: true,
+        });
+        console.log(`[suspendUser] Step 3: Revoking refresh tokens for uid ${targetUid}`);
+        await authAdmin.revokeRefreshTokens(targetUid);
+        console.log(`[suspendUser] Step 4: Recording audit log for suspension`);
+        await db.collection('audit_logs').add({
+            action: `SUSPEND_USER (${reason})`,
+            actorName: caller.displayName,
+            actorRole: 'admin',
+            target: `User ID: ${targetUid}`,
+            timestamp: new Date().toISOString(),
+        });
+        return { success: true, targetUid, isSuspended: true };
+    }
+    catch (err) {
+        console.error(`[suspendUser] Error suspending user ${targetUid}:`, err);
+        throw new https_1.HttpsError('internal', err.message || 'Failed to complete user suspension sequence.');
+    }
 });
-exports.reactivateUser = (0, https_1.onCall)(async (request) => {
+exports.reactivateUser = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
     const caller = await verifyAdminCaller(request.auth);
     const targetUid = request.data?.targetUid;
     if (!targetUid || typeof targetUid !== 'string') {
@@ -72,29 +78,35 @@ exports.reactivateUser = (0, https_1.onCall)(async (request) => {
     }
     const db = (0, firestore_1.getFirestore)();
     const authAdmin = (0, auth_1.getAuth)();
-    // 1. Write Firestore isActive = true
-    const targetRef = db.collection('users').doc(targetUid);
-    await targetRef.set({
-        isActive: true,
-        updatedAt: new Date().toISOString(),
-    }, { merge: true });
-    // 2. Set custom claim isSuspended: false
-    const userRecord = await authAdmin.getUser(targetUid);
-    const existingClaims = userRecord.customClaims || {};
-    await authAdmin.setCustomUserClaims(targetUid, {
-        ...existingClaims,
-        isSuspended: false,
-    });
-    // 3. Revoke active refresh tokens
-    await authAdmin.revokeRefreshTokens(targetUid);
-    // 4. Record audit log
-    await db.collection('audit_logs').add({
-        action: 'UNSUSPEND_USER',
-        actorName: caller.displayName,
-        actorRole: 'admin',
-        target: `User ID: ${targetUid}`,
-        timestamp: new Date().toISOString(),
-    });
-    return { success: true, targetUid, isSuspended: false };
+    try {
+        console.log(`[reactivateUser] Step 1: Setting isActive=true on users/${targetUid}`);
+        const targetRef = db.collection('users').doc(targetUid);
+        await targetRef.set({
+            isActive: true,
+            updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        console.log(`[reactivateUser] Step 2: Clearing isSuspended custom claim on auth uid ${targetUid}`);
+        const userRecord = await authAdmin.getUser(targetUid);
+        const existingClaims = userRecord.customClaims || {};
+        await authAdmin.setCustomUserClaims(targetUid, {
+            ...existingClaims,
+            isSuspended: false,
+        });
+        console.log(`[reactivateUser] Step 3: Revoking refresh tokens for uid ${targetUid}`);
+        await authAdmin.revokeRefreshTokens(targetUid);
+        console.log(`[reactivateUser] Step 4: Recording audit log for reactivation`);
+        await db.collection('audit_logs').add({
+            action: 'UNSUSPEND_USER',
+            actorName: caller.displayName,
+            actorRole: 'admin',
+            target: `User ID: ${targetUid}`,
+            timestamp: new Date().toISOString(),
+        });
+        return { success: true, targetUid, isSuspended: false };
+    }
+    catch (err) {
+        console.error(`[reactivateUser] Error reactivating user ${targetUid}:`, err);
+        throw new https_1.HttpsError('internal', err.message || 'Failed to complete user reactivation sequence.');
+    }
 });
 //# sourceMappingURL=suspendUser.js.map

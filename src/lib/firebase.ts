@@ -1,9 +1,11 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   Firestore,
-  enableMultiTabIndexedDbPersistence,
+  persistentLocalCache,
+  persistentMultipleTabManager,
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
@@ -34,22 +36,23 @@ if (!getApps().length) {
 export const auth: Auth = getAuth(app);
 
 const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
-export const db: Firestore = databaseId && databaseId !== '(default)'
-  ? getFirestore(app, databaseId)
-  : getFirestore(app);
-
-// Enable offline persistence
+let dbInstance: Firestore;
 try {
-  enableMultiTabIndexedDbPersistence(db).catch((err) => {
-    if (err.code === 'failed-precondition') {
-      console.warn('[Firestore] Persistence failed: Multiple tabs open');
-    } else if (err.code === 'unimplemented') {
-      console.warn('[Firestore] Persistence is not supported by browser');
-    }
-  });
-} catch (e) {
-  console.warn('[Firestore] Error configuring persistence:', e);
+  const cacheSettings = {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager(),
+    }),
+  };
+  dbInstance = databaseId && databaseId !== '(default)'
+    ? initializeFirestore(app, cacheSettings, databaseId)
+    : initializeFirestore(app, cacheSettings);
+} catch {
+  dbInstance = databaseId && databaseId !== '(default)'
+    ? getFirestore(app, databaseId)
+    : getFirestore(app);
 }
+
+export const db: Firestore = dbInstance;
 
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app);

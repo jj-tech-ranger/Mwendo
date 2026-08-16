@@ -166,8 +166,8 @@ const calculateVehicleRiskScore = (events, totalTripCount, currentTimeMs = Date.
         if (!Number.isFinite(eventTimeMs)) {
             continue;
         }
-        const ageDays = Math.max(0, (currentTimeMs - eventTimeMs) / (1000 * 60 * 60 * 24));
-        const decayFactor = Math.exp(-lambda * ageDays);
+        const ageDays = Math.max(0, (currentTimeMs - eventTimeMs) / 86400000);
+        const decayFactor = Math.min(1.0, Math.exp(-lambda * ageDays));
         let basePenalty = 5;
         switch (ev.severity) {
             case 'low':

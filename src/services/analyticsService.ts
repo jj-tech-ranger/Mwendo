@@ -38,7 +38,7 @@ export const analyticsService = {
   /**
    * Log an analytics event (only executed if DPA consent has been explicitly granted)
    */
-  logAnalyticsEvent(eventName: string, eventParams?: Record<string, any>): void {
+  logAnalyticsEvent(eventName: string, eventParams?: Record<string, unknown>): void {
     if (!this.hasDpaConsent()) {
       return; // Respect Kenya DPA 2019 privacy regulation - do not track
     }

@@ -25,7 +25,7 @@ export const remoteConfigService = {
         minimumFetchIntervalMillis: 3600000, // 1 hour
         fetchTimeoutMillis: 10000,
       };
-      remoteConfig.defaultConfig = DEFAULT_FLAGS as any;
+      remoteConfig.defaultConfig = DEFAULT_FLAGS as unknown as Record<string, string | number | boolean>;
 
       await fetchAndActivate(remoteConfig);
 

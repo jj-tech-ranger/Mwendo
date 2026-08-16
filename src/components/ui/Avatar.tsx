@@ -74,6 +74,8 @@ export const Avatar: React.FC<AvatarProps> = ({
           <img
             src={src}
             alt={name}
+            loading="lazy"
+            referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
             onError={(e) => {
               // Hide broken image to fallback to initials

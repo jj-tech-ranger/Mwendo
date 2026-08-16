@@ -114,7 +114,22 @@ export const AuthorityShell: React.FC = () => {
           </header>
 
           <main className="p-lg sm:p-xl max-w-7xl w-full mx-auto flex-1">
-            <Outlet />
+            <React.Suspense
+              fallback={
+                <div className="min-h-[400px] flex items-center justify-center p-8">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">
+                      progress_activity
+                    </span>
+                    <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+                      Loading Authority module...
+                    </span>
+                  </div>
+                </div>
+              }
+            >
+              <Outlet />
+            </React.Suspense>
           </main>
         </div>
       </div>

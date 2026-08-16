@@ -14,7 +14,7 @@ export const serviceWorkerService = {
           console.log('[PWA] Service Worker registered with scope:', reg.scope);
 
           // Check if an updated worker is already waiting in background
-          if (reg.waiting) {
+          if (reg.waiting && !import.meta.env.DEV) {
             console.log('[PWA] Found waiting worker on registration');
             usePwaStore.getState().setUpdateAvailable(true, reg.waiting);
           }
@@ -25,7 +25,7 @@ export const serviceWorkerService = {
             if (!newWorker) return;
 
             newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !import.meta.env.DEV) {
                 // An active controller already exists -> this is an update, not initial install
                 console.log('[PWA] New version installed and waiting for user confirmation');
                 usePwaStore.getState().setUpdateAvailable(true, newWorker);

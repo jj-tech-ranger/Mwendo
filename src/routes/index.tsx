@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { PassengerShell } from '../components/shells/PassengerShell';
 import { SaccoShell } from '../components/shells/SaccoShell';
 import { AuthorityShell } from '../components/shells/AuthorityShell';
@@ -230,7 +230,20 @@ const AdminSettingsScreen = lazy(() =>
   import('../features/admin/AdminSettingsScreen').then((m) => ({ default: m.AdminSettingsScreen }))
 );
 
-const LoadingFallback = () => (
+const ContentLoadingFallback = () => (
+  <div className="w-full h-full min-h-[300px] flex items-center justify-center p-8">
+    <div className="flex flex-col items-center gap-3">
+      <span className="material-symbols-outlined text-primary text-3xl animate-spin">
+        progress_activity
+      </span>
+      <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+        Loading view...
+      </span>
+    </div>
+  </div>
+);
+
+const FullPageLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <div className="flex flex-col items-center gap-md">
       <span className="material-symbols-outlined text-primary text-4xl animate-spin">
@@ -243,94 +256,104 @@ const LoadingFallback = () => (
   </div>
 );
 
+const withFullPageSuspense = (element: React.ReactNode) => (
+  <Suspense fallback={<FullPageLoadingFallback />}>{element}</Suspense>
+);
+
+export const ContentSuspenseOutlet: React.FC = () => (
+  <Suspense fallback={<ContentLoadingFallback />}>
+    <Outlet />
+  </Suspense>
+);
+
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <WelcomeScreen />,
+    element: withFullPageSuspense(<WelcomeScreen />),
   },
   {
     path: '/onboarding',
-    element: <WelcomeScreen />,
+    element: withFullPageSuspense(<WelcomeScreen />),
   },
   {
     path: '/location-permission',
-    element: <PermissionsWizardScreen />,
+    element: withFullPageSuspense(<PermissionsWizardScreen />),
   },
   {
     path: '/permissions-wizard',
-    element: <PermissionsWizardScreen />,
+    element: withFullPageSuspense(<PermissionsWizardScreen />),
   },
 
   // Auth Layouts
   {
     path: '/auth/login',
-    element: <LoginScreen />,
+    element: withFullPageSuspense(<LoginScreen />),
   },
   {
     path: '/auth/register',
-    element: <RegisterScreen />,
+    element: withFullPageSuspense(<RegisterScreen />),
   },
   {
     path: '/auth/forgot-password',
-    element: <ForgotPasswordScreen />,
+    element: withFullPageSuspense(<ForgotPasswordScreen />),
   },
   {
     path: '/auth/verify-email',
-    element: <EmailVerificationScreen />,
+    element: withFullPageSuspense(<EmailVerificationScreen />),
   },
   {
     path: '/auth/verify-otp',
-    element: <OtpVerificationScreen />,
+    element: withFullPageSuspense(<OtpVerificationScreen />),
   },
   {
     path: '/auth/loading',
-    element: <LoadingAuthScreen />,
+    element: withFullPageSuspense(<LoadingAuthScreen />),
   },
   {
     path: '/auth/session-expired',
-    element: <SessionExpiredScreen />,
+    element: withFullPageSuspense(<SessionExpiredScreen />),
   },
   {
     path: '/auth/suspended',
-    element: <AccountSuspendedScreen />,
+    element: withFullPageSuspense(<AccountSuspendedScreen />),
   },
   {
     path: '/auth/unauthorized',
-    element: <UnauthorizedScreen />,
+    element: withFullPageSuspense(<UnauthorizedScreen />),
   },
   {
     path: '/auth/mfa-enrollment',
-    element: <MfaEnrollmentScreen />,
+    element: withFullPageSuspense(<MfaEnrollmentScreen />),
   },
   {
     path: '/auth/mfa-challenge',
-    element: <MfaChallengeScreen />,
+    element: withFullPageSuspense(<MfaChallengeScreen />),
   },
 
   // System Layouts
   {
     path: '/dev/components',
-    element: <ComponentShowcaseScreen />,
+    element: withFullPageSuspense(<ComponentShowcaseScreen />),
   },
   {
     path: '/maintenance',
-    element: <MaintenanceModeScreen />,
+    element: withFullPageSuspense(<MaintenanceModeScreen />),
   },
   {
     path: '/scheduled-maintenance',
-    element: <ScheduledMaintenanceScreen />,
+    element: withFullPageSuspense(<ScheduledMaintenanceScreen />),
   },
   {
     path: '/server-unavailable',
-    element: <ServerUnavailableScreen />,
+    element: withFullPageSuspense(<ServerUnavailableScreen />),
   },
   {
     path: '/update-required',
-    element: <UpdateRequiredScreen />,
+    element: withFullPageSuspense(<UpdateRequiredScreen />),
   },
   {
     path: '/update-available',
-    element: <UpdateAvailableScreen />,
+    element: withFullPageSuspense(<UpdateAvailableScreen />),
   },
 
   // Passenger Shell & Routes
@@ -608,16 +631,14 @@ const router = createBrowserRouter([
   // Fallback 404
   {
     path: '*',
-    element: <NotFound404Screen />,
+    element: withFullPageSuspense(<NotFound404Screen />),
   },
 ]);
 
 export const AppRoutes: React.FC = () => {
   return (
     <ErrorBoundary>
-      <Suspense fallback={<LoadingFallback />}>
-        <RouterProvider router={router} />
-      </Suspense>
+      <RouterProvider router={router} />
     </ErrorBoundary>
   );
 };

@@ -19,6 +19,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          aria-label={props['aria-label'] || placeholder}
           className={cn(
             'w-full h-11 bg-surface-container-low border border-outline-variant/40 rounded-full pl-11 pr-10 text-sm font-body-md text-on-surface placeholder:text-outline transition-all focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary',
             className
@@ -29,6 +30,7 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
           <button
             type="button"
             onClick={onClear}
+            aria-label="Clear search"
             className="absolute right-3 p-1 text-on-surface-variant hover:text-on-surface transition-colors"
           >
             <span className="material-symbols-outlined text-lg">cancel</span>

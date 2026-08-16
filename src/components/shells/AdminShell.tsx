@@ -19,7 +19,8 @@ interface NavGroup {
 
 export const AdminShell: React.FC = () => {
   const setVariant = useThemeStore((s) => s.setVariant);
-  const { user, logout } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -356,7 +357,22 @@ export const AdminShell: React.FC = () => {
 
           {/* Main Workspace Area */}
           <main className="p-lg sm:p-xl max-w-7xl w-full mx-auto flex-1 space-y-lg">
-            <Outlet />
+            <React.Suspense
+              fallback={
+                <div className="min-h-[400px] flex items-center justify-center p-8">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">
+                      progress_activity
+                    </span>
+                    <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+                      Loading Admin console...
+                    </span>
+                  </div>
+                </div>
+              }
+            >
+              <Outlet />
+            </React.Suspense>
           </main>
         </div>
       </div>

@@ -54,5 +54,35 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      include: [
+        'src/**/*.test.{ts,tsx}',
+        'src/**/__tests__/**/*.{ts,tsx}',
+        'apps/functions/src/**/*.test.{ts,tsx}',
+        'apps/functions/src/**/__tests__/**/*.{ts,tsx}',
+      ],
+      exclude: ['node_modules', 'dist', 'e2e/**', '.idea', '.git', '.cache'],
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'json', 'html'],
+        include: [
+          'src/lib/**',
+          'apps/functions/src/**',
+        ],
+        exclude: [
+          '**/*.test.{ts,tsx}',
+          '**/__tests__/**',
+          '**/*.d.ts',
+        ],
+        thresholds: {
+          lines: 80,
+          functions: 80,
+          branches: 80,
+          statements: 80,
+        },
+      },
+    },
   };
 });

@@ -50,13 +50,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => set({ user: null, claims: null, isAuthenticated: false, isLoading: false }),
 }));
 
+interface WindowWithAuthHelpers {
+  __useAuthStore?: typeof useAuthStore;
+  __setTestAuth?: (role?: UserRole, saccoId?: string) => void;
+  __TEST_AUTH_OVERRIDE__?: boolean;
+  __INITIAL_TEST_ROLE__?: UserRole;
+  __INITIAL_TEST_SACCO__?: string;
+}
+
 if (typeof window !== 'undefined') {
-  (window as any).__useAuthStore = useAuthStore;
-  (window as any).__setTestAuth = (
+  const win = window as unknown as WindowWithAuthHelpers;
+  win.__useAuthStore = useAuthStore;
+  win.__setTestAuth = (
     role: UserRole = 'admin',
     saccoId = 'sacco_metrolink'
   ) => {
-    (window as any).__TEST_AUTH_OVERRIDE__ = true;
+    win.__TEST_AUTH_OVERRIDE__ = true;
     const claims: UserClaims = {
       activeRole: role,
       saccoId: role === 'sacco_manager' ? saccoId : undefined,
@@ -85,10 +94,10 @@ if (typeof window !== 'undefined') {
     );
   };
 
-  if ((window as any).__INITIAL_TEST_ROLE__) {
-    (window as any).__setTestAuth(
-      (window as any).__INITIAL_TEST_ROLE__,
-      (window as any).__INITIAL_TEST_SACCO__ || 'sacco_metrolink'
+  if (win.__INITIAL_TEST_ROLE__) {
+    win.__setTestAuth(
+      win.__INITIAL_TEST_ROLE__,
+      win.__INITIAL_TEST_SACCO__ || 'sacco_metrolink'
     );
   }
 }

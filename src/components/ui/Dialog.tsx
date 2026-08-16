@@ -38,7 +38,8 @@ export const Dialog: React.FC<DialogProps> = ({
           <h2 className="font-headline-lg-mobile text-on-surface">{title}</h2>
           <button
             onClick={onClose}
-            className="text-on-surface-variant hover:text-on-surface transition-colors p-1"
+            aria-label="Close dialog"
+            className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors p-2.5 -mr-1 -mt-1 rounded-xl min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <span className="material-symbols-outlined text-xl">close</span>
           </button>

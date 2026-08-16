@@ -1,32 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { vehicleRepository, auditLogRepository } from '../../repositories';
 import { Vehicle } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminVehiclesScreen: React.FC = () => {
-  const { user: currentAdmin } = useAuthStore();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const currentAdmin = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadVehicles();
-  }, []);
-
-  async function loadVehicles() {
-    setIsLoading(true);
-    try {
-      const fetched = await vehicleRepository.getAll();
-      setVehicles(fetched);
-    } catch (err) {
-      console.error('Failed to load vehicles:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: vehicles = [], isLoading } = useQuery({
+    queryKey: ['adminVehicles'],
+    queryFn: async () => {
+      return vehicleRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
   async function handleToggleVehicleStatus(v: Vehicle) {
     const newStatus = v.status === 'active' ? 'suspended' : 'active';
@@ -42,9 +35,7 @@ export const AdminVehiclesScreen: React.FC = () => {
         timestamp: new Date().toISOString(),
       });
 
-      setVehicles((prev) =>
-        prev.map((item) => (item.id === v.id ? { ...item, status: newStatus } : item))
-      );
+      await queryClient.invalidateQueries({ queryKey: ['adminVehicles'] });
     } catch (err) {
       console.error('Failed to change vehicle status:', err);
     }

@@ -4,8 +4,10 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
-import { alertRepository, userRepository } from '../../repositories';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { userRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { authService } from '../../services/authService';
 import { functionsService } from '../../services/functionsService';
 import { messagingService } from '../../services/messagingService';
 
@@ -16,14 +18,10 @@ interface ContactItem {
   phone: string;
 }
 
-const DEFAULT_SAMPLE_CONTACTS: ContactItem[] = [
-  { id: '1', name: 'Mary Wanjiku', relationship: 'Sister', phone: '+254 712 345 678' },
-  { id: '2', name: 'Peter Ochieng', relationship: 'Spouse', phone: '+254 722 987 654' },
-];
-
 export const EmergencySosScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [sosSent, setSosSent] = useState(false);
@@ -35,18 +33,8 @@ export const EmergencySosScreen: React.FC = () => {
     alertId?: string;
   } | null>(null);
 
-  // Initialize from user's persisted profile or default samples
-  const [contacts, setContacts] = useState<ContactItem[]>(() => {
-    if (user?.emergencyContacts && user.emergencyContacts.length > 0) {
-      return user.emergencyContacts.map((c, idx) => ({
-        id: `c_${idx}_${c.phone}`,
-        name: c.name,
-        relationship: c.relationship || 'Family',
-        phone: c.phone,
-      }));
-    }
-    return DEFAULT_SAMPLE_CONTACTS;
-  });
+  // Initialize strictly as empty array with no fabricated sample data
+  const [contacts, setContacts] = useState<ContactItem[]>([]);
 
   const [showAddContact, setShowAddContact] = useState(false);
   const [newContactName, setNewContactName] = useState('');
@@ -54,7 +42,7 @@ export const EmergencySosScreen: React.FC = () => {
   const [newContactRel, setNewContactRel] = useState('Family');
   const [isSavingContact, setIsSavingContact] = useState(false);
 
-  // Sync state if user's emergency contacts change
+  // Sync state if user's real persisted emergency contacts change or on mount
   useEffect(() => {
     if (user?.emergencyContacts && user.emergencyContacts.length > 0) {
       setContacts(
@@ -65,6 +53,8 @@ export const EmergencySosScreen: React.FC = () => {
           phone: c.phone,
         }))
       );
+    } else {
+      setContacts([]);
     }
   }, [user?.emergencyContacts]);
 
@@ -166,7 +156,7 @@ export const EmergencySosScreen: React.FC = () => {
   };
 
   const handleAddContact = async () => {
-    if (!newContactName || !newContactPhone) return;
+    if (!newContactName.trim() || !newContactPhone.trim()) return;
     setIsSavingContact(true);
 
     const newContactItem: ContactItem = {
@@ -179,28 +169,38 @@ export const EmergencySosScreen: React.FC = () => {
     const updatedContacts = [...contacts, newContactItem];
     setContacts(updatedContacts);
 
-    // Persist to user's Firestore profile
-    if (user?.id || user?.uid) {
-      const userId = user.id || user.uid;
-      const formattedForProfile = updatedContacts.map((c) => ({
-        name: c.name,
-        relationship: c.relationship,
-        phone: c.phone,
-      }));
+    const formattedForProfile = updatedContacts.map((c) => ({
+      name: c.name,
+      relationship: c.relationship,
+      phone: c.phone,
+    }));
 
-      try {
-        await userRepository.update(userId, {
-          emergencyContacts: formattedForProfile,
-          updatedAt: new Date().toISOString(),
-        } as any);
-
-        setUser({
-          ...user,
-          emergencyContacts: formattedForProfile,
-        });
-      } catch (saveErr) {
-        console.warn('[EmergencySosScreen] Error persisting emergency contacts to profile:', saveErr);
+    // 1. Persist to user's Firestore profile via authService
+    try {
+      await authService.updateProfileData({
+        emergencyContacts: formattedForProfile,
+      });
+    } catch (saveErr) {
+      console.warn('[EmergencySosScreen] Error updating profile via authService:', saveErr);
+      if (user?.id || user?.uid) {
+        const userId = user.id || user.uid;
+        try {
+          await userRepository.update(userId, {
+            emergencyContacts: formattedForProfile,
+            updatedAt: new Date().toISOString(),
+          } as Partial<any>);
+        } catch (repoErr) {
+          console.warn('[EmergencySosScreen] Error updating userRepository fallback:', repoErr);
+        }
       }
+    }
+
+    // 2. Keep local auth store state updated
+    if (user) {
+      setUser({
+        ...user,
+        emergencyContacts: formattedForProfile,
+      });
     }
 
     setNewContactName('');
@@ -213,27 +213,36 @@ export const EmergencySosScreen: React.FC = () => {
     const updatedContacts = contacts.filter((c) => c.id !== contactId);
     setContacts(updatedContacts);
 
-    if (user?.id || user?.uid) {
-      const userId = user.id || user.uid;
-      const formattedForProfile = updatedContacts.map((c) => ({
-        name: c.name,
-        relationship: c.relationship,
-        phone: c.phone,
-      }));
+    const formattedForProfile = updatedContacts.map((c) => ({
+      name: c.name,
+      relationship: c.relationship,
+      phone: c.phone,
+    }));
 
-      try {
-        await userRepository.update(userId, {
-          emergencyContacts: formattedForProfile,
-          updatedAt: new Date().toISOString(),
-        } as any);
-
-        setUser({
-          ...user,
-          emergencyContacts: formattedForProfile,
-        });
-      } catch (saveErr) {
-        console.warn('[EmergencySosScreen] Error updating emergency contacts on profile:', saveErr);
+    try {
+      await authService.updateProfileData({
+        emergencyContacts: formattedForProfile,
+      });
+    } catch (saveErr) {
+      console.warn('[EmergencySosScreen] Error updating profile via authService:', saveErr);
+      if (user?.id || user?.uid) {
+        const userId = user.id || user.uid;
+        try {
+          await userRepository.update(userId, {
+            emergencyContacts: formattedForProfile,
+            updatedAt: new Date().toISOString(),
+          } as Partial<any>);
+        } catch (repoErr) {
+          console.warn('[EmergencySosScreen] Error updating userRepository fallback:', repoErr);
+        }
       }
+    }
+
+    if (user) {
+      setUser({
+        ...user,
+        emergencyContacts: formattedForProfile,
+      });
     }
   };
 
@@ -434,20 +443,22 @@ export const EmergencySosScreen: React.FC = () => {
                 Persisted to your profile & automatically notified upon SOS trigger.
               </p>
             </div>
-            <Button size="sm" onClick={() => setShowAddContact(true)} className="text-xs">
-              + Add Contact
-            </Button>
+            {contacts.length > 0 && (
+              <Button size="sm" onClick={() => setShowAddContact(true)} className="text-xs">
+                + Add Contact
+              </Button>
+            )}
           </div>
 
           <div className="space-y-2">
             {contacts.length === 0 ? (
-              <Card className="p-6 text-center text-xs text-on-surface-variant space-y-2">
-                <span className="material-symbols-outlined text-2xl text-on-surface-variant/60">person_off</span>
-                <p>No emergency contacts saved yet.</p>
-                <Button size="sm" onClick={() => setShowAddContact(true)} className="text-xs">
-                  Add First Contact
-                </Button>
-              </Card>
+              <EmptyState
+                icon="contact_emergency"
+                title="No Emergency Contacts Saved"
+                description="SOS alert effectiveness depends on having trusted contacts saved. When triggered, SMS alerts with your live GPS location will be broadcast to your emergency contacts."
+                primaryCtaLabel="Add First Emergency Contact"
+                onPrimaryCta={() => setShowAddContact(true)}
+              />
             ) : (
               contacts.map((c) => (
                 <Card key={c.id} className="p-4 flex items-center justify-between">
@@ -465,6 +476,7 @@ export const EmergencySosScreen: React.FC = () => {
                       onClick={() => handleDeleteContact(c.id)}
                       className="text-on-surface-variant/60 hover:text-error transition-colors p-1"
                       title="Remove contact"
+                      aria-label={`Remove contact ${c.name}`}
                     >
                       <span className="material-symbols-outlined text-sm">delete</span>
                     </button>
@@ -517,7 +529,7 @@ export const EmergencySosScreen: React.FC = () => {
             <input
               value={newContactName}
               onChange={(e) => setNewContactName(e.target.value)}
-              placeholder="e.g. Mary Wanjiku"
+              placeholder="e.g. Jane Muthoni"
               className="w-full h-9 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface"
             />
           </div>

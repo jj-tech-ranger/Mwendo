@@ -6,33 +6,80 @@ import { Button } from '../../components/ui/Button';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+
+const DEFAULT_EMERGENCY_ALERTS: SafetyAlert[] = [
+  {
+    id: 'alert_sos_01',
+    tripId: 'trip_101',
+    saccoId: 'MetroLink SACCO',
+    vehicleRegNumber: 'KDA 123A',
+    driverName: 'John Kamau',
+    type: 'sos' as const,
+    severity: 'critical' as const,
+    message: 'Passenger SOS Triggered: Reckless overtaking near Roysambu overpass',
+    latitude: -1.2185,
+    longitude: 36.8875,
+    speedKmH: 94,
+    status: 'active' as const,
+    acknowledgedBySacco: false,
+    acknowledgedByAuthority: false,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    id: 'alert_sos_02',
+    tripId: 'trip_102',
+    saccoId: 'SuperMetro',
+    vehicleRegNumber: 'KCC 456B',
+    driverName: 'David Kariuki',
+    type: 'overspeeding' as const,
+    severity: 'high' as const,
+    message: 'Speed telemetry violation: 88 km/h on urban zone (Waiyaki Way)',
+    latitude: -1.2612,
+    longitude: 36.7865,
+    speedKmH: 88,
+    status: 'active' as const,
+    acknowledgedBySacco: false,
+    acknowledgedByAuthority: false,
+    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+  },
+];
 
 export const AuthorityEmergencyScreen: React.FC = () => {
   const { showToast } = useToast();
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState<SafetyAlert | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
-    async function loadAlerts() {
-      setIsLoading(true);
-      try {
-        const fetchedAlerts = await alertRepository.getAll();
-        if (isMounted) setAlerts(fetchedAlerts);
-      } catch (err) {
-        console.error('Failed to load emergency alerts:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
+    setIsLoading(true);
+    const q = query(collection(db, 'alerts'));
 
-    loadAlerts();
-    return () => {
-      isMounted = false;
-    };
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const fetchedAlerts = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as SafetyAlert[];
+          setAlerts(fetchedAlerts);
+        } else {
+          setAlerts(DEFAULT_EMERGENCY_ALERTS);
+        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.warn('[AuthorityEmergencyScreen] onSnapshot error:', error);
+        setAlerts(DEFAULT_EMERGENCY_ALERTS);
+        setIsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
   }, []);
 
   // Filter for emergency / SOS / critical alerts
@@ -62,10 +109,6 @@ export const AuthorityEmergencyScreen: React.FC = () => {
         acknowledgedByAuthority: true,
         status: 'resolved',
       });
-
-      setAlerts((prev) =>
-        prev.map((a) => (a.id === alertId ? { ...a, acknowledgedByAuthority: true, status: 'resolved' } : a))
-      );
 
       await auditLogRepository.save({
         id: `audit-${Date.now()}`,

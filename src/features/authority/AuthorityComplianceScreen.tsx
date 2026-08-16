@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { violationRepository, auditLogRepository } from '../../repositories';
 import { Violation, SeverityLevel } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AuthorityComplianceScreen: React.FC = () => {
   const { showToast } = useToast();
-  const { user } = useAuthStore();
-  const [violations, setViolations] = useState<Violation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,27 +20,13 @@ export const AuthorityComplianceScreen: React.FC = () => {
   const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadViolations() {
-      setIsLoading(true);
-      try {
-        const data = await violationRepository.getAll();
-        if (isMounted) {
-          setViolations(data);
-        }
-      } catch (err) {
-        console.error('Failed to load violations:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadViolations();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { data: violations = [], isLoading } = useQuery({
+    queryKey: ['violations'],
+    queryFn: async () => {
+      return violationRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
+  });
 
   // Filtered dataset
   const filteredViolations = useMemo(() => {
@@ -60,9 +47,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
   const handleUpdateStatus = async (violationId: string, newStatus: 'reviewed' | 'disputed' | 'dismissed', actionNote: string) => {
     try {
       await violationRepository.update(violationId, { status: newStatus });
-      setViolations((prev) =>
-        prev.map((v) => (v.id === violationId ? { ...v, status: newStatus } : v))
-      );
+      await queryClient.invalidateQueries({ queryKey: ['violations'] });
 
       // Write Audit Log
       await auditLogRepository.save({

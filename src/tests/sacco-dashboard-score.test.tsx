@@ -3,6 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SaccoDashboard } from '../features/sacco/SaccoDashboard';
 import { useAuthStore } from '../store/useAuthStore';
 import {
@@ -16,7 +17,18 @@ import { calculateSaccoSafetyScore } from '../lib/engine';
 import '../services/i18n';
 
 describe('AN-002: SaccoDashboard Canonical Safety Score Computation', () => {
+  let testQueryClient: QueryClient;
+
   beforeEach(() => {
+    testQueryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 0,
+        },
+      },
+    });
+
     useAuthStore.setState({
       user: {
         id: 'manager_1',
@@ -80,9 +92,11 @@ describe('AN-002: SaccoDashboard Canonical Safety Score Computation', () => {
     expect(expectedCanonicalScore).toBe(78);
 
     render(
-      <MemoryRouter>
-        <SaccoDashboard />
-      </MemoryRouter>
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter>
+          <SaccoDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
     );
 
     // Wait for the dashboard to finish loading and display the safety score
@@ -116,9 +130,11 @@ describe('AN-002: SaccoDashboard Canonical Safety Score Computation', () => {
     expect(expectedScore).toBe(100);
 
     render(
-      <MemoryRouter>
-        <SaccoDashboard />
-      </MemoryRouter>
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter>
+          <SaccoDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
     );
 
     await waitFor(() => {
@@ -146,9 +162,11 @@ describe('AN-002: SaccoDashboard Canonical Safety Score Computation', () => {
     vi.spyOn(analyticsRepository, 'getById').mockResolvedValue(mockPrecomputed as any);
 
     render(
-      <MemoryRouter>
-        <SaccoDashboard />
-      </MemoryRouter>
+      <QueryClientProvider client={testQueryClient}>
+        <MemoryRouter>
+          <SaccoDashboard />
+        </MemoryRouter>
+      </QueryClientProvider>
     );
 
     await waitFor(() => {

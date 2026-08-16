@@ -30,6 +30,7 @@ async function processUpdateDailyAnalyticsLogic(db, dateStr) {
     const docId = `daily_${dateStr}`;
     const payload = {
         id: docId,
+        docId,
         date: dateStr,
         type: 'daily',
         totalTrips,
@@ -46,9 +47,13 @@ async function processUpdateDailyAnalyticsLogic(db, dateStr) {
     await db.collection('analytics').doc(docId).set(payload, { merge: true });
     return payload;
 }
-exports.updateDailyAnalytics = (0, https_1.onCall)(async (request) => {
+exports.updateDailyAnalytics = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
+    }
+    const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger');
+    if (role !== 'admin' && role !== 'authority') {
+        throw new https_1.HttpsError('permission-denied', 'Only administrative or authority users may compute platform-wide daily analytics.');
     }
     const dateStr = request.data?.dateStr || new Date().toISOString().split('T')[0];
     const db = (0, firestore_1.getFirestore)();

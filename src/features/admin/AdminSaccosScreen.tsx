@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { saccoRepository, auditLogRepository } from '../../repositories';
 import { SACCO } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminSaccosScreen: React.FC = () => {
   const { showToast } = useToast();
-  const { user: currentAdmin } = useAuthStore();
-  const [saccos, setSaccos] = useState<SACCO[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const currentAdmin = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -31,21 +32,13 @@ export const AdminSaccosScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSaccos();
-  }, []);
-
-  async function loadSaccos() {
-    setIsLoading(true);
-    try {
-      const fetched = await saccoRepository.getAll();
-      setSaccos(fetched);
-    } catch (err) {
-      console.error('Failed to load SACCOs:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: saccos = [], isLoading } = useQuery({
+    queryKey: ['adminSaccos'],
+    queryFn: async () => {
+      return saccoRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
   // Handle Register New SACCO
   async function handleRegisterSacco(e: React.FormEvent) {
@@ -76,7 +69,7 @@ export const AdminSaccosScreen: React.FC = () => {
         timestamp: new Date().toISOString(),
       });
 
-      setSaccos((prev) => [created, ...prev]);
+      await queryClient.invalidateQueries({ queryKey: ['adminSaccos'] });
       setShowRegisterModal(false);
       setToastMsg(`Successfully registered ${created.name}.`);
     } catch (err) {
@@ -102,9 +95,7 @@ export const AdminSaccosScreen: React.FC = () => {
         timestamp: new Date().toISOString(),
       });
 
-      setSaccos((prev) =>
-        prev.map((s) => (s.id === sacco.id ? { ...s, status: 'active' } : s))
-      );
+      await queryClient.invalidateQueries({ queryKey: ['adminSaccos'] });
       setToastMsg(`${sacco.name} verified and activated.`);
       setSaccoToVerify(null);
     } catch (err) {
@@ -184,6 +175,8 @@ export const AdminSaccosScreen: React.FC = () => {
             search
           </span>
           <input
+            id="admin-saccos-search"
+            aria-label="Search SACCO name or Reg code"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -193,6 +186,8 @@ export const AdminSaccosScreen: React.FC = () => {
         </div>
 
         <select
+          id="admin-saccos-status-filter"
+          aria-label="Filter by SACCO Status"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-label-mono"
@@ -267,10 +262,11 @@ export const AdminSaccosScreen: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="reg-sacco-name" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   SACCO Name
                 </label>
                 <input
+                  id="reg-sacco-name"
                   type="text"
                   required
                   placeholder="e.g. Kenya Bus Service"
@@ -281,10 +277,11 @@ export const AdminSaccosScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="reg-sacco-code" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   NTSA Registration Code
                 </label>
                 <input
+                  id="reg-sacco-code"
                   type="text"
                   required
                   placeholder="e.g. NTSA/SACCO/2026/101"
@@ -295,10 +292,11 @@ export const AdminSaccosScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="reg-sacco-email" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   Official Email
                 </label>
                 <input
+                  id="reg-sacco-email"
                   type="email"
                   required
                   placeholder="info@sacco.co.ke"

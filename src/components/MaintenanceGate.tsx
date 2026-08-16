@@ -11,7 +11,7 @@ interface MaintenanceConfig {
 
 export const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [maintenance, setMaintenance] = useState<MaintenanceConfig | null>(null);
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -28,7 +28,9 @@ export const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ child
         }
       },
       (error) => {
-        console.warn('[MaintenanceGate] Error reading maintenance status:', error);
+        if (error.code !== 'permission-denied') {
+          console.warn('[MaintenanceGate] Error reading maintenance status:', error);
+        }
         setMaintenance({ active: false });
       }
     );

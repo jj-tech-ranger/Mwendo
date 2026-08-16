@@ -1,6 +1,7 @@
 import { offlineStorage } from './offlineStorage';
 import { tripRepository, blackSpotRepository } from '../repositories';
 import { useOfflineStore } from '../store/useOfflineStore';
+import { Trip, BlackSpot } from '../types';
 
 export interface DrainResult {
   syncedTrips: number;
@@ -46,7 +47,7 @@ class OfflineSyncService {
    */
   async drainQueue(): Promise<DrainResult> {
     if (this.isDraining) {
-      console.log('[OfflineSyncService] Drain already in progress. Skipping duplicate run.');
+      console.debug('[OfflineSyncService] Drain already in progress. Skipping duplicate run.');
       const { tripKeys, reportKeys } = await this.getQueuedKeys();
       return {
         syncedTrips: 0,
@@ -70,7 +71,7 @@ class OfflineSyncService {
       // 1. Process queued trips
       for (const key of tripKeys) {
         try {
-          const trip = await offlineStorage.getItem<any>(key);
+          const trip = await offlineStorage.getItem<Trip>(key);
           if (!trip || !trip.id) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);
@@ -94,7 +95,7 @@ class OfflineSyncService {
       // 2. Process queued black spot reports
       for (const key of reportKeys) {
         try {
-          const report = await offlineStorage.getItem<any>(key);
+          const report = await offlineStorage.getItem<BlackSpot>(key);
           if (!report || !report.id) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);

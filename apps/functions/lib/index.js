@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendSOS = exports.syncPublicPins = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
+exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.sendSOS = exports.syncPublicPins = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
 if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
@@ -20,4 +20,10 @@ var syncPublicPins_1 = require("./pins/syncPublicPins");
 Object.defineProperty(exports, "syncPublicPins", { enumerable: true, get: function () { return syncPublicPins_1.syncPublicPins; } });
 var sendSOS_1 = require("./alerts/sendSOS");
 Object.defineProperty(exports, "sendSOS", { enumerable: true, get: function () { return sendSOS_1.sendSOS; } });
+var dailyPurge_1 = require("./scheduled/dailyPurge");
+Object.defineProperty(exports, "dailyPurge", { enumerable: true, get: function () { return dailyPurge_1.dailyPurge; } });
+var weeklyReport_1 = require("./scheduled/weeklyReport");
+Object.defineProperty(exports, "weeklyReport", { enumerable: true, get: function () { return weeklyReport_1.weeklyReport; } });
+var monthlyArchival_1 = require("./scheduled/monthlyArchival");
+Object.defineProperty(exports, "monthlyArchival", { enumerable: true, get: function () { return monthlyArchival_1.monthlyArchival; } });
 //# sourceMappingURL=index.js.map

@@ -12,7 +12,7 @@ export interface UserClaims {
   saccoId?: string | undefined;
   authorityScope?: ('national' | 'county') | undefined;
   isSuspended?: boolean | undefined;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface UserProfile {
@@ -152,6 +152,7 @@ export interface SafetyAlert {
   tripId: string;
   userId?: string;
   vehicleRegNumber: string;
+  driverName?: string;
   saccoId: string;
   type: AlertType;
   severity: SeverityLevel;

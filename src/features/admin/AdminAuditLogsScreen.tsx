@@ -1,30 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
 import { AuditLog } from '../../types';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminAuditLogsScreen: React.FC = () => {
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAuditLogs();
-  }, []);
-
-  async function loadAuditLogs() {
-    setIsLoading(true);
-    try {
-      const fetched = await auditLogRepository.getAll();
-      setLogs(fetched);
-    } catch (err) {
-      console.error('Failed to load audit logs:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: logs = [], isLoading } = useQuery({
+    queryKey: ['adminAuditLogs'],
+    queryFn: async () => {
+      return auditLogRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
 
   const filtered = logs.filter((l) => {
     const q = searchQuery.toLowerCase();

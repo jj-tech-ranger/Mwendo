@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { complaintRepository, auditLogRepository } from '../../repositories';
 import { Complaint } from '../../types';
 import { Badge } from '../../components/ui/Badge';
@@ -6,36 +7,24 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AuthorityComplaintsScreen: React.FC = () => {
   const { showToast } = useToast();
-  const { user } = useAuthStore();
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadComplaints() {
-      setIsLoading(true);
-      try {
-        const fetched = await complaintRepository.getAll();
-        if (isMounted) setComplaints(fetched);
-      } catch (err) {
-        console.error('Failed to load complaints:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadComplaints();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { data: complaints = [], isLoading } = useQuery({
+    queryKey: ['complaints'],
+    queryFn: async () => {
+      return complaintRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
+  });
 
   const filteredComplaints = useMemo(() => {
     return complaints.filter((c) => {
@@ -52,9 +41,7 @@ export const AuthorityComplaintsScreen: React.FC = () => {
   const handleAction = async (complaintId: string, newStatus: 'investigating' | 'resolved', actionText: string) => {
     try {
       await complaintRepository.update(complaintId, { status: newStatus });
-      setComplaints((prev) =>
-        prev.map((c) => (c.id === complaintId ? { ...c, status: newStatus } : c))
-      );
+      await queryClient.invalidateQueries({ queryKey: ['complaints'] });
 
       await auditLogRepository.save({
         id: `audit-${Date.now()}`,

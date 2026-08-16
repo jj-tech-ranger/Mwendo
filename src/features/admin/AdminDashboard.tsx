@@ -1,65 +1,52 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { AreaChartWrapper } from '../../components/charts/Charts';
 import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
 import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [complaints, setComplaints] = useState<Complaint[]>([]);
-  const [stats, setStats] = useState({
-    userCount: 0,
-    saccoCount: 0,
-    tripCount: 0,
-  });
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const [fetchedLogs, fetchedUsers, fetchedSaccos, precomputedDoc, fetchedComplaints] = await Promise.all([
-          auditLogRepository.getAll(),
-          userRepository.getAll(),
-          saccoRepository.getAll(),
-          analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
-          complaintRepository.getAll(),
-        ]);
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['adminDashboardData'],
+    queryFn: async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [fetchedLogs, fetchedUsers, fetchedSaccos, precomputedDoc, fetchedComplaints] = await Promise.all([
+        auditLogRepository.getAll(),
+        userRepository.getAll(),
+        saccoRepository.getAll(),
+        analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
+        complaintRepository.getAll(),
+      ]);
 
-        if (isMounted) {
-          setLogs(fetchedLogs);
-          setComplaints(fetchedComplaints.filter((c) => c.status === 'open' || c.status === 'investigating'));
-
-          let tripCount = 0;
-          if (precomputedDoc && 'totalTrips' in precomputedDoc && typeof (precomputedDoc as PlatformAnalyticsDaily).totalTrips === 'number') {
-            tripCount = (precomputedDoc as PlatformAnalyticsDaily).totalTrips;
-          } else {
-            const fallbackTrips = await tripRepository.getAll();
-            tripCount = fallbackTrips.length;
-          }
-
-          setStats({
-            userCount: fetchedUsers.length,
-            saccoCount: fetchedSaccos.length,
-            tripCount,
-          });
-        }
-      } catch (err) {
-        console.error('Failed to load admin dashboard data:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      let tripCount = 0;
+      if (precomputedDoc && 'totalTrips' in precomputedDoc && typeof (precomputedDoc as PlatformAnalyticsDaily).totalTrips === 'number') {
+        tripCount = (precomputedDoc as PlatformAnalyticsDaily).totalTrips;
+      } else {
+        const fallbackTrips = await tripRepository.getAll();
+        tripCount = fallbackTrips.length;
       }
-    }
-    loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+
+      return {
+        logs: fetchedLogs,
+        complaints: fetchedComplaints.filter((c) => c.status === 'open' || c.status === 'investigating'),
+        stats: {
+          userCount: fetchedUsers.length,
+          saccoCount: fetchedSaccos.length,
+          tripCount,
+        },
+      };
+    },
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
+
+  const logs = dashboardData?.logs || [];
+  const complaints = dashboardData?.complaints || [];
+  const stats = dashboardData?.stats || { userCount: 0, saccoCount: 0, tripCount: 0 };
 
   return (
     <div className="space-y-lg">

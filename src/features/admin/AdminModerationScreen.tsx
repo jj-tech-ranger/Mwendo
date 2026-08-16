@@ -1,14 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { where } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { auditLogRepository, userRepository } from '../../repositories';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { auditLogRepository, userRepository, violationRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { Violation } from '../../types';
 
 export const AdminModerationScreen: React.FC = () => {
   const { showToast } = useToast();
   const { user: currentAdmin } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'queue' | 'review' | 'trust'>('queue');
+
+  // Real Disputed Violations state
+  const [disputedViolations, setDisputedViolations] = useState<Violation[]>([]);
+  const [loadingDisputes, setLoadingDisputes] = useState(true);
+  const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [isResolving, setIsResolving] = useState(false);
 
   // Trust Score Adjustment state
   const [targetUserId, setTargetUserId] = useState('');
@@ -16,6 +26,68 @@ export const AdminModerationScreen: React.FC = () => {
   const [overrideReason, setOverrideReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const fetchDisputes = useCallback(async () => {
+    setLoadingDisputes(true);
+    try {
+      const results = await violationRepository.getAll([where('status', '==', 'disputed')]);
+      setDisputedViolations(results);
+    } catch (err) {
+      console.error('[AdminModerationScreen] Error fetching disputed violations:', err);
+      showToast('error', 'Query Failed', 'Failed to load disputed violations from Firestore.');
+    } finally {
+      setLoadingDisputes(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    fetchDisputes();
+  }, [fetchDisputes]);
+
+  async function handleResolveDispute(action: 'reviewed' | 'dismissed') {
+    if (!selectedViolation) return;
+    if (!resolutionNotes.trim()) {
+      showToast('warning', 'Notes Required', 'Please enter resolution notes before submitting a decision.');
+      return;
+    }
+
+    setIsResolving(true);
+    try {
+      // 1. Update violation in Firestore
+      await violationRepository.update(selectedViolation.id, {
+        status: action,
+      });
+
+      // 2. Write immutable audit log entry
+      await auditLogRepository.save({
+        id: `audit-${Date.now()}`,
+        saccoId: selectedViolation.saccoId || 'SYSTEM_ADMIN',
+        actorName: currentAdmin?.displayName || 'System Admin',
+        actorRole: 'admin',
+        action: `RESOLVE_VIOLATION_DISPUTE (${action.toUpperCase()})`,
+        target: `Violation ID: ${selectedViolation.id} (${selectedViolation.vehicleRegNumber}) - Notes: ${resolutionNotes}`,
+        timestamp: new Date().toISOString(),
+      });
+
+      showToast(
+        'success',
+        'Dispute Adjudicated',
+        action === 'reviewed'
+          ? `Dispute dismissed and violation upheld for ${selectedViolation.vehicleRegNumber}.`
+          : `Dispute upheld and violation dismissed for ${selectedViolation.vehicleRegNumber}.`
+      );
+
+      setSelectedViolation(null);
+      setResolutionNotes('');
+      setActiveTab('queue');
+      await fetchDisputes();
+    } catch (err) {
+      console.error('[AdminModerationScreen] Failed to adjudicate dispute:', err);
+      showToast('error', 'Adjudication Error', 'Failed to update violation status in Firestore.');
+    } finally {
+      setIsResolving(false);
+    }
+  }
 
   async function handleOverrideTrustScore(e: React.FormEvent) {
     e.preventDefault();
@@ -87,7 +159,7 @@ export const AdminModerationScreen: React.FC = () => {
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            Abuse Case Review
+            Dispute Case Review
           </button>
 
           <button
@@ -115,116 +187,255 @@ export const AdminModerationScreen: React.FC = () => {
       {/* Tab 1: Moderation Queue */}
       {activeTab === 'queue' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-lg">
+          {/* Left Column: Flagged Community Reports (Honest Disclosure) */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md space-y-md shadow-sm">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-sm">
               <h3 className="font-headline-lg-mobile text-sm font-bold text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-600">report_problem</span>
                 Flagged Community Reports
               </h3>
-              <Badge variant="warning">2 Pending</Badge>
+              <Badge variant="neutral">Not Implemented</Badge>
             </div>
 
-            <div className="space-y-3 text-xs font-body-sm">
-              <div className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-on-surface">Case #AR-2291</span>
-                  <Badge variant="danger">High Priority</Badge>
-                </div>
-                <p className="text-on-surface-variant">
-                  Multiple commuters reported abusive comments attached to blackspot report #BS-881.
-                </p>
-                <div className="pt-2 flex justify-end">
-                  <Button size="sm" variant="primary" onClick={() => setActiveTab('review')}>
-                    Review Case #AR-2291
-                  </Button>
-                </div>
-              </div>
-
-              <div className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-on-surface">Case #AR-2292</span>
-                  <Badge variant="warning">Medium</Badge>
-                </div>
-                <p className="text-on-surface-variant">
-                  Suspected automated spam submissions on route Waiyaki Way from user ID <code className="font-label-mono text-primary">usr-104</code>.
-                </p>
-                <div className="pt-2 flex justify-end">
-                  <Button size="sm" variant="secondary" onClick={() => setActiveTab('trust')}>
-                    Adjust Trust Score
-                  </Button>
+            <div className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-3 text-xs font-body-sm">
+              <div className="flex items-start gap-3">
+                <span className="material-symbols-outlined text-outline text-xl mt-0.5">info</span>
+                <div className="space-y-1">
+                  <p className="font-bold text-on-surface">Community abuse-flagging is not yet implemented</p>
+                  <p className="text-on-surface-variant leading-relaxed">
+                    User-submitted abuse reports and content flags against community members are not yet backed by a dedicated Firestore schema or moderation collection.
+                  </p>
+                  <p className="text-on-surface-variant leading-relaxed pt-1">
+                    Hazard and road-safety report verification is handled separately via the Black Spots moderation panel.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Right Column: Real Disputed Speed Violations Queue */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md space-y-md shadow-sm">
             <div className="flex items-center justify-between border-b border-outline-variant/20 pb-sm">
               <h3 className="font-headline-lg-mobile text-sm font-bold text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-rose-600">gavel</span>
                 Disputed Speed Violations Queue
               </h3>
-              <Badge variant="neutral">1 Pending</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant={disputedViolations.length > 0 ? 'warning' : 'neutral'}>
+                  {loadingDisputes ? 'Loading...' : `${disputedViolations.length} Pending`}
+                </Badge>
+                <button
+                  onClick={fetchDisputes}
+                  className="p-1 text-on-surface-variant hover:text-on-surface transition-colors"
+                  title="Refresh Disputed Violations"
+                  aria-label="Refresh Disputed Violations"
+                >
+                  <span className="material-symbols-outlined text-sm">refresh</span>
+                </button>
+              </div>
             </div>
 
-            <div className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-label-mono font-bold text-primary">Dispute #V-4081</span>
-                <span className="font-label-mono text-[10px] text-outline">MetroLink Express</span>
+            {loadingDisputes ? (
+              <div className="p-lg text-center text-xs text-on-surface-variant font-label-mono animate-pulse">
+                Fetching disputed violations from Firestore...
               </div>
-              <p className="text-on-surface-variant">
-                Driver disputing 94 km/h speed breach recorded on A104 Waiyaki Way at 14:10 PM. Claims speed governor calibration certificate was active.
-              </p>
-            </div>
+            ) : disputedViolations.length === 0 ? (
+              <EmptyState
+                icon="gavel"
+                title="No disputed violations pending review"
+                description="All speed breach recordings and SACCO citations are currently clear of open disputes."
+              />
+            ) : (
+              <div className="space-y-3">
+                {disputedViolations.map((violation) => (
+                  <div
+                    key={violation.id}
+                    className="p-md rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono font-bold text-primary">
+                        {violation.vehicleRegNumber}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            violation.severity === 'critical' || violation.severity === 'high'
+                              ? 'danger'
+                              : 'warning'
+                          }
+                        >
+                          {violation.severity.toUpperCase()}
+                        </Badge>
+                        <span className="font-label-mono text-[10px] text-outline">
+                          {violation.saccoId}
+                        </span>
+                      </div>
+                    </div>
+
+                    <p className="text-on-surface-variant">
+                      Recorded speed of{' '}
+                      <strong className="text-rose-600 dark:text-rose-400 font-label-mono">
+                        {violation.recordedSpeedKmH} km/h
+                      </strong>{' '}
+                      in a {violation.speedLimitKmH} km/h zone
+                      {violation.routeName ? ` on ${violation.routeName}` : ''}
+                      {violation.driverName ? ` (Driver: ${violation.driverName})` : ''}.
+                    </p>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-outline-variant/10 text-[11px] text-on-surface-variant font-label-mono">
+                      <span>{new Date(violation.timestamp).toLocaleString()}</span>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          setSelectedViolation(violation);
+                          setActiveTab('review');
+                        }}
+                      >
+                        Review Dispute
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Tab 2: Abuse Review Case Detail */}
+      {/* Tab 2: Dispute Case Review */}
       {activeTab === 'review' && (
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-lg space-y-md shadow-sm max-w-3xl mx-auto">
-          <div className="flex items-center justify-between border-b border-outline-variant/20 pb-md">
-            <div>
-              <span className="font-label-mono text-xs text-primary font-bold">CASE #AR-2291</span>
-              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">
-                Abuse Review: Unverified Hazard Report Misinformation
-              </h3>
-            </div>
-            <Badge variant="danger">High Severity</Badge>
-          </div>
-
-          <div className="space-y-sm text-xs font-body-sm">
-            <div className="p-md rounded-xl bg-surface-container-low space-y-1">
-              <span className="font-label-mono text-[10px] text-outline uppercase font-bold">
-                Flagged Content Preview
-              </span>
-              <p className="text-on-surface italic">
-                "Major carjacking risk near Kangemi stage. Avoid at night."
-              </p>
-              <div className="font-label-mono text-[10px] text-outline pt-1">
-                Submitted by User ID: usr-104 • Reporter Trust Score: 42/100
+          {selectedViolation ? (
+            <>
+              <div className="flex items-center justify-between border-b border-outline-variant/20 pb-md">
+                <div>
+                  <span className="font-label-mono text-xs text-primary font-bold">
+                    DISPUTE: {selectedViolation.vehicleRegNumber}
+                  </span>
+                  <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">
+                    Violation Adjudication & Evidence Review
+                  </h3>
+                </div>
+                <Badge
+                  variant={
+                    selectedViolation.severity === 'critical' || selectedViolation.severity === 'high'
+                      ? 'danger'
+                      : 'warning'
+                  }
+                >
+                  {selectedViolation.severity.toUpperCase()} SEVERITY
+                </Badge>
               </div>
-            </div>
 
-            <div className="p-md rounded-xl border border-outline-variant/20 space-y-2">
-              <span className="font-label-mono text-[10px] text-outline uppercase font-bold">
-                Decision Panel & Resolution Notes
-              </span>
-              <textarea
-                rows={3}
-                placeholder="Enter mandatory resolution notes for audit log..."
-                className="w-full bg-surface-container border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+              <div className="space-y-sm text-xs font-body-sm">
+                <div className="p-md rounded-xl bg-surface-container-low space-y-2">
+                  <span className="font-label-mono text-[10px] text-outline uppercase font-bold">
+                    Violation Telemetry Details
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-label-mono text-xs">
+                    <div>
+                      <span className="text-[10px] text-outline block">Violation ID</span>
+                      <span className="text-on-surface font-bold">{selectedViolation.id}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Vehicle Plate</span>
+                      <span className="text-on-surface font-bold">{selectedViolation.vehicleRegNumber}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">SACCO ID</span>
+                      <span className="text-on-surface">{selectedViolation.saccoId}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Recorded Speed</span>
+                      <span className="text-rose-600 dark:text-rose-400 font-bold">
+                        {selectedViolation.recordedSpeedKmH} km/h
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Zone Speed Limit</span>
+                      <span className="text-on-surface">{selectedViolation.speedLimitKmH} km/h</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Confidence Score</span>
+                      <span className="text-on-surface">{selectedViolation.confidenceScore}%</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Driver</span>
+                      <span className="text-on-surface">{selectedViolation.driverName || 'Not specified'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Route / Location</span>
+                      <span className="text-on-surface">{selectedViolation.routeName || selectedViolation.locationName || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-outline block">Timestamp</span>
+                      <span className="text-on-surface">{new Date(selectedViolation.timestamp).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-md rounded-xl border border-outline-variant/20 space-y-2">
+                  <label htmlFor="adjudication-notes" className="font-label-mono text-[10px] text-outline uppercase font-bold block">
+                    Adjudication Decision Notes (Required for Audit Log)
+                  </label>
+                  <textarea
+                    id="adjudication-notes"
+                    rows={3}
+                    required
+                    placeholder="Enter mandatory resolution notes (e.g., GPS telemetry calibrated against road grade; speed breach upheld / false positive sensor reading dismissed)..."
+                    value={resolutionNotes}
+                    onChange={(e) => setResolutionNotes(e.target.value)}
+                    className="w-full bg-surface-container border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-sm pt-md border-t border-outline-variant/20">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedViolation(null);
+                    setActiveTab('queue');
+                  }}
+                  disabled={isResolving}
+                >
+                  Cancel & Return to Queue
+                </Button>
+                <div className="flex items-center gap-sm">
+                  <Button
+                    variant="outline"
+                    className="text-rose-600 dark:text-rose-400 border-rose-600/30 hover:bg-rose-500/10"
+                    onClick={() => handleResolveDispute('dismissed')}
+                    disabled={isResolving}
+                  >
+                    {isResolving ? 'Processing...' : 'Uphold Dispute (Dismiss Violation)'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => handleResolveDispute('reviewed')}
+                    disabled={isResolving}
+                  >
+                    {isResolving ? 'Processing...' : 'Dismiss Dispute (Uphold Violation)'}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="py-xl">
+              <EmptyState
+                icon="fact_check"
+                title="No Dispute Selected for Review"
+                description={
+                  disputedViolations.length > 0
+                    ? `There are ${disputedViolations.length} disputed violation(s) waiting in the Moderation Queue.`
+                    : 'The disputed violations queue is currently empty.'
+                }
+                primaryCtaLabel="Open Moderation Queue"
+                onPrimaryCta={() => setActiveTab('queue')}
               />
             </div>
-          </div>
-
-          <div className="flex items-center justify-end gap-sm pt-md border-t border-outline-variant/20">
-            <Button variant="outline" onClick={() => setActiveTab('queue')}>
-              Dismiss Flag
-            </Button>
-            <Button variant="primary" className="bg-rose-600 hover:bg-rose-700 text-white border-none">
-              Remove Content & Warn User
-            </Button>
-          </div>
+          )}
         </div>
       )}
 
@@ -243,10 +454,11 @@ export const AdminModerationScreen: React.FC = () => {
 
           <form onSubmit={handleOverrideTrustScore} className="space-y-md text-xs">
             <div>
-              <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+              <label htmlFor="target-user-id" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
                 Target User ID or Email
               </label>
               <input
+                id="target-user-id"
                 type="text"
                 required
                 placeholder="e.g. usr-104 or passenger4471@mwendosalama.co.ke"
@@ -258,12 +470,13 @@ export const AdminModerationScreen: React.FC = () => {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="trust-score-range" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   New Adjusted Trust Score (0 - 100)
                 </label>
                 <span className="font-label-mono font-bold text-sm text-primary">{newScore} / 100</span>
               </div>
               <input
+                id="trust-score-range"
                 type="range"
                 min="0"
                 max="100"
@@ -274,10 +487,11 @@ export const AdminModerationScreen: React.FC = () => {
             </div>
 
             <div>
-              <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+              <label htmlFor="override-reason" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant block mb-1">
                 Mandatory Reason for Override (Audit Logged)
               </label>
               <textarea
+                id="override-reason"
                 required
                 rows={3}
                 placeholder="e.g. Manual verification by NTSA officer confirms false positive flag on driver account."

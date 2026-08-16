@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -10,33 +11,24 @@ import { violationRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Violation } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoViolationsScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
-  const [violations, setViolations] = useState<Violation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const loadViolations = async () => {
-    if (!saccoId) return;
-    setLoading(true);
-    try {
-      const docs = await violationRepository.getAll([where('saccoId', '==', saccoId)]);
-      setViolations(docs);
-    } catch (err) {
-      console.warn('Error loading violations:', err);
-      setViolations([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadViolations();
-  }, [saccoId]);
+  const { data: violations = [], isLoading: loading } = useQuery({
+    queryKey: ['saccoViolations', saccoId],
+    queryFn: async () => {
+      if (!saccoId) return [];
+      return violationRepository.getAll([where('saccoId', '==', saccoId)]);
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
+  });
 
   const filtered = violations.filter(
     (v) =>

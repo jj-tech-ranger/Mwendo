@@ -36,7 +36,22 @@ export const PassengerShell: React.FC<PassengerShellProps> = ({ hideBottomNav = 
 
       {/* Main Content View Container */}
       <main className={cn('flex-1 w-full max-w-lg mx-auto', !isImmersiveRoute && 'pb-20')}>
-        <Outlet />
+        <React.Suspense
+          fallback={
+            <div className="min-h-[50vh] flex items-center justify-center p-8">
+              <div className="flex flex-col items-center gap-3">
+                <span className="material-symbols-outlined text-primary text-3xl animate-spin">
+                  progress_activity
+                </span>
+                <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+                  Loading...
+                </span>
+              </div>
+            </div>
+          }
+        >
+          <Outlet />
+        </React.Suspense>
       </main>
 
       {/* Persistent Bottom Nav Bar */}

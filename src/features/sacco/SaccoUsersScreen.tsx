@@ -194,7 +194,7 @@ export const SaccoUsersScreen: React.FC = () => {
               <label className="font-bold block mb-1">Role Assignment</label>
               <select
                 value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as any)}
+                onChange={(e) => setInviteRole(e.target.value as 'sacco_manager' | 'operations' | 'viewer')}
                 className="w-full p-2 bg-surface text-on-surface border border-outline-variant/40 rounded-xl"
               >
                 <option value="sacco_manager">SACCO Manager</option>

@@ -50,7 +50,7 @@ export const storageService = {
   /**
    * Upload owner-scoped trip telemetry JSON blob (gzipped with 5MB cap per VT-005)
    */
-  async uploadTelemetryBlob(telemetryData: any, userId: string, tripId: string): Promise<string> {
+  async uploadTelemetryBlob(telemetryData: unknown, userId: string, tripId: string): Promise<string> {
     const jsonStr = JSON.stringify(telemetryData);
     let blob: Blob;
     let extension = 'json';

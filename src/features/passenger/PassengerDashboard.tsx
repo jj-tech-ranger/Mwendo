@@ -13,8 +13,9 @@ import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 export const PassengerDashboard: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const { startTrip, activeTrip } = useTripStore();
+  const user = useAuthStore((s) => s.user);
+  const startTrip = useTripStore((s) => s.startTrip);
+  const activeTrip = useTripStore((s) => s.activeTrip);
 
   const [isGuestMode, setIsGuestMode] = useState(() => !!user?.isAnonymous);
 

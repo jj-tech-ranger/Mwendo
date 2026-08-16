@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -7,31 +8,30 @@ import { driverRepository, vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Driver, Vehicle } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoAnalyticsScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'leaderboards'>('analytics');
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
-  useEffect(() => {
-    async function loadData() {
-      if (!saccoId) return;
-      try {
-        const [dList, vList] = await Promise.all([
-          driverRepository.getAll([where('saccoId', '==', saccoId)]),
-          vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
-        ]);
-        setDrivers(dList);
-        setVehicles(vList);
-      } catch (err) {
-        console.warn('Error loading analytics data:', err);
-      }
-    }
-    loadData();
-  }, [saccoId]);
+  const { data: analyticsData } = useQuery({
+    queryKey: ['saccoAnalyticsData', saccoId],
+    queryFn: async () => {
+      if (!saccoId) return { drivers: [], vehicles: [] };
+      const [dList, vList] = await Promise.all([
+        driverRepository.getAll([where('saccoId', '==', saccoId)]),
+        vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
+      ]);
+      return { drivers: dList, vehicles: vList };
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
+
+  const drivers = analyticsData?.drivers || [];
+  const vehicles = analyticsData?.vehicles || [];
 
   const topDrivers = [...drivers].sort((a, b) => b.safetyScore - a.safetyScore);
   const flaggedVehicles = vehicles.filter((v) => v.status === 'suspended' || v.status === 'maintenance');

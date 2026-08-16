@@ -21,16 +21,21 @@ import { auth, db } from '../lib/firebase';
 import { UserProfile, UserRole, UserClaims } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 
+export interface MfaAuthError extends Error {
+  code?: string;
+  resolver?: unknown;
+}
+
 export const authService = {
   // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
   initAuthListener() {
-    if (typeof window !== 'undefined' && (window as any).__TEST_AUTH_OVERRIDE__) {
+    if (typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
       useAuthStore.getState().setLoading(false);
       return () => {};
     }
     useAuthStore.getState().setLoading(true);
     return onAuthStateChanged(auth, async (firebaseUser) => {
-      if (typeof window !== 'undefined' && (window as any).__TEST_AUTH_OVERRIDE__) {
+      if (typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
         useAuthStore.getState().setLoading(false);
         return;
       }
@@ -177,12 +182,13 @@ export const authService = {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, pass);
       return await this.fetchOrInitUserProfile(cred.user);
-    } catch (err: any) {
-      if (err.code === 'auth/multi-factor-auth-required') {
-        const resolver = getMultiFactorResolver(auth, err);
-        const mfaError = new Error('Multi-factor authentication required.');
-        (mfaError as any).code = 'auth/multi-factor-auth-required';
-        (mfaError as any).resolver = resolver;
+    } catch (err: unknown) {
+      const errorObj = err as { code?: string; message?: string };
+      if (errorObj?.code === 'auth/multi-factor-auth-required') {
+        const resolver = getMultiFactorResolver(auth, err as Parameters<typeof getMultiFactorResolver>[1]);
+        const mfaError = new Error('Multi-factor authentication required.') as MfaAuthError;
+        mfaError.code = 'auth/multi-factor-auth-required';
+        mfaError.resolver = resolver;
         throw mfaError;
       }
       throw err;
@@ -215,7 +221,7 @@ export const authService = {
     try {
       const result = await linkWithCredential(currentUser, credential);
       updatedUser = result.user;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If link fails (e.g., account already exists), create new account or fallback
       console.warn('Account linking warning, falling back to createUser:', err);
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
@@ -321,16 +327,16 @@ export const authService = {
 
     // Strip out privileged fields so client-side updates match firestore.rules owner update restriction
     const {
-      role,
-      activeRole,
-      roles,
-      saccoId,
-      authorityId,
-      authorityScope,
-      isActive,
-      trustScore,
+      role: _role,
+      activeRole: _activeRole,
+      roles: _roles,
+      saccoId: _saccoId,
+      authorityId: _authorityId,
+      authorityScope: _authorityScope,
+      isActive: _isActive,
+      trustScore: _trustScore,
       ...safeProfileData
-    } = data as any;
+    } = data as Record<string, unknown>;
 
     const userRef = doc(db, 'users', currentUser.uid);
     await updateDoc(userRef, {

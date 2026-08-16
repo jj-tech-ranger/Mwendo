@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { where } from 'firebase/firestore';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -9,31 +10,24 @@ import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { tripRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { Trip } from '../../types';
 
 export const TripHistoryScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [loading, setLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [filterSacco, setFilterSacco] = useState('all');
 
-  useEffect(() => {
-    async function loadTrips() {
-      try {
-        const constraints = user?.uid ? [where('userId', '==', user.uid)] : [];
-        const docs = await tripRepository.getAll(constraints);
-        setTrips(docs);
-      } catch (err) {
-        console.warn('Failed to load trips:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadTrips();
-  }, [user?.uid]);
+  const { data: trips = [], isLoading: loading } = useQuery({
+    queryKey: ['passengerTrips', user?.uid],
+    queryFn: async () => {
+      const constraints = user?.uid ? [where('userId', '==', user.uid)] : [];
+      return tripRepository.getAll(constraints);
+    },
+    staleTime: QUERY_STALE_TIMES.REALTIME_TRIPS,
+  });
 
   const filteredTrips = trips.filter((t) => {
     if (filterSacco !== 'all' && t.saccoName !== filterSacco) return false;

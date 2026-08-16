@@ -140,9 +140,10 @@ export const mfaService = {
       try {
         const assertion = TotpMultiFactorGenerator.assertionForSignIn(hint.uid, cleanCode);
         await resolver.resolveSignIn(assertion);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('[mfaService] MultiFactorResolver failed:', err);
-        if (err.code === 'auth/invalid-verification-code') {
+        const errorObj = err as { code?: string; message?: string };
+        if (errorObj?.code === 'auth/invalid-verification-code') {
           throw new Error('Invalid 6-digit TOTP verification code.');
         }
         throw err;
@@ -158,17 +159,18 @@ export const mfaService = {
         if (!result?.data?.success && !result?.data?.verified) {
           throw new Error('Invalid 6-digit TOTP verification code.');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('[mfaService] verifyTotpChallenge Cloud Function failed:', err);
+        const errorObj = err as { code?: string; message?: string };
         if (
-          err.code === 'functions/invalid-argument' ||
-          err.code === 'invalid-argument' ||
-          err.message?.includes('Invalid') ||
-          err.message?.includes('invalid')
+          errorObj?.code === 'functions/invalid-argument' ||
+          errorObj?.code === 'invalid-argument' ||
+          errorObj?.message?.includes('Invalid') ||
+          errorObj?.message?.includes('invalid')
         ) {
           throw new Error('Invalid 6-digit TOTP verification code.');
         }
-        throw new Error(err.message || 'MFA verification failed. Please check your authenticator code.');
+        throw new Error(errorObj?.message || 'MFA verification failed. Please check your authenticator code.');
       }
     }
 

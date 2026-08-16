@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { inspectionReportRepository, vehicleRepository, auditLogRepository } from '../../repositories';
 import { InspectionReport, Vehicle } from '../../types';
 import { Badge } from '../../components/ui/Badge';
@@ -6,13 +7,12 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AuthorityInspectionsScreen: React.FC = () => {
   const { showToast } = useToast();
-  const { user } = useAuthStore();
-  const [reports, setReports] = useState<InspectionReport[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
 
   // Form State for New Vehicle Inspection
   const [showModal, setShowModal] = useState(false);
@@ -30,31 +30,20 @@ export const AuthorityInspectionsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'inspections' | 'impounded'>('inspections');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const [fetchedReports, fetchedVehicles] = await Promise.all([
-          inspectionReportRepository.getAll(),
-          vehicleRepository.getAll(),
-        ]);
-        if (isMounted) {
-          setReports(fetchedReports);
-          setVehicles(fetchedVehicles);
-        }
-      } catch (err) {
-        console.error('Failed to load inspection data:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
+  const { data: inspectionData, isLoading } = useQuery({
+    queryKey: ['inspectionsData'],
+    queryFn: async () => {
+      const [fetchedReports, fetchedVehicles] = await Promise.all([
+        inspectionReportRepository.getAll(),
+        vehicleRepository.getAll(),
+      ]);
+      return { reports: fetchedReports, vehicles: fetchedVehicles };
+    },
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
-    loadData();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const reports = inspectionData?.reports || [];
+  const vehicles = inspectionData?.vehicles || [];
 
   const filteredReports = useMemo(() => {
     return reports.filter((r) =>
@@ -100,7 +89,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
 
     try {
       await inspectionReportRepository.save(newReport);
-      setReports((prev) => [newReport, ...prev]);
+      await queryClient.invalidateQueries({ queryKey: ['inspectionsData'] });
 
       // Write Audit Log
       await auditLogRepository.save({
@@ -188,6 +177,8 @@ export const AuthorityInspectionsScreen: React.FC = () => {
               search
             </span>
             <input
+              id="authority-inspections-search"
+              aria-label="Search by vehicle plate or SACCO"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -339,8 +330,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
             <div className="space-y-sm text-xs font-body-sm">
               <div className="grid grid-cols-2 gap-sm">
                 <div>
-                  <label className="font-label-bold text-on-surface">Vehicle Registration Plate</label>
+                  <label htmlFor="inspect-plate-input" className="font-label-bold text-on-surface">Vehicle Registration Plate</label>
                   <input
+                    id="inspect-plate-input"
                     type="text"
                     value={plate}
                     onChange={(e) => setPlate(e.target.value)}
@@ -351,8 +343,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-label-bold text-on-surface">SACCO / Operator</label>
+                  <label htmlFor="inspect-sacco-input" className="font-label-bold text-on-surface">SACCO / Operator</label>
                   <input
+                    id="inspect-sacco-input"
                     type="text"
                     value={saccoName}
                     onChange={(e) => setSaccoName(e.target.value)}
@@ -364,8 +357,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-sm">
                 <div>
-                  <label className="font-label-bold text-on-surface">Inspection County</label>
+                  <label htmlFor="inspect-county-select" className="font-label-bold text-on-surface">Inspection County</label>
                   <select
+                    id="inspect-county-select"
                     value={county}
                     onChange={(e) => setCounty(e.target.value)}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-label-mono"
@@ -379,8 +373,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-label-bold text-on-surface">Speed Governor Unit</label>
+                  <label htmlFor="inspect-governor-select" className="font-label-bold text-on-surface">Speed Governor Unit</label>
                   <select
+                    id="inspect-governor-select"
                     value={speedGovernor}
                     onChange={(e) => setSpeedGovernor(e.target.value as any)}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-label-mono"
@@ -395,8 +390,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-sm">
                 <div>
-                  <label className="font-label-bold text-on-surface">Braking System Check</label>
+                  <label htmlFor="inspect-brake-select" className="font-label-bold text-on-surface">Braking System Check</label>
                   <select
+                    id="inspect-brake-select"
                     value={brakeStatus}
                     onChange={(e) => setBrakeStatus(e.target.value as any)}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none font-label-mono"
@@ -407,8 +403,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="font-label-bold text-on-surface">Tire Tread Depth Check</label>
+                  <label htmlFor="inspect-tire-select" className="font-label-bold text-on-surface">Tire Tread Depth Check</label>
                   <select
+                    id="inspect-tire-select"
                     value={tireStatus}
                     onChange={(e) => setTireStatus(e.target.value as any)}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none font-label-mono"
@@ -420,8 +417,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-bold text-on-surface">Overall Inspection Finding</label>
+                <label htmlFor="inspect-overall-select" className="font-label-bold text-on-surface">Overall Inspection Finding</label>
                 <select
+                  id="inspect-overall-select"
                   value={overallResult}
                   onChange={(e) => setOverallResult(e.target.value as any)}
                   className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface font-label-bold focus:outline-none"
@@ -434,8 +432,9 @@ export const AuthorityInspectionsScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-bold text-on-surface">Inspector Observations & Notes</label>
+                <label htmlFor="inspect-notes-textarea" className="font-label-bold text-on-surface">Inspector Observations & Notes</label>
                 <textarea
+                  id="inspect-notes-textarea"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Mechanical findings, speed governor serial number, depot location..."

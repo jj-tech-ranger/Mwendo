@@ -33,7 +33,7 @@ export const messagingService = {
   /**
    * Attach listener for foreground FCM push notifications
    */
-  onForegroundNotification(callback: (payload: any) => void): (() => void) | null {
+  onForegroundNotification(callback: (payload: unknown) => void): (() => void) | null {
     const messaging = getMessagingInstance();
     if (!messaging) return null;
 

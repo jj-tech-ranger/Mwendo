@@ -1,11 +1,9 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { usePwaStore } from '../../store/usePwaStore';
 
 export const UpdateAvailableScreen: React.FC<{ onDismiss?: () => void }> = ({ onDismiss }) => {
-  const navigate = useNavigate();
   const applyUpdate = usePwaStore((s) => s.applyUpdate);
   const setUpdateAvailable = usePwaStore((s) => s.setUpdateAvailable);
 
@@ -17,8 +15,6 @@ export const UpdateAvailableScreen: React.FC<{ onDismiss?: () => void }> = ({ on
     setUpdateAvailable(false);
     if (onDismiss) {
       onDismiss();
-    } else {
-      navigate('/passenger');
     }
   };
 

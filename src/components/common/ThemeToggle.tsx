@@ -2,7 +2,8 @@ import React from 'react';
 import { useThemeStore } from '../../store/useThemeStore';
 
 export const ThemeToggle: React.FC = () => {
-  const { mode, toggleDarkMode } = useThemeStore();
+  const mode = useThemeStore((s) => s.mode);
+  const toggleDarkMode = useThemeStore((s) => s.toggleDarkMode);
 
   return (
     <button

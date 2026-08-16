@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +9,8 @@ import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
 import { publicPinRepository } from '../../repositories';
 import { useToast } from '../../components/ui/Toast';
+import { MapComponent, MapMarker } from '../../components/map/MapComponent';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 interface HazardPin {
   id: string;
@@ -18,83 +21,123 @@ interface HazardPin {
   corroborationCount: number;
   description: string;
   distanceKm: number;
+  latitude: number;
+  longitude: number;
 }
 
 export const SafetyMapScreen: React.FC = () => {
   const { t } = useTranslation();
   const { showToast } = useToast();
   const navigate = useNavigate();
-  const [hazards, setHazards] = useState<HazardPin[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedHazard, setSelectedHazard] = useState<HazardPin | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'hazards' | 'emergency'>('all');
 
-  useEffect(() => {
-    async function loadHazards() {
-      setIsLoading(true);
-      try {
-        const pins = await publicPinRepository.getAll();
-        const mapped: HazardPin[] = pins.map((p: any) => ({
-          id: p.id,
-          title: p.title || p.name || 'Hazardous Location',
-          type: (p.type === 'hospital' || p.type === 'police' || p.type === 'hotspot' || p.type === 'danger_zone')
+  const { data: hazards = [], isLoading } = useQuery({
+    queryKey: ['publicPinHazards'],
+    queryFn: async () => {
+      const pins = await publicPinRepository.getAll();
+      const mapped: HazardPin[] = pins.map((p: any, idx: number) => ({
+        id: p.id,
+        title: p.title || p.name || 'Hazardous Location',
+        type:
+          p.type === 'hospital' || p.type === 'police' || p.type === 'hotspot' || p.type === 'danger_zone'
             ? p.type
-            : (p.hazardType === 'accident_prone' ? 'blackspot' : 'blackspot'),
-          severity: p.severity === 'critical' ? 'high' : (p.severity || 'high'),
-          locationName: p.routeName || p.locationName || 'Corridor',
-          corroborationCount: p.corroborationCount || p.corroborationsCount || 0,
-          description: p.description || 'Verified public safety hazard location.',
-          distanceKm: 1.0,
-        }));
+            : p.hazardType === 'accident_prone'
+            ? 'blackspot'
+            : 'blackspot',
+        severity: p.severity === 'critical' ? 'high' : p.severity || 'high',
+        locationName: p.routeName || p.locationName || 'Corridor',
+        corroborationCount: p.corroborationCount || p.corroborationsCount || 0,
+        description: p.description || 'Verified public safety hazard location.',
+        distanceKm: 1.0 + idx * 0.8,
+        latitude: typeof p.latitude === 'number' ? p.latitude : -1.286389 + (idx % 3) * 0.02,
+        longitude: typeof p.longitude === 'number' ? p.longitude : 36.817223 + (idx % 3) * 0.02,
+      }));
 
-        if (mapped.length === 0) {
-          // Default public pins for unpopulated state
-          setHazards([
-            {
-              id: 'pin_default_1',
-              title: 'Kinungi Blackspot (A104)',
-              type: 'blackspot',
-              severity: 'high',
-              locationName: 'Naivasha - Nakuru Highway',
-              corroborationCount: 14,
-              description: 'High frequency collision area near Kinungi flyover.',
-              distanceKm: 2.5,
-            },
-            {
-              id: 'pin_default_2',
-              title: 'Salgaa Deceleration Hill',
-              type: 'blackspot',
-              severity: 'high',
-              locationName: 'Nakuru - Eldoret Highway',
-              corroborationCount: 22,
-              description: 'Steep incline with runaway truck ramp.',
-              distanceKm: 12.0,
-            },
-          ]);
-        } else {
-          setHazards(mapped);
-        }
-      } catch (err) {
-        console.error('Failed to load public pin safety hazards:', err);
-      } finally {
-        setIsLoading(false);
+      if (mapped.length === 0) {
+        return [
+          {
+            id: 'pin_default_1',
+            title: 'Kinungi Blackspot (A104)',
+            type: 'blackspot' as const,
+            severity: 'high' as const,
+            locationName: 'Naivasha - Nakuru Highway',
+            corroborationCount: 14,
+            description: 'High frequency collision area near Kinungi flyover.',
+            distanceKm: 2.5,
+            latitude: -0.8351,
+            longitude: 36.4678,
+          },
+          {
+            id: 'pin_default_2',
+            title: 'Salgaa Deceleration Hill',
+            type: 'blackspot' as const,
+            severity: 'high' as const,
+            locationName: 'Nakuru - Eldoret Highway',
+            corroborationCount: 22,
+            description: 'Steep incline with runaway truck ramp.',
+            distanceKm: 12.0,
+            latitude: -0.2185,
+            longitude: 35.8821,
+          },
+          {
+            id: 'pin_default_3',
+            title: 'A104 Waiyaki Way U-Turn',
+            type: 'danger_zone' as const,
+            severity: 'medium' as const,
+            locationName: 'Waiyaki Way / Westlands',
+            corroborationCount: 8,
+            description: 'Sharp merges and pedestrian crossing hazard.',
+            distanceKm: 4.2,
+            latitude: -1.2612,
+            longitude: 36.7865,
+          },
+          {
+            id: 'pin_default_4',
+            title: 'Mombasa Road City Cabanas Junction',
+            type: 'blackspot' as const,
+            severity: 'high' as const,
+            locationName: 'Mombasa Road (A109)',
+            corroborationCount: 19,
+            description: 'High speed entry zone with heavy freight traffic.',
+            distanceKm: 8.5,
+            latitude: -1.3321,
+            longitude: 36.8794,
+          },
+        ];
       }
-    }
-    loadHazards();
-  }, []);
-
-  const filteredHazards = hazards.filter((h) => {
-    if (activeCategory === 'hazards' && (h.type === 'hospital' || h.type === 'police')) return false;
-    if (activeCategory === 'emergency' && h.type !== 'hospital' && h.type !== 'police') return false;
-    if (searchQuery) {
-      return (
-        h.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        h.locationName.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    return true;
+      return mapped;
+    },
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
   });
+
+  const filteredHazards = useMemo(() => {
+    return hazards.filter((h) => {
+      if (activeCategory === 'hazards' && (h.type === 'hospital' || h.type === 'police')) return false;
+      if (activeCategory === 'emergency' && h.type !== 'hospital' && h.type !== 'police') return false;
+      if (searchQuery) {
+        return (
+          h.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          h.locationName.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+      }
+      return true;
+    });
+  }, [hazards, activeCategory, searchQuery]);
+
+  // Convert hazards to MapMarker format for the real geospatial map
+  const mapMarkers: MapMarker[] = useMemo(() => {
+    return filteredHazards.map((h) => ({
+      id: h.id,
+      lat: h.latitude,
+      lng: h.longitude,
+      type: h.type === 'hospital' || h.type === 'police' ? 'incident' : 'blackspot',
+      title: h.title,
+      subtitle: `${h.locationName} • ${h.severity.toUpperCase()} RISK`,
+      severity: h.severity,
+    }));
+  }, [filteredHazards]);
 
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
@@ -154,50 +197,18 @@ export const SafetyMapScreen: React.FC = () => {
         </button>
       </div>
 
-      {/* Interactive Map Visual Simulation Tile */}
-      <Card className="relative h-64 w-full rounded-2xl overflow-hidden border border-outline-variant/30 shadow-sm flex flex-col justify-between p-4 bg-gradient-to-br from-emerald-950 via-[#0d2818] to-teal-950 text-white">
-        {/* Map Grid Pattern */}
-        <div className="absolute inset-0 bg-[radial-gradient(#1b4d2e_1px,transparent_1px)] [background-size:20px_20px] opacity-40 pointer-events-none" />
-
-        {/* Floating Controls */}
-        <div className="relative z-10 flex items-center justify-between text-xs font-mono">
-          <Badge className="bg-emerald-900/80 text-emerald-200 border-emerald-700">
-            GPS Corridor: Active
-          </Badge>
-          <span className="text-[10px] text-emerald-300">Live Traffic Feed</span>
-        </div>
-
-        {/* Map Pins Simulation */}
-        <div className="relative z-10 my-auto flex items-center justify-around">
-          {filteredHazards.map((hazard) => (
-            <button
-              key={hazard.id}
-              onClick={() => setSelectedHazard(hazard)}
-              className={`p-2.5 rounded-full shadow-lg transform transition-all hover:scale-110 active:scale-95 flex items-center justify-center ${
-                hazard.type === 'hospital'
-                  ? 'bg-blue-600 text-white ring-2 ring-blue-300'
-                  : hazard.type === 'police'
-                  ? 'bg-indigo-600 text-white ring-2 ring-indigo-300'
-                  : hazard.severity === 'high'
-                  ? 'bg-error text-on-error ring-2 ring-red-300 animate-pulse'
-                  : 'bg-amber-500 text-slate-950 ring-2 ring-amber-300'
-              }`}
-            >
-              <span className="material-symbols-outlined text-lg">
-                {hazard.type === 'hospital'
-                  ? 'local_hospital'
-                  : hazard.type === 'police'
-                  ? 'local_police'
-                  : 'warning'}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="relative z-10 text-center text-[11px] text-emerald-300/80 font-mono">
-          Tap any map pin above to inspect hazard or emergency details
-        </div>
-      </Card>
+      {/* Real Geospatial Map Component */}
+      <MapComponent
+        markers={mapMarkers}
+        centerAddress="Kenya Transit Safety Corridor"
+        showHeatmapOverlay={true}
+        showRouteTrace={false}
+        onMarkerClick={(m) => {
+          const matched = filteredHazards.find((h) => h.id === m.id);
+          if (matched) setSelectedHazard(matched);
+        }}
+        className="h-80 shadow-md"
+      />
 
       {/* Hazards & Services List */}
       <div className="space-y-3">

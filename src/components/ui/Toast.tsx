@@ -72,7 +72,8 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             </div>
             <button
               onClick={() => removeToast(toast.id)}
-              className="opacity-70 hover:opacity-100 transition-opacity p-0.5"
+              aria-label="Dismiss toast"
+              className="opacity-70 hover:opacity-100 transition-opacity p-2 -mr-1 -mt-1 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
             >
               <span className="material-symbols-outlined text-base">close</span>
             </button>

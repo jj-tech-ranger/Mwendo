@@ -2,7 +2,8 @@ import React from 'react';
 import { useLanguageStore } from '../../store/useLanguageStore';
 
 export const LanguageToggle: React.FC = () => {
-  const { language, toggleLanguage } = useLanguageStore();
+  const language = useLanguageStore((s) => s.language);
+  const toggleLanguage = useLanguageStore((s) => s.toggleLanguage);
 
   return (
     <button

@@ -28,6 +28,7 @@ async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     const docId = `sacco_${saccoId}`;
     const payload = {
         id: docId,
+        docId,
         saccoId,
         type: 'sacco',
         safetyScore: saccoSafetyScore,
@@ -39,13 +40,21 @@ async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     await db.collection('analytics').doc(docId).set(payload, { merge: true });
     return payload;
 }
-exports.rebuildSaccoAnalytics = (0, https_1.onCall)(async (request) => {
+exports.rebuildSaccoAnalytics = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
     }
     const saccoId = request.data?.saccoId;
     if (!saccoId || typeof saccoId !== 'string') {
         throw new https_1.HttpsError('invalid-argument', 'The saccoId string parameter must be provided.');
+    }
+    // Role-based multi-tenancy access check
+    const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger');
+    const userSaccoId = request.auth.token?.saccoId;
+    const isPrivileged = role === 'admin' || role === 'authority';
+    const isMatchingSaccoManager = role === 'sacco_manager' && userSaccoId === saccoId;
+    if (!isPrivileged && !isMatchingSaccoManager) {
+        throw new https_1.HttpsError('permission-denied', 'Insufficient permissions to view or rebuild analytics for this SACCO.');
     }
     const db = (0, firestore_1.getFirestore)();
     return await processRebuildSaccoAnalyticsLogic(db, saccoId);

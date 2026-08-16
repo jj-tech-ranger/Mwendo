@@ -18,7 +18,7 @@ export function createConverter<T extends { id: string }>(): FirestoreDataConver
   return {
     toFirestore(data: T): DocumentData {
       // Remove id before saving to Firestore document
-      const { id, ...rest } = data as any;
+      const { id: _id, ...rest } = data as unknown as Record<string, unknown>;
       return rest;
     },
     fromFirestore(snapshot: QueryDocumentSnapshot, options: SnapshotOptions): T {
@@ -80,7 +80,7 @@ export class BaseRepository<T extends { id: string }> {
 
   async update(id: string, data: Partial<T>): Promise<void> {
     try {
-      await updateDoc(this.getDocRef(id), data as any);
+      await updateDoc(doc(db, this.collectionName, id), data as DocumentData);
     } catch (err) {
       console.error(`[BaseRepository] update error for ${this.collectionName}/${id}:`, err);
       throw err;

@@ -508,30 +508,30 @@ export const functionsService = {
   /**
    * Universal Callable Invoker
    */
-  async callCloudFunction<T = any>(functionName: string, data: any): Promise<T> {
+  async callCloudFunction<T = unknown>(functionName: string, data: Record<string, unknown>): Promise<T> {
     try {
-      const callable = httpsCallable<any, T>(functions, functionName);
+      const callable = httpsCallable<Record<string, unknown>, T>(functions, functionName);
       const res = await callable(data);
       return res.data;
     } catch (err) {
       console.warn(`[functionsService] Cloud Function ${functionName} remote call failed, invoking local fallback:`, err);
       if (functionName === 'suspendUser') {
-        const targetUid = data.targetUid;
+        const targetUid = data.targetUid as string;
         await updateDoc(doc(db, 'users', targetUid), {
           isActive: false,
           updatedAt: new Date().toISOString(),
         });
         await setDoc(doc(collection(db, 'audit_logs')), {
-          action: `SUSPEND_USER (${data.reason || 'Admin action'})`,
+          action: `SUSPEND_USER (${(data.reason as string) || 'Admin action'})`,
           actorName: 'System Admin',
           actorRole: 'admin',
           target: `User ID: ${targetUid}`,
           timestamp: new Date().toISOString(),
         });
-        return { success: true, targetUid, isSuspended: true } as any;
+        return { success: true, targetUid, isSuspended: true } as unknown as T;
       }
       if (functionName === 'reactivateUser') {
-        const targetUid = data.targetUid;
+        const targetUid = data.targetUid as string;
         await updateDoc(doc(db, 'users', targetUid), {
           isActive: true,
           updatedAt: new Date().toISOString(),
@@ -543,25 +543,26 @@ export const functionsService = {
           target: `User ID: ${targetUid}`,
           timestamp: new Date().toISOString(),
         });
-        return { success: true, targetUid, isSuspended: false } as any;
+        return { success: true, targetUid, isSuspended: false } as unknown as T;
       }
       if (functionName === 'computeVehicleRisk') {
-        return (await this.computeVehicleRisk(data)) as any;
+        return (await this.computeVehicleRisk(data as unknown as VehicleRiskEvent)) as unknown as T;
       }
       if (functionName === 'onVehicleClaimed') {
-        return (await this.onVehicleClaimed(data.vehicleRegNumber, data.saccoId, data.saccoName)) as any;
+        return (await this.onVehicleClaimed(data.vehicleRegNumber as string, data.saccoId as string, data.saccoName as string)) as unknown as T;
       }
       if (functionName === 'syncPublicPins') {
-        return (await this.syncPublicPins()) as any;
+        return (await this.syncPublicPins()) as unknown as T;
       }
       if (functionName === 'updateDailyAnalytics') {
-        return (await this.updateDailyAnalytics(data.dateStr || new Date().toISOString().split('T')[0])) as any;
+        const dateStr = typeof data.dateStr === 'string' ? data.dateStr : new Date().toISOString().slice(0, 10);
+        return (await this.updateDailyAnalytics(dateStr)) as unknown as T;
       }
       if (functionName === 'rebuildSaccoAnalytics') {
-        return (await this.rebuildSaccoAnalytics(data.saccoId)) as any;
+        return (await this.rebuildSaccoAnalytics(data.saccoId as string)) as unknown as T;
       }
       if (functionName === 'sendSOS') {
-        return (await this.sendSOS(data)) as any;
+        return (await this.sendSOS(data as Parameters<typeof this.sendSOS>[0])) as unknown as T;
       }
       throw err;
     }
@@ -589,7 +590,14 @@ export const functionsService = {
     contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
   }> {
     try {
-      const callable = httpsCallable<any, any>(functions, 'sendSOS');
+      const callable = httpsCallable<typeof payload, {
+        success: boolean;
+        alertId: string;
+        contactsNotifiedCount: number;
+        fcmDispatchedCount: number;
+        dlqCount: number;
+        contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
+      }>(functions, 'sendSOS');
       const res = await callable(payload);
       return res.data;
     } catch (remoteErr) {

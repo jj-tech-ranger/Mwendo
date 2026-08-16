@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -10,16 +11,16 @@ import { vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Vehicle } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoFleetScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
+  const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'all' | 'provisional'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [routeFilter, setRouteFilter] = useState('all');
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Modal & Slide-over states
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
@@ -40,22 +41,15 @@ export const SaccoFleetScreen: React.FC = () => {
   // Provisional vehicles state (unclaimed vehicles for this sacco)
   const [provisionalVehicles, setProvisionalVehicles] = useState<any[]>([]);
 
-  const loadVehicles = async () => {
-    if (!saccoId) return;
-    setLoading(true);
-    try {
-      const docs = await vehicleRepository.getAll([where('saccoId', '==', saccoId)]);
-      setVehicles(docs);
-    } catch (err) {
-      console.warn('Error loading vehicles:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadVehicles();
-  }, [saccoId]);
+  const { data: vehicles = [], isLoading: loading } = useQuery({
+    queryKey: ['saccoVehicles', saccoId],
+    queryFn: async () => {
+      if (!saccoId) return [];
+      return vehicleRepository.getAll([where('saccoId', '==', saccoId)]);
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
   const handleOpenAdd = () => {
     setEditingVehicle(null);
@@ -75,6 +69,8 @@ export const SaccoFleetScreen: React.FC = () => {
     setShowAddEditSlideover(true);
   };
 
+  const saccoName = getSaccoName(saccoId || '');
+
   const handleSaveVehicle = async () => {
     if (!formPlate || !saccoId) return;
 
@@ -92,14 +88,9 @@ export const SaccoFleetScreen: React.FC = () => {
 
     try {
       await vehicleRepository.save(newVehicle);
-      await loadVehicles();
+      await queryClient.invalidateQueries({ queryKey: ['saccoVehicles', saccoId] });
     } catch (err) {
       console.warn('Saving to local state fallback:', err);
-      if (editingVehicle) {
-        setVehicles(vehicles.map((v) => (v.id === editingVehicle.id ? newVehicle : v)));
-      } else {
-        setVehicles([...vehicles, newVehicle]);
-      }
     } finally {
       setShowAddEditSlideover(false);
     }
@@ -122,9 +113,9 @@ export const SaccoFleetScreen: React.FC = () => {
         };
         try {
           await vehicleRepository.save(claimed);
-          await loadVehicles();
+          await queryClient.invalidateQueries({ queryKey: ['saccoVehicles', saccoId] });
         } catch (err) {
-          setVehicles((prev) => [...prev, claimed]);
+          console.warn('Error saving claimed vehicle:', err);
         }
         setProvisionalVehicles((prev) => prev.filter((pv) => pv.id !== claimingVehicle.id));
       }
@@ -147,8 +138,6 @@ export const SaccoFleetScreen: React.FC = () => {
       />
     );
   }
-
-  const saccoName = getSaccoName(saccoId);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

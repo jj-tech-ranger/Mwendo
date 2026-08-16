@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -7,65 +8,65 @@ import { tripRepository, violationRepository, vehicleRepository, complaintReposi
 import { calculateSaccoSafetyScore } from '../../lib/engine';
 import { where } from 'firebase/firestore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoDashboard: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [recentReports] = useState<any[]>([]);
+  const [routeRankings] = useState<any[]>([]);
+
+  const { data: stats = {
     totalTrips: 0,
     totalViolations: 0,
     highRiskVehicles: 0,
     activePilots: 0,
     safetyScore: 85,
-  });
-
-  const [recentReports] = useState<any[]>([]);
-
-  const [routeRankings] = useState<any[]>([]);
-
-  useEffect(() => {
-    async function loadSaccoData() {
-      if (!saccoId) return;
-      setLoading(true);
-      try {
-        const [trips, vehicles, violations, complaints, precomputedDoc] = await Promise.all([
-          tripRepository.getAll([where('saccoId', '==', saccoId)]),
-          vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
-          violationRepository.getAll([where('saccoId', '==', saccoId)]),
-          complaintRepository.getAll([where('saccoId', '==', saccoId)]),
-          analyticsRepository.getById(`sacco_${saccoId}`).catch(() => null),
-        ]);
-
-        const vehicleScores = vehicles.map((v) =>
-          typeof v.riskScore === 'number' ? v.riskScore : 85
-        );
-        const unresolvedComplaintsCount = complaints.filter(
-          (c) => c.status !== 'resolved'
-        ).length;
-
-        const calculatedSafetyScore =
-          precomputedDoc && 'safetyScore' in precomputedDoc && typeof precomputedDoc.safetyScore === 'number'
-            ? precomputedDoc.safetyScore
-            : calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount);
-
-        setStats({
-          totalTrips: trips.length,
-          totalViolations: violations.length,
-          highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length,
-          activePilots: vehicles.filter((v) => v.status === 'active').length,
-          safetyScore: calculatedSafetyScore,
-        });
-      } catch (err) {
-        console.warn('Error fetching Firestore sacco data:', err);
-      } finally {
-        setLoading(false);
+  }, isLoading: loading } = useQuery({
+    queryKey: ['saccoDashboardStats', saccoId],
+    queryFn: async () => {
+      if (!saccoId) {
+        return {
+          totalTrips: 0,
+          totalViolations: 0,
+          highRiskVehicles: 0,
+          activePilots: 0,
+          safetyScore: 85,
+        };
       }
-    }
 
-    loadSaccoData();
-  }, [saccoId]);
+      const [trips, vehicles, violations, complaints, precomputedDoc] = await Promise.all([
+        tripRepository.getAll([where('saccoId', '==', saccoId)]),
+        vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
+        violationRepository.getAll([where('saccoId', '==', saccoId)]),
+        complaintRepository.getAll([where('saccoId', '==', saccoId)]),
+        analyticsRepository.getById(`sacco_${saccoId}`).catch(() => null),
+      ]);
+
+      const vehicleScores = vehicles.map((v) =>
+        typeof v.riskScore === 'number' ? v.riskScore : 85
+      );
+      const unresolvedComplaintsCount = complaints.filter(
+        (c) => c.status !== 'resolved'
+      ).length;
+
+      const calculatedSafetyScore =
+        precomputedDoc && 'safetyScore' in precomputedDoc && typeof precomputedDoc.safetyScore === 'number'
+          ? precomputedDoc.safetyScore
+          : calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount);
+
+      return {
+        totalTrips: trips.length,
+        totalViolations: violations.length,
+        highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length,
+        activePilots: vehicles.filter((v) => v.status === 'active').length,
+        safetyScore: calculatedSafetyScore,
+      };
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
 
   if (!saccoId) {
     return (

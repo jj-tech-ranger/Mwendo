@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { userRepository } from '../../repositories';
@@ -7,13 +8,13 @@ import { UserProfile } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
 import { functionsService } from '../../services/functionsService';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminUsersScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { showToast } = useToast();
-  const { user: currentAdmin } = useAuthStore();
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const currentAdmin = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -34,21 +35,13 @@ export const AdminUsersScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  async function loadUsers() {
-    setIsLoading(true);
-    try {
-      const fetched = await userRepository.getAll();
-      setUsers(fetched);
-    } catch (err) {
-      console.error('Failed to load users:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: async () => {
+      return userRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
   // Handle Suspend / Unsuspend action
   async function handleToggleSuspend() {
@@ -74,12 +67,7 @@ export const AdminUsersScreen: React.FC = () => {
         });
       }
 
-      // Update local state
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userToSuspend.id ? { ...u, isActive: newStatus } : u
-        )
-      );
+      await queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
 
       setActionSuccess(
         isSuspending

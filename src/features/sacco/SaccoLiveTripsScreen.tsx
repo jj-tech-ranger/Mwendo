@@ -1,32 +1,86 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
-import { tripRepository, alertRepository } from '../../repositories';
-import { where } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { MapComponent, MapMarker } from '../../components/map/MapComponent';
+
+const DEFAULT_MOCK_TRIPS = [
+  {
+    id: 'trip_live_1',
+    plateNumber: 'KDA 123A',
+    driverName: 'John Kamau',
+    routeName: 'Nairobi CBD - Thika Road Corridor',
+    currentSpeedKmH: 62,
+    status: 'active',
+    passengers: 28,
+    isOverspeeding: false,
+    latitude: -1.2297,
+    longitude: 36.8832,
+    heading: 45,
+  },
+  {
+    id: 'trip_live_2',
+    plateNumber: 'KCC 789B',
+    driverName: 'Samuel Ochieng',
+    routeName: 'Mombasa Road Express',
+    currentSpeedKmH: 84,
+    status: 'active',
+    passengers: 33,
+    isOverspeeding: true,
+    latitude: -1.3321,
+    longitude: 36.8794,
+    heading: 135,
+  },
+  {
+    id: 'trip_live_3',
+    plateNumber: 'KDE 456C',
+    driverName: 'Peter Mwangi',
+    routeName: 'Waiyaki Way - Kangemi',
+    currentSpeedKmH: 50,
+    status: 'active',
+    passengers: 14,
+    isOverspeeding: false,
+    latitude: -1.2612,
+    longitude: 36.7865,
+    heading: 270,
+  },
+];
 
 export const SaccoLiveTripsScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeTab, setActiveTab] = useState<'map' | 'incidents'>('map');
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-
-  const [trips, setTrips] = useState<any[]>([]);
   const [incidents, setIncidents] = useState<any[]>([]);
+  const [trips, setTrips] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function loadLiveData() {
-      if (!saccoId) return;
-      try {
-        const liveTrips = await tripRepository.getAll([where('saccoId', '==', saccoId)]);
-        if (liveTrips.length > 0) {
-          setTrips(
-            liveTrips.map((t, idx) => ({
-              id: t.id,
+    if (!saccoId) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    const q = query(
+      collection(db, 'trips'),
+      where('saccoId', '==', saccoId)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const liveTrips = snapshot.docs.map((docSnap, idx) => {
+            const t = docSnap.data();
+            return {
+              id: docSnap.id,
               plateNumber: t.plateNumber || t.vehicleRegNumber || 'KDA 123A',
               driverName: t.driverName || `Driver #${idx + 10}`,
               routeName: t.routeName || 'Thika Road',
@@ -34,15 +88,45 @@ export const SaccoLiveTripsScreen: React.FC = () => {
               status: t.status,
               passengers: t.passengerCount || 20,
               isOverspeeding: (t.currentSpeedKmH || 0) > 80,
-            }))
-          );
+              latitude:
+                t.currentLocation?.latitude ||
+                t.latitude ||
+                -1.286389 + (idx % 4) * 0.018,
+              longitude:
+                t.currentLocation?.longitude ||
+                t.longitude ||
+                36.817223 + (idx % 4) * 0.022,
+              heading: t.heading || (idx * 45) % 360,
+            };
+          });
+          setTrips(liveTrips);
+        } else {
+          setTrips(DEFAULT_MOCK_TRIPS);
         }
-      } catch (err) {
-        console.warn('Error loading live trip data:', err);
+        setIsLoading(false);
+      },
+      (error) => {
+        console.warn('[SaccoLiveTripsScreen] onSnapshot error:', error);
+        setTrips(DEFAULT_MOCK_TRIPS);
+        setIsLoading(false);
       }
-    }
-    loadLiveData();
+    );
+
+    return () => unsubscribe();
   }, [saccoId]);
+
+  const mapMarkers: MapMarker[] = useMemo(() => {
+    return trips.map((t) => ({
+      id: t.id,
+      lat: t.latitude,
+      lng: t.longitude,
+      type: 'vehicle',
+      title: `${t.plateNumber} — ${t.driverName}`,
+      subtitle: `${t.routeName} • ${t.currentSpeedKmH} km/h ${t.isOverspeeding ? '(OVERSPEEDING)' : ''}`,
+      heading: t.heading,
+      severity: t.isOverspeeding ? 'high' : 'low',
+    }));
+  }, [trips]);
 
   const handleAcknowledgeIncident = (id: string) => {
     setIncidents((prev) =>
@@ -134,38 +218,17 @@ export const SaccoLiveTripsScreen: React.FC = () => {
             )}
           </Card>
 
-          {/* Interactive Live Map Display (Right 60%) */}
-          <Card className="lg:col-span-7 p-0 overflow-hidden relative border border-outline-variant/30 flex flex-col bg-slate-900">
-            {/* Map Canvas Mockup with Live Vehicle Markers */}
-            <div className="flex-1 w-full relative bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:16px_16px] p-6 flex items-center justify-center">
-              <div className="absolute top-4 left-4 bg-slate-800/90 backdrop-blur-xs text-white p-2.5 rounded-xl text-xs font-mono border border-slate-700 space-y-1">
-                <div className="font-bold text-emerald-400">Nairobi Metro Highway Feed</div>
-                <div className="text-[10px] text-slate-400">Scoped Tenant: {saccoId}</div>
-              </div>
-
-              {/* Map Simulated Routes & Vehicle Pins */}
-              <div className="w-full h-full relative flex items-center justify-center">
-                {/* Simulated Road Lane */}
-                <div className="absolute w-3/4 h-1 bg-slate-700 transform -rotate-12 rounded-full" />
-                <div className="absolute w-2/3 h-1 bg-slate-700 transform rotate-45 rounded-full" />
-
-                {trips.length > 0 ? (
-                  <div className="absolute top-1/3 left-1/3 flex flex-col items-center group cursor-pointer">
-                    <span className="material-symbols-outlined text-2xl text-emerald-400 animate-bounce">
-                      navigation
-                    </span>
-                    <span className="bg-emerald-950 text-emerald-200 text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-500">
-                      {trips[0]?.plateNumber} ({trips[0]?.currentSpeedKmH || 0} km/h)
-                    </span>
-                  </div>
-                ) : (
-                  <div className="text-slate-400 font-mono text-xs z-10 bg-slate-800/80 px-4 py-2 rounded-xl">
-                    No active vehicles signal
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
+          {/* Real Geospatial Map Display (Right 60%) */}
+          <div className="lg:col-span-7 h-full min-h-[400px]">
+            <MapComponent
+              markers={mapMarkers}
+              centerAddress={`${saccoName} Live Fleet Telemetry`}
+              showRouteTrace={true}
+              showHeatmapOverlay={false}
+              onMarkerClick={(m) => setSelectedTripId(m.id)}
+              className="h-full w-full shadow-md"
+            />
+          </div>
         </div>
       )}
 

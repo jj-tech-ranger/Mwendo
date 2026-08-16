@@ -118,10 +118,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
 
       {/* Scope Filter */}
       <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm flex items-center justify-between">
-        <span className="font-label-mono text-xs text-on-surface-variant uppercase font-bold">
+        <label htmlFor="admin-authorities-scope-filter" className="font-label-mono text-xs text-on-surface-variant uppercase font-bold">
           Filter Jurisdiction Scope:
-        </span>
+        </label>
         <select
+          id="admin-authorities-scope-filter"
           value={scopeFilter}
           onChange={(e) => setScopeFilter(e.target.value)}
           className="bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-label-mono"
@@ -206,10 +207,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="inspector-name-input" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   Inspector Name
                 </label>
                 <input
+                  id="inspector-name-input"
                   type="text"
                   required
                   placeholder="e.g. Inspector John Kamau"
@@ -220,10 +222,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="inspector-email-input" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   Official Email
                 </label>
                 <input
+                  id="inspector-email-input"
                   type="email"
                   required
                   placeholder="inspector@ntsa.go.ke"
@@ -234,10 +237,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="inspector-badge-input" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   Badge ID Number
                 </label>
                 <input
+                  id="inspector-badge-input"
                   type="text"
                   placeholder="NTSA-INS-9901"
                   value={newInspector.badgeNumber}
@@ -247,10 +251,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
               </div>
 
               <div>
-                <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                <label htmlFor="inspector-scope-select" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                   Authority Jurisdiction Scope
                 </label>
                 <select
+                  id="inspector-scope-select"
                   value={newInspector.authorityScope}
                   onChange={(e) =>
                     setNewInspector({
@@ -267,10 +272,11 @@ export const AdminAuthoritiesScreen: React.FC = () => {
 
               {newInspector.authorityScope === 'county' && (
                 <div>
-                  <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
+                  <label htmlFor="inspector-county-select" className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
                     Assigned Kenya County
                   </label>
                   <select
+                    id="inspector-county-select"
                     value={newInspector.county}
                     onChange={(e) => setNewInspector({ ...newInspector, county: e.target.value })}
                     className="w-full bg-surface-container border border-outline-variant/30 rounded-xl p-2.5 text-xs text-on-surface font-label-mono"

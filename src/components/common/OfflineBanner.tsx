@@ -3,7 +3,9 @@ import { useOfflineStore } from '../../store/useOfflineStore';
 import { offlineSyncService } from '../../services/offlineSyncService';
 
 export const OfflineBanner: React.FC = () => {
-  const { isOnline, setIsOnline, queuedActionsCount } = useOfflineStore();
+  const isOnline = useOfflineStore((s) => s.isOnline);
+  const setIsOnline = useOfflineStore((s) => s.setIsOnline);
+  const queuedActionsCount = useOfflineStore((s) => s.queuedActionsCount);
 
   useEffect(() => {
     const handleOnline = () => {

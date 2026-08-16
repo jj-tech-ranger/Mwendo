@@ -3,7 +3,7 @@ import { db } from '../lib/firebase';
 
 export type PubSubTopic = 'vehicle-events' | 'safety-alerts' | 'system-notifications';
 
-export interface PubSubMessage<T = any> {
+export interface PubSubMessage<T = unknown> {
   messageId: string;
   topic: PubSubTopic;
   payload: T;
@@ -15,7 +15,7 @@ export const pubsubService = {
   /**
    * Publish a message to a named Pub/Sub topic with exponential retry policy
    */
-  async publish<T = any>(topic: PubSubTopic, payload: T): Promise<PubSubMessage<T>> {
+  async publish<T = unknown>(topic: PubSubTopic, payload: T): Promise<PubSubMessage<T>> {
     const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const message: PubSubMessage<T> = {
       messageId,
@@ -57,7 +57,7 @@ export const pubsubService = {
   /**
    * Route failed message to Dead Letter Queue (DLQ)
    */
-  async routeToDLQ(message: PubSubMessage, error: any): Promise<void> {
+  async routeToDLQ(message: PubSubMessage, error: unknown): Promise<void> {
     try {
       const dlqRef = doc(db, 'dlq_notifications', message.messageId);
       await setDoc(dlqRef, {

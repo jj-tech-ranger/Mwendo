@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -10,13 +11,13 @@ import { driverRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Driver } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoDriversScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
+  const queryClient = useQueryClient();
 
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -27,22 +28,15 @@ export const SaccoDriversScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [assignedVehicleReg, setAssignedVehicleReg] = useState('');
 
-  const loadDrivers = async () => {
-    if (!saccoId) return;
-    setLoading(true);
-    try {
-      const docs = await driverRepository.getAll([where('saccoId', '==', saccoId)]);
-      setDrivers(docs);
-    } catch (err) {
-      console.warn('Error loading drivers:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDrivers();
-  }, [saccoId]);
+  const { data: drivers = [], isLoading: loading } = useQuery({
+    queryKey: ['saccoDrivers', saccoId],
+    queryFn: async () => {
+      if (!saccoId) return [];
+      return driverRepository.getAll([where('saccoId', '==', saccoId)]);
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
+  });
 
   const handleAddDriver = async () => {
     if (!name || !licenseNumber || !saccoId) return;
@@ -62,9 +56,9 @@ export const SaccoDriversScreen: React.FC = () => {
 
     try {
       await driverRepository.save(newDriver);
-      await loadDrivers();
+      await queryClient.invalidateQueries({ queryKey: ['saccoDrivers', saccoId] });
     } catch (err) {
-      setDrivers([...drivers, newDriver]);
+      console.warn('Fallback error adding driver:', err);
     } finally {
       setShowAddModal(false);
       setName('');

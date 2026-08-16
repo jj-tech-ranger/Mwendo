@@ -86,7 +86,13 @@ export const MediaUploader: React.FC<MediaUploaderProps> = ({
             isAvatarMode ? 'w-24 h-24 rounded-full mx-auto' : 'w-full h-40 rounded-2xl'
           )}
         >
-          <img src={previewUrl} alt="Upload Preview" className="w-full h-full object-cover" />
+          <img
+            src={previewUrl}
+            alt="Upload Preview"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover"
+          />
           <div className="absolute inset-0 bg-on-background/60 backdrop-blur-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
             <Button
               type="button"

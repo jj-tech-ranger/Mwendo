@@ -1,74 +1,73 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LineChartWrapper, BarChartWrapper, DonutChartWrapper } from '../../components/charts/Charts';
 import { useAuthStore } from '../../store/useAuthStore';
 import { saccoRepository, blackSpotRepository, violationRepository } from '../../repositories';
 import { SACCO, BlackSpot, Violation } from '../../types';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AuthorityReportsScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const [selectedReportType, setSelectedReportType] = useState('national_digest');
   const [selectedScope, setSelectedScope] = useState(user?.county || 'All Kenya (National)');
   const [dateRange, setDateRange] = useState('30d');
   const [isExporting, setIsExporting] = useState(false);
   const [downloadNotice, setDownloadNotice] = useState<string | null>(null);
 
-  const [saccos, setSaccos] = useState<SACCO[]>([]);
-  const [blackSpots, setBlackSpots] = useState<BlackSpot[]>([]);
-  const [violations, setViolations] = useState<Violation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: reportData, isLoading } = useQuery({
+    queryKey: ['authorityReportsData'],
+    queryFn: async () => {
+      const [sList, bList, vList] = await Promise.all([
+        saccoRepository.getAll(),
+        blackSpotRepository.getAll(),
+        violationRepository.getAll(),
+      ]);
+      return { saccos: sList, blackSpots: bList, violations: vList };
+    },
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
 
-  useEffect(() => {
-    async function loadData() {
-      setIsLoading(true);
-      try {
-        const [sList, bList, vList] = await Promise.all([
-          saccoRepository.getAll(),
-          blackSpotRepository.getAll(),
-          violationRepository.getAll(),
-        ]);
-        setSaccos(sList);
-        setBlackSpots(bList);
-        setViolations(vList);
-      } catch (err) {
-        console.error('Error loading report analytics:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    loadData();
-  }, []);
+  const saccos = reportData?.saccos || [];
+  const blackSpots = reportData?.blackSpots || [];
+  const violations = reportData?.violations || [];
 
-  const saccoComplianceData = saccos.map((s, idx) => ({
-    name: s.name,
-    value: s.safetyScore || 100,
-    color: idx % 2 === 0 ? '#1A5C2E' : '#185FA5',
-  }));
+  const saccoComplianceData = useMemo(() => {
+    return saccos.map((s, idx) => ({
+      name: s.name,
+      value: s.safetyScore || 100,
+      color: idx % 2 === 0 ? '#1A5C2E' : '#185FA5',
+    }));
+  }, [saccos]);
 
-  const speedTrendData = Object.entries(
-    violations.reduce((acc, v) => {
-      const day = new Date(v.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
-      acc[day] = (acc[day] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  ).map(([day, infractions]) => ({
-    day,
-    infractions,
-    complianceRate: Math.max(70, 100 - infractions * 2),
-  }));
+  const speedTrendData = useMemo(() => {
+    return Object.entries(
+      violations.reduce((acc, v) => {
+        const day = new Date(v.timestamp).toLocaleDateString('en-US', { weekday: 'short' });
+        acc[day] = (acc[day] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    ).map(([day, infractions]) => ({
+      day,
+      infractions,
+      complianceRate: Math.max(70, 100 - infractions * 2),
+    }));
+  }, [violations]);
 
-  const hazardBreakdownData = Object.entries(
-    blackSpots.reduce((acc, spot) => {
-      const type = spot.hazardType || 'accident_prone';
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
-  ).map(([type, count], idx) => ({
-    name: type.replace('_', ' ').toUpperCase(),
-    value: count,
-    color: ['#C0392B', '#E67E22', '#185FA5', '#64748B'][idx % 4],
-  }));
+  const hazardBreakdownData = useMemo(() => {
+    return Object.entries(
+      blackSpots.reduce((acc, spot) => {
+        const type = spot.hazardType || 'accident_prone';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>)
+    ).map(([type, count], idx) => ({
+      name: type.replace('_', ' ').toUpperCase(),
+      value: count,
+      color: ['#C0392B', '#E67E22', '#185FA5', '#64748B'][idx % 4],
+    }));
+  }, [blackSpots]);
 
   // CSV Exporter
   const handleExportCsv = () => {

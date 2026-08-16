@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -8,38 +9,29 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { blackSpotRepository } from '../../repositories';
 import { BlackSpot } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoBlackSpotsScreen: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
+  const queryClient = useQueryClient();
 
-  const [spots, setSpots] = useState<BlackSpot[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedSpot, setSelectedSpot] = useState<BlackSpot | null>(null);
 
-  const loadSpots = async () => {
-    if (!saccoId) return;
-    setLoading(true);
-    try {
-      const docs = await blackSpotRepository.getAll();
-      setSpots(docs);
-    } catch (err) {
-      console.warn('Error loading blackspots:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadSpots();
-  }, [saccoId]);
+  const { data: spots = [], isLoading: loading } = useQuery({
+    queryKey: ['blackSpots'],
+    queryFn: async () => {
+      return blackSpotRepository.getAll();
+    },
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
+  });
 
   const handleUpdateStatus = async (id: string, newStatus: 'published' | 'rejected') => {
     try {
       await blackSpotRepository.update(id, { status: newStatus });
-      setSpots((prev) => prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s)));
+      await queryClient.invalidateQueries({ queryKey: ['blackSpots'] });
     } catch (err) {
-      setSpots((prev) => prev.map((s) => (s.id === id ? { ...s, status: newStatus } : s)));
+      console.warn('Update spot status fallback:', err);
     }
     setSelectedSpot(null);
   };

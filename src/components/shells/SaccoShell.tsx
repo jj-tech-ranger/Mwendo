@@ -12,7 +12,8 @@ import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 export const SaccoShell: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
-  const { user, setUser } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const currentSaccoId = getEffectiveSaccoId(user?.saccoId) || 'sacco_metrolink';
   const currentSaccoName = getSaccoName(currentSaccoId);
@@ -200,7 +201,22 @@ export const SaccoShell: React.FC = () => {
           </header>
 
           <main className="p-6 max-w-7xl w-full mx-auto flex-1">
-            <Outlet />
+            <React.Suspense
+              fallback={
+                <div className="min-h-[400px] flex items-center justify-center p-8">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">
+                      progress_activity
+                    </span>
+                    <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+                      Loading SACCO workspace...
+                    </span>
+                  </div>
+                </div>
+              }
+            >
+              <Outlet />
+            </React.Suspense>
           </main>
         </div>
       </div>

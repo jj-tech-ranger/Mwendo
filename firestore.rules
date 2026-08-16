@@ -224,7 +224,7 @@ service cloud.firestore {
         hasActiveRole('authority')
       );
       allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidViolationData(request.resource.data);
-      allow update: if ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()) && isValidViolationData(request.resource.data);
+      allow update: if ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority() || isAdmin()) && isValidViolationData(request.resource.data);
       allow delete: if isAdmin();
     }
 

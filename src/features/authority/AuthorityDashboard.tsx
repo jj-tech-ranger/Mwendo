@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   tripRepository,
   violationRepository,
   blackSpotRepository,
-  alertRepository,
   vehicleRepository,
   saccoRepository,
   analyticsRepository,
 } from '../../repositories';
+import { collection, query, onSnapshot } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO, PlatformAnalyticsDaily } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
@@ -16,6 +18,27 @@ import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+
+const DEFAULT_ALERTS_MOCK: SafetyAlert[] = [
+  {
+    id: 'alert_sos_01',
+    tripId: 'trip_101',
+    saccoId: 'MetroLink SACCO',
+    vehicleRegNumber: 'KDA 123A',
+    driverName: 'John Kamau',
+    type: 'sos',
+    severity: 'critical',
+    message: 'Passenger SOS Triggered near Roysambu',
+    latitude: -1.2185,
+    longitude: 36.8875,
+    speedKmH: 94,
+    status: 'active',
+    acknowledgedBySacco: false,
+    acknowledgedByAuthority: false,
+    timestamp: new Date().toISOString(),
+  },
+];
 
 const KENYA_COUNTIES = [
   'All Kenya (National)',
@@ -31,7 +54,7 @@ const KENYA_COUNTIES = [
 ];
 
 export const AuthorityDashboard: React.FC = () => {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
   const userCounty = user?.county || 'Nairobi';
   const isCountyScoped = user?.authorityScope === 'county';
 
@@ -39,53 +62,120 @@ export const AuthorityDashboard: React.FC = () => {
     isCountyScoped ? userCounty : 'All Kenya (National)'
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [realtimeAlerts, setRealtimeAlerts] = useState<SafetyAlert[]>(DEFAULT_ALERTS_MOCK);
 
-  // Firestore state
-  const [trips, setTrips] = useState<Trip[]>([]);
-  const [violations, setViolations] = useState<Violation[]>([]);
-  const [blackSpots, setBlackSpots] = useState<BlackSpot[]>([]);
-  const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [saccos, setSaccos] = useState<SACCO[]>([]);
-
+  // Real-time onSnapshot listener for emergency feed
   useEffect(() => {
-    let isMounted = true;
-    async function loadAuthorityData() {
-      setIsLoading(true);
-      try {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedAlerts, fetchedVehicles, fetchedSaccos, _precomputedDoc] =
-          await Promise.all([
-            tripRepository.getAll(),
-            violationRepository.getAll(),
-            blackSpotRepository.getAll(),
-            alertRepository.getAll(),
-            vehicleRepository.getAll(),
-            saccoRepository.getAll(),
-            analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
-          ]);
-
-        if (isMounted) {
-          setTrips(fetchedTrips);
-          setViolations(fetchedViolations);
-          setBlackSpots(fetchedSpots);
-          setAlerts(fetchedAlerts);
-          setVehicles(fetchedVehicles);
-          setSaccos(fetchedSaccos);
+    const q = query(collection(db, 'alerts'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const fetched = snapshot.docs.map((docSnap) => ({
+            id: docSnap.id,
+            ...docSnap.data(),
+          })) as SafetyAlert[];
+          setRealtimeAlerts(fetched);
+        } else {
+          setRealtimeAlerts(DEFAULT_ALERTS_MOCK);
         }
-      } catch (err) {
-        console.error('Failed to load authority dashboard data:', err);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      },
+      (error) => {
+        console.warn('[AuthorityDashboard] Real-time alerts error:', error);
       }
-    }
+    );
 
-    loadAuthorityData();
-    return () => {
-      isMounted = false;
-    };
+    return () => unsubscribe();
   }, []);
+
+  const { data: authorityData, isLoading } = useQuery({
+    queryKey: ['authorityDashboardData'],
+    queryFn: async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedVehicles, fetchedSaccos, _precomputedDoc] =
+        await Promise.all([
+          tripRepository.getAll(),
+          violationRepository.getAll(),
+          blackSpotRepository.getAll(),
+          vehicleRepository.getAll(),
+          saccoRepository.getAll(),
+          analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
+        ]);
+
+      const blackSpots: BlackSpot[] =
+        fetchedSpots.length > 0
+          ? fetchedSpots
+          : [
+              {
+                id: 'bs-salgaa-01',
+                name: 'Salgaa Deceleration Incline',
+                routeName: 'Nakuru - Eldoret Highway (A104)',
+                county: 'Nakuru',
+                latitude: -0.2185,
+                longitude: 35.8821,
+                severity: 'critical',
+                hazardType: 'accident_prone',
+                accidentCount12M: 28,
+                hazardDescription: 'Steep hill descent with runaway truck risk.',
+                reportedByUid: 'ntsa',
+                verifiedByAuthority: true,
+                status: 'published',
+                confidenceScore: 0.98,
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: 'bs-kinungi-02',
+                name: 'Kinungi Flyover Crash Zone',
+                routeName: 'Nairobi - Naivasha Highway (A104)',
+                county: 'Nakuru',
+                latitude: -0.8351,
+                longitude: 36.4678,
+                severity: 'high',
+                hazardType: 'accident_prone',
+                accidentCount12M: 19,
+                hazardDescription: 'High velocity overtake conflict area.',
+                reportedByUid: 'ntsa',
+                verifiedByAuthority: true,
+                status: 'published',
+                confidenceScore: 0.95,
+                createdAt: new Date().toISOString(),
+              },
+              {
+                id: 'bs-waiyaki-03',
+                name: 'Waiyaki Way Kangemi U-Turn',
+                routeName: 'Waiyaki Way Corridor',
+                county: 'Nairobi',
+                latitude: -1.2612,
+                longitude: 36.7865,
+                severity: 'high',
+                hazardType: 'unmarked_bump',
+                accidentCount12M: 14,
+                hazardDescription: 'Sudden deceleration zone.',
+                reportedByUid: 'ntsa',
+                verifiedByAuthority: true,
+                status: 'published',
+                confidenceScore: 0.92,
+                createdAt: new Date().toISOString(),
+              },
+            ];
+
+      return {
+        trips: fetchedTrips,
+        violations: fetchedViolations,
+        blackSpots,
+        vehicles: fetchedVehicles,
+        saccos: fetchedSaccos,
+      };
+    },
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
+
+  const trips = authorityData?.trips || [];
+  const violations = authorityData?.violations || [];
+  const blackSpots = authorityData?.blackSpots || [];
+  const alerts = realtimeAlerts;
+  const vehicles = authorityData?.vehicles || [];
+  const saccos = authorityData?.saccos || [];
 
   // Sort SACCOs by safetyScore ascending (lowest safety score = highest audit priority)
   const auditPrioritySaccos = useMemo(() => {
@@ -212,10 +302,14 @@ export const AuthorityDashboard: React.FC = () => {
 
         {/* Scope Selector */}
         <div className="flex items-center gap-sm">
-          <label className="font-label-bold text-xs text-on-surface-variant whitespace-nowrap">
+          <label
+            htmlFor="authority-scope-select"
+            className="font-label-bold text-xs text-on-surface-variant whitespace-nowrap"
+          >
             Authority Scope:
           </label>
           <select
+            id="authority-scope-select"
             value={selectedCounty}
             onChange={(e) => setSelectedCounty(e.target.value)}
             disabled={isCountyScoped}

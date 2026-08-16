@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from './lib/queryClient';
 import { AppRoutes } from './routes';
 import { authService } from './services/authService';
@@ -31,6 +32,7 @@ export function App() {
           {isUpdateAvailable && <UpdateAvailableScreen />}
         </MaintenanceGate>
       </ToastProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 }
