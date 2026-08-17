@@ -8,6 +8,7 @@ import { Dialog } from '../../components/ui/Dialog';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../services/authService';
+import { analyticsService } from '../../services/analyticsService';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 
@@ -318,8 +319,43 @@ export const PassengerProfileScreen: React.FC = () => {
         onClose={() => setActiveModal(null)}
         title={t('passenger.profile.dataPrivacy')}
       >
-        <div className="space-y-3 text-xs text-on-surface-variant">
+        <div className="space-y-4 text-xs text-on-surface-variant">
           <p>{t('passenger.profile.dpaNotice')}</p>
+          
+          {/* SEC-006 & SEC-007: Kenya DPA 2019 Analytics Consent Management */}
+          <div className="p-3.5 bg-surface-container rounded-xl space-y-2.5 border border-outline-variant/30">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <div className="font-bold text-on-surface flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base text-primary">insights</span>
+                  <span>Kenya DPA 2019 Analytics Consent</span>
+                </div>
+                <div className="text-[11px] text-on-surface-variant">
+                  {analyticsService.hasDpaConsent()
+                    ? `Consent Granted ${user?.analyticsConsentAt ? `(${new Date(user.analyticsConsentAt).toLocaleDateString()})` : ''}`
+                    : 'Consent Withheld (Essential Telemetry Only)'}
+                </div>
+              </div>
+              <Badge variant={analyticsService.hasDpaConsent() ? 'success' : 'neutral'} className="font-mono text-[10px]">
+                {analyticsService.hasDpaConsent() ? 'Active' : 'Disabled'}
+              </Badge>
+            </div>
+            <p className="text-[11px] text-on-surface-variant leading-relaxed">
+              Allows Mwendo Salama to aggregate anonymized transit speeds and hazard logs for PSV road safety improvements.
+            </p>
+            <Button
+              size="sm"
+              variant={analyticsService.hasDpaConsent() ? 'outline' : 'primary'}
+              className="w-full text-xs h-8 font-semibold"
+              onClick={async () => {
+                const nextState = !analyticsService.hasDpaConsent();
+                await analyticsService.setDpaConsent(nextState, user?.uid || user?.id);
+              }}
+            >
+              {analyticsService.hasDpaConsent() ? 'Revoke Analytics Consent' : 'Grant Analytics Consent'}
+            </Button>
+          </div>
+
           <div className="p-3 bg-surface-container rounded-xl font-mono text-[11px] text-on-surface">
             {t('passenger.profile.anonymizedTelemetry')}
             <br />

@@ -23,7 +23,7 @@ export const SaccoDashboard: React.FC = () => {
     highRiskVehicles: 0,
     activePilots: 0,
     safetyScore: 85,
-  }, isLoading: loading } = useQuery({
+  }, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoDashboardStats', saccoId],
     queryFn: async () => {
       if (!saccoId) {
@@ -74,6 +74,21 @@ export const SaccoDashboard: React.FC = () => {
         icon="error"
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load SACCO Dashboard Telemetry"
+        description={
+          (error as Error)?.message ||
+          'Unable to fetch fleet telemetry, violation records, and compliance metrics from the server. Please check your network connection.'
+        }
+        secondaryCtaLabel="Retry Telemetry Sync"
+        onSecondaryCta={() => refetch()}
       />
     );
   }

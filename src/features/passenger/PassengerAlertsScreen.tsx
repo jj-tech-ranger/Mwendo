@@ -1,15 +1,69 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Dialog } from '../../components/ui/Dialog';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { useAuthStore } from '../../store/useAuthStore';
+import { blackSpotRepository, safetyAlertRepository } from '../../repositories';
+import { BlackSpot, SafetyAlert } from '../../types';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const PassengerAlertsScreen: React.FC = () => {
+  const { user } = useAuthStore();
   const [activeSubTab, setActiveSubTab] = useState<'alerts' | 'achievements' | 'trust' | 'reports'>('alerts');
-  const [selectedAlert, setSelectedAlert] = useState<any | null>(null);
+  const [selectedAlert, setSelectedAlert] = useState<SafetyAlert | null>(null);
 
-  const [alertsList] = useState<any[]>([]);
-  const [reportsList] = useState<any[]>([]);
+  const {
+    data: alertsData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['passengerAlertsAndReports', user?.uid],
+    queryFn: async () => {
+      const [allAlerts, allSpots] = await Promise.all([
+        safetyAlertRepository.getAll().catch(() => [] as SafetyAlert[]),
+        blackSpotRepository.getAll().catch(() => [] as BlackSpot[]),
+      ]);
+
+      const mySpots = user?.uid
+        ? allSpots.filter((s) => s.reportedByUid === user.uid)
+        : allSpots;
+
+      return {
+        alerts: allAlerts,
+        myReports: mySpots,
+      };
+    },
+    staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
+  });
+
+  const alertsList = alertsData?.alerts || [];
+  const reportsList = alertsData?.myReports || [];
+
+  // Calculate passenger Trust Score dynamically from confirmed reports
+  const verifiedReportsCount = reportsList.filter((r) => r.verifiedByAuthority || r.status === 'published').length;
+  const calculatedTrustScore = Math.min(100, 50 + verifiedReportsCount * 15 + (user ? 10 : 0));
+
+  if (isError) {
+    return (
+      <div className="p-4 sm:p-6 max-w-xl mx-auto pb-24">
+        <EmptyState
+          icon="error"
+          title="Failed to Load Safety Alerts"
+          description={
+            (error as Error)?.message ||
+            'Unable to fetch transit notifications and submitted hazard reports. Please try again.'
+          }
+          secondaryCtaLabel="Retry"
+          onSecondaryCta={() => refetch()}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
@@ -17,7 +71,7 @@ export const PassengerAlertsScreen: React.FC = () => {
       <div>
         <h1 className="text-xl font-black text-on-surface">Alerts & Safety Center</h1>
         <p className="text-xs text-on-surface-variant">
-          Notifications, trust score, and hazard submission history
+          Live transit notices, community trust score, and hazard report history
         </p>
       </div>
 
@@ -29,7 +83,7 @@ export const PassengerAlertsScreen: React.FC = () => {
             activeSubTab === 'alerts' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant'
           }`}
         >
-          Notifications
+          Notifications ({alertsList.length})
         </button>
         <button
           onClick={() => setActiveSubTab('trust')}
@@ -45,7 +99,7 @@ export const PassengerAlertsScreen: React.FC = () => {
             activeSubTab === 'reports' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant'
           }`}
         >
-          My Reports
+          My Reports ({reportsList.length})
         </button>
         <button
           onClick={() => setActiveSubTab('achievements')}
@@ -61,16 +115,20 @@ export const PassengerAlertsScreen: React.FC = () => {
       {activeSubTab === 'alerts' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant">
-            <span>Recent Activity</span>
-            <span>{alertsList.length} Unread</span>
+            <span>Live Corridor Alerts</span>
+            <span>{alertsList.length} Active</span>
           </div>
 
-          {alertsList.length === 0 ? (
-            <div className="p-8 text-center bg-surface-container-low rounded-2xl border border-outline-variant/30 space-y-1">
-              <span className="material-symbols-outlined text-3xl text-on-surface-variant">notifications_off</span>
-              <p className="text-xs font-bold text-on-surface">No Unread Alerts</p>
-              <p className="text-[11px] text-on-surface-variant">You have no active safety or overspeed notifications.</p>
+          {isLoading ? (
+            <div className="p-8 text-center text-xs text-on-surface-variant font-mono animate-pulse">
+              Loading active corridor alerts...
             </div>
+          ) : alertsList.length === 0 ? (
+            <EmptyState
+              icon="notifications_off"
+              title="No Active Safety Alerts"
+              description="Corridor speed compliance warnings and verified road hazard notices will appear here in real time."
+            />
           ) : (
             alertsList.map((alert) => (
               <Card
@@ -82,24 +140,26 @@ export const PassengerAlertsScreen: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span
                       className={`p-1.5 rounded-full ${
-                        alert.severity === 'high'
+                        alert.severity === 'critical'
                           ? 'bg-error/20 text-error'
-                          : alert.severity === 'medium'
+                          : alert.severity === 'high'
                           ? 'bg-amber-500/20 text-amber-600'
                           : 'bg-emerald-500/20 text-emerald-700'
                       }`}
                     >
                       <span className="material-symbols-outlined text-base block">
-                        {alert.type === 'overspeed' ? 'speed' : alert.type === 'blackspot' ? 'warning' : 'verified'}
+                        {alert.type === 'overspeeding' ? 'speed' : alert.type === 'sos' ? 'emergency' : 'warning'}
                       </span>
                     </span>
-                    <span className="font-bold text-sm text-on-surface">{alert.title}</span>
+                    <span className="font-bold text-sm text-on-surface">{alert.type.replace('_', ' ').toUpperCase()} Alert</span>
                   </div>
 
-                  <span className="text-[10px] font-mono text-on-surface-variant">{alert.time}</span>
+                  <span className="text-[10px] font-mono text-on-surface-variant">
+                    {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
 
-                <p className="text-xs text-on-surface-variant">{alert.route}</p>
+                <p className="text-xs text-on-surface-variant">{alert.message}</p>
               </Card>
             ))
           )}
@@ -111,34 +171,36 @@ export const PassengerAlertsScreen: React.FC = () => {
         <div className="space-y-4">
           <Card className="p-6 text-center space-y-3 bg-gradient-to-br from-emerald-900/10 to-teal-900/10 border border-emerald-500/20">
             <div className="w-24 h-24 mx-auto rounded-full bg-emerald-600/10 border-4 border-emerald-600 text-emerald-800 dark:text-emerald-300 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black font-mono">78</span>
+              <span className="text-3xl font-black font-mono">{calculatedTrustScore}</span>
               <span className="text-[9px] uppercase tracking-wider font-bold">/ 100</span>
             </div>
 
             <div>
-              <Badge className="bg-emerald-700 text-white font-bold">Trusted Reporter</Badge>
+              <Badge className="bg-emerald-700 text-white font-bold">
+                {calculatedTrustScore >= 80 ? 'Trusted Reporter' : 'Community Contributor'}
+              </Badge>
               <p className="text-xs text-on-surface-variant mt-2 max-w-xs mx-auto">
-                Your hazard reports receive priority moderation review. Keep contributing verified road data!
+                Your hazard submissions receive priority moderation review based on your verified report track record.
               </p>
             </div>
           </Card>
 
           <div className="space-y-2">
             <h3 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
-              Trust Score Breakdown
+              Trust Score Metrics
             </h3>
             <Card className="p-3 text-xs space-y-2 font-mono">
               <div className="flex justify-between">
-                <span>Confirmed Hazard Reports (3)</span>
-                <span className="text-emerald-700 font-bold">+30 pts</span>
+                <span>Verified Hazard Reports ({verifiedReportsCount})</span>
+                <span className="text-emerald-700 font-bold">+{verifiedReportsCount * 15} pts</span>
               </div>
               <div className="flex justify-between">
-                <span>Tracked Safe Trips (47)</span>
-                <span className="text-emerald-700 font-bold">+28 pts</span>
+                <span>Base Reporter Standing</span>
+                <span className="text-emerald-700 font-bold">+50 pts</span>
               </div>
               <div className="flex justify-between">
-                <span>Account Verified Bonus</span>
-                <span className="text-emerald-700 font-bold">+20 pts</span>
+                <span>Authenticated Account</span>
+                <span className="text-emerald-700 font-bold">+{user ? 10 : 0} pts</span>
               </div>
             </Card>
           </div>
@@ -152,28 +214,44 @@ export const PassengerAlertsScreen: React.FC = () => {
             Submitted Hazard Reports
           </h2>
 
-          {reportsList.map((r) => (
-            <Card key={r.id} className="p-4 space-y-2">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="font-bold text-sm text-on-surface">{r.title}</div>
-                  <div className="text-xs text-on-surface-variant">{r.location}</div>
+          {isLoading ? (
+            <div className="p-8 text-center text-xs text-on-surface-variant font-mono animate-pulse">
+              Loading your hazard reports...
+            </div>
+          ) : reportsList.length === 0 ? (
+            <EmptyState
+              icon="report_off"
+              title="No Hazard Reports Submitted"
+              description="You have not submitted any road hazard or black spot reports yet. Report unsafe road conditions to protect fellow commuters."
+            />
+          ) : (
+            reportsList.map((r) => (
+              <Card key={r.id} className="p-4 space-y-2">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="font-bold text-sm text-on-surface">{r.name}</div>
+                    <div className="text-xs text-on-surface-variant">{r.routeName || r.county}</div>
+                  </div>
+
+                  <Badge
+                    variant={r.status === 'published' ? 'success' : r.status === 'rejected' ? 'danger' : 'warning'}
+                    className="text-[10px] uppercase font-bold"
+                  >
+                    {r.status || 'pending'}
+                  </Badge>
                 </div>
 
-                <Badge
-                  variant={r.status === 'published' ? 'success' : 'neutral'}
-                  className="text-[10px] uppercase font-bold"
-                >
-                  {r.status}
-                </Badge>
-              </div>
+                <p className="text-xs text-on-surface-variant line-clamp-2">{r.hazardDescription}</p>
 
-              <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant border-t border-outline-variant/20 pt-2">
-                <span>Date: {r.date}</span>
-                <span className="text-emerald-700 font-bold">{r.trustBonus}</span>
-              </div>
-            </Card>
-          ))}
+                <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant border-t border-outline-variant/20 pt-2">
+                  <span>Reported: {new Date(r.createdAt).toLocaleDateString()}</span>
+                  <span className="text-emerald-700 font-bold">
+                    {r.verifiedByAuthority ? 'Verified (+15 pts)' : 'Under Moderation'}
+                  </span>
+                </div>
+              </Card>
+            ))
+          )}
         </div>
       )}
 
@@ -181,17 +259,27 @@ export const PassengerAlertsScreen: React.FC = () => {
       {activeSubTab === 'achievements' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="font-bold text-on-surface">Badges Earned</span>
-            <span className="text-emerald-700 font-bold">12 of 24 Unlocked</span>
+            <span className="font-bold text-on-surface">Community Badges</span>
+            <span className="text-emerald-700 font-bold">
+              {verifiedReportsCount > 0 ? '2 Unlocked' : '1 Unlocked'}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {[
-              { title: 'Safe Traveler', desc: '10 trips without overspeed', icon: 'verified_user', earned: true },
-              { title: 'Road Guardian', desc: 'First black spot report verified', icon: 'shield', earned: true },
-              { title: 'Corridor Eagle', desc: 'Tracked trips across 3 corridors', icon: 'alt_route', earned: true },
-              { title: 'Night Watch', desc: 'Tracked night trip safely', icon: 'dark_mode', earned: false },
-              { title: 'Civic Pioneer', desc: 'Reported 5 road hazards', icon: 'flag', earned: false },
+              { title: 'Safe Commuter', desc: 'Registered commuter on Mwendo Salama', icon: 'verified_user', earned: true },
+              {
+                title: 'Road Guardian',
+                desc: 'First road hazard verified by authority',
+                icon: 'shield',
+                earned: verifiedReportsCount > 0,
+              },
+              {
+                title: 'Active Reporter',
+                desc: 'Submitted 3+ road safety hazard reports',
+                icon: 'flag',
+                earned: reportsList.length >= 3,
+              },
             ].map((b, idx) => (
               <Card
                 key={idx}
@@ -218,12 +306,19 @@ export const PassengerAlertsScreen: React.FC = () => {
       <Dialog
         isOpen={!!selectedAlert}
         onClose={() => setSelectedAlert(null)}
-        title={selectedAlert?.title || 'Notification Detail'}
+        title={selectedAlert ? `${selectedAlert.type.toUpperCase()} Alert Detail` : 'Notification Detail'}
       >
         {selectedAlert && (
           <div className="space-y-3 text-xs text-on-surface">
-            <div className="font-mono text-on-surface-variant">{selectedAlert.time} · {selectedAlert.route}</div>
+            <div className="font-mono text-on-surface-variant">
+              {new Date(selectedAlert.timestamp).toLocaleString()}
+            </div>
             <p className="text-on-surface leading-relaxed">{selectedAlert.message}</p>
+            {typeof selectedAlert.speedKmH === 'number' && (
+              <div className="p-2 rounded bg-surface-container font-mono text-xs">
+                Recorded Speed: <strong>{selectedAlert.speedKmH} km/h</strong> (Limit: 80 km/h)
+              </div>
+            )}
             <Button className="w-full mt-2" onClick={() => setSelectedAlert(null)}>
               Dismiss
             </Button>

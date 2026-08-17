@@ -564,7 +564,132 @@ export const functionsService = {
       if (functionName === 'sendSOS') {
         return (await this.sendSOS(data as Parameters<typeof this.sendSOS>[0])) as unknown as T;
       }
+      if (functionName === 'reportBlackSpot') {
+        return (await this.reportBlackSpot(data as Parameters<typeof this.reportBlackSpot>[0])) as unknown as T;
+      }
       throw err;
+    }
+  },
+
+  /**
+   * SEC-005: Client-side transactional rate limit enforcement fallback
+   */
+  async checkClientRateLimit(
+    userId: string,
+    action: 'sos' | 'black_spot',
+    config: { maxAllowed: number; windowMs: number; errorMessage: string }
+  ): Promise<void> {
+    if (!userId || userId === 'anonymous') return;
+    const rateLimitRef = doc(db, 'rate_limits', userId);
+    try {
+      const snap = await getDoc(rateLimitRef);
+      const data = snap.exists() ? snap.data() || {} : {};
+      const fieldKey = action === 'sos' ? 'sosTimestamps' : 'blackSpotTimestamps';
+      const rawTimestamps: number[] = Array.isArray(data[fieldKey]) ? data[fieldKey] : [];
+      const now = Date.now();
+      const cutoff = now - config.windowMs;
+      const validTimestamps = rawTimestamps.filter((ts) => typeof ts === 'number' && ts > cutoff);
+
+      if (validTimestamps.length >= config.maxAllowed) {
+        const err = new Error(config.errorMessage);
+        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        throw err;
+      }
+
+      validTimestamps.push(now);
+      await setDoc(
+        rateLimitRef,
+        {
+          userId,
+          [fieldKey]: validTimestamps,
+          updatedAt: new Date(now).toISOString(),
+        },
+        { merge: true }
+      );
+    } catch (e: any) {
+      if (e.message?.includes('RATE_LIMIT_EXCEEDED') || e.code === 'RATE_LIMIT_EXCEEDED') {
+        throw e;
+      }
+      console.warn('[functionsService] Client rate limit check warning:', e);
+    }
+  },
+
+  /**
+   * Gen 2 Function: reportBlackSpot (SEC-005)
+   * Dispatches black-spot hazard report with server-enforced rate limiting (Max 10 per 24h).
+   */
+  async reportBlackSpot(payload: {
+    id?: string;
+    title?: string;
+    description?: string;
+    hazardType?: string;
+    severity?: string;
+    locationName?: string;
+    routeName?: string;
+    county?: string;
+    location?: { lat: number; lng: number };
+    photoUrl?: string;
+    reportedByUid?: string;
+    reportedByDisplayName?: string;
+  }): Promise<{ success: boolean; spotId: string }> {
+    try {
+      const callable = httpsCallable<typeof payload, { success: boolean; spotId: string }>(functions, 'reportBlackSpot');
+      const res = await callable(payload);
+      return res.data;
+    } catch (remoteErr: any) {
+      if (
+        remoteErr?.message?.includes('RATE_LIMIT_EXCEEDED') ||
+        remoteErr?.code === 'resource-exhausted' ||
+        remoteErr?.details?.code === 'RATE_LIMIT_EXCEEDED'
+      ) {
+        const err = new Error(remoteErr.message || 'RATE_LIMIT_EXCEEDED: Maximum 10 hazard reports permitted per 24 hours.');
+        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        throw err;
+      }
+      console.warn('[functionsService] Remote reportBlackSpot failed, executing client fallback:', remoteErr);
+
+      const userId = payload.reportedByUid || 'passenger_me';
+      await this.checkClientRateLimit(userId, 'black_spot', {
+        maxAllowed: 10,
+        windowMs: 24 * 60 * 60 * 1000,
+        errorMessage: 'RATE_LIMIT_EXCEEDED: Maximum 10 hazard reports permitted per 24 hours.',
+      });
+
+      const spotId = payload.id || `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+      const lat = payload.location?.lat ?? -1.286389;
+      const lng = payload.location?.lng ?? 36.817223;
+
+      const newReport = {
+        id: spotId,
+        spotId,
+        title: payload.title || 'Road Hazard',
+        name: payload.title || payload.locationName || 'Road Hazard',
+        description: payload.description || '',
+        hazardDescription: payload.description || payload.title || 'Road Hazard',
+        hazardType: payload.hazardType || 'accident_prone',
+        severity: payload.severity || 'high',
+        locationName: payload.locationName || '',
+        routeName: payload.routeName || payload.locationName || 'Kenyan Highway',
+        county: payload.county || 'Nairobi',
+        latitude: lat,
+        longitude: lng,
+        location: { lat, lng },
+        photoUrl: payload.photoUrl || undefined,
+        reportedByUid: userId,
+        reportedByUserId: userId,
+        reportedByDisplayName: payload.reportedByDisplayName || 'Commuter',
+        status: 'pending',
+        corroborationCount: 1,
+        corroborationsCount: 1,
+        confidenceScore: 0.8,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await setDoc(doc(db, 'black_spots', spotId), newReport, { merge: true });
+
+      return { success: true, spotId };
     }
   },
 
@@ -600,11 +725,26 @@ export const functionsService = {
       }>(functions, 'sendSOS');
       const res = await callable(payload);
       return res.data;
-    } catch (remoteErr) {
+    } catch (remoteErr: any) {
+      if (
+        remoteErr?.message?.includes('RATE_LIMIT_EXCEEDED') ||
+        remoteErr?.code === 'resource-exhausted' ||
+        remoteErr?.details?.code === 'RATE_LIMIT_EXCEEDED'
+      ) {
+        const err = new Error(remoteErr.message || 'RATE_LIMIT_EXCEEDED: Maximum 3 SOS alerts permitted per hour.');
+        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        throw err;
+      }
       console.warn('[functionsService] Remote sendSOS failed or offline, executing client fallback:', remoteErr);
 
-      const alertId = payload.alertId || `sos_${Date.now()}`;
       const userId = payload.userId || 'passenger_me';
+      await this.checkClientRateLimit(userId, 'sos', {
+        maxAllowed: 3,
+        windowMs: 60 * 60 * 1000,
+        errorMessage: 'RATE_LIMIT_EXCEEDED: Maximum 3 SOS alerts permitted per hour.',
+      });
+
+      const alertId = payload.alertId || `sos_${Date.now()}`;
       const userRef = doc(db, 'users', userId);
       const userSnap = await getDoc(userRef);
       const userData = userSnap.data() || {};

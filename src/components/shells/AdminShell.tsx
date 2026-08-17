@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { BRAND_ASSETS } from '../assets/BrandAssets';
 import { OfflineBanner } from '../common/OfflineBanner';
@@ -18,6 +19,7 @@ interface NavGroup {
 }
 
 export const AdminShell: React.FC = () => {
+  const { t } = useTranslation();
   const setVariant = useThemeStore((s) => s.setVariant);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -35,62 +37,62 @@ export const AdminShell: React.FC = () => {
 
   const navGroups: NavGroup[] = [
     {
-      label: 'OVERVIEW',
+      label: t('admin.navGroup.overview', 'OVERVIEW'),
       items: [
-        { path: '/admin', label: 'Dashboard', icon: 'dashboard', end: true },
+        { path: '/admin', label: t('admin.nav.dashboard', 'Dashboard'), icon: 'dashboard', end: true },
       ],
     },
     {
-      label: 'PEOPLE & ORGANIZATIONS',
+      label: t('admin.navGroup.peopleOrgs', 'PEOPLE & ORGANIZATIONS'),
       items: [
-        { path: '/admin/users', label: 'Users', icon: 'manage_accounts' },
-        { path: '/admin/roles', label: 'Roles', icon: 'admin_panel_settings' },
-        { path: '/admin/saccos', label: 'SACCOs', icon: 'domain' },
-        { path: '/admin/authorities', label: 'Authorities', icon: 'policy' },
+        { path: '/admin/users', label: t('admin.nav.users', 'Users'), icon: 'manage_accounts' },
+        { path: '/admin/roles', label: t('admin.nav.roles', 'Roles'), icon: 'admin_panel_settings' },
+        { path: '/admin/saccos', label: t('admin.nav.saccos', 'SACCOs'), icon: 'domain' },
+        { path: '/admin/authorities', label: t('admin.nav.authorities', 'Authorities'), icon: 'policy' },
       ],
     },
     {
-      label: 'FLEET & TRIPS',
+      label: t('admin.navGroup.fleetTrips', 'FLEET & TRIPS'),
       items: [
-        { path: '/admin/vehicles', label: 'Vehicles', icon: 'directions_bus' },
-        { path: '/admin/trips', label: 'Trips', icon: 'route' },
+        { path: '/admin/vehicles', label: t('admin.nav.vehicles', 'Vehicles'), icon: 'directions_bus' },
+        { path: '/admin/trips', label: t('admin.nav.trips', 'Trips'), icon: 'route' },
       ],
     },
     {
-      label: 'INSIGHTS',
+      label: t('admin.navGroup.insights', 'INSIGHTS'),
       items: [
-        { path: '/admin/analytics', label: 'Analytics', icon: 'analytics' },
-        { path: '/admin/reports', label: 'Reports', icon: 'assessment' },
+        { path: '/admin/analytics', label: t('admin.nav.analytics', 'Analytics'), icon: 'analytics' },
+        { path: '/admin/reports', label: t('admin.nav.reports', 'Reports'), icon: 'assessment' },
       ],
     },
     {
-      label: 'TRUST & SAFETY',
+      label: t('admin.navGroup.trustSafety', 'TRUST & SAFETY'),
       items: [
-        { path: '/admin/moderation', label: 'Moderation', icon: 'gavel' },
+        { path: '/admin/moderation', label: t('admin.nav.moderation', 'Moderation'), icon: 'gavel' },
       ],
     },
     {
-      label: 'GOVERNANCE',
+      label: t('admin.navGroup.governance', 'GOVERNANCE'),
       items: [
-        { path: '/admin/audit-logs', label: 'Audit Logs', icon: 'receipt_long' },
+        { path: '/admin/audit-logs', label: t('admin.nav.auditLogs', 'Audit Logs'), icon: 'receipt_long' },
       ],
     },
     {
-      label: 'OPERATIONS',
+      label: t('admin.navGroup.operations', 'OPERATIONS'),
       items: [
-        { path: '/admin/monitoring', label: 'Monitoring', icon: 'insights' },
-        { path: '/admin/integrations', label: 'Integrations', icon: 'extension' },
-        { path: '/admin/feature-flags', label: 'Feature Flags', icon: 'toggle_on' },
-        { path: '/admin/system-health', label: 'System Health', icon: 'monitor_heart' },
+        { path: '/admin/monitoring', label: t('admin.nav.monitoring', 'Monitoring'), icon: 'insights' },
+        { path: '/admin/integrations', label: t('admin.nav.integrations', 'Integrations'), icon: 'extension' },
+        { path: '/admin/feature-flags', label: t('admin.nav.featureFlags', 'Feature Flags'), icon: 'toggle_on' },
+        { path: '/admin/system-health', label: t('admin.nav.systemHealth', 'System Health'), icon: 'monitor_heart' },
       ],
     },
     {
-      label: 'SETTINGS & RUNBOOKS',
+      label: t('admin.navGroup.settingsRunbooks', 'SETTINGS & RUNBOOKS'),
       items: [
-        { path: '/admin/settings', label: 'Settings', icon: 'settings' },
-        { path: '/admin/maintenance', label: 'Maintenance Mode', icon: 'build_circle' },
-        { path: '/admin/docs', label: 'Documentation', icon: 'menu_book' },
-        { path: '/admin/profile', label: 'Admin Profile', icon: 'account_circle' },
+        { path: '/admin/settings', label: t('admin.nav.settings', 'Settings'), icon: 'settings' },
+        { path: '/admin/maintenance', label: t('admin.nav.maintenance', 'Maintenance Mode'), icon: 'build_circle' },
+        { path: '/admin/docs', label: t('admin.nav.documentation', 'Documentation'), icon: 'menu_book' },
+        { path: '/admin/profile', label: t('admin.nav.profile', 'Admin Profile'), icon: 'account_circle' },
       ],
     },
   ];
@@ -98,26 +100,26 @@ export const AdminShell: React.FC = () => {
   // Helper to determine breadcrumb title
   const getBreadcrumb = () => {
     const path = location.pathname;
-    if (path === '/admin') return 'Dashboard Overview';
-    if (path.includes('/users')) return 'User Management';
-    if (path.includes('/roles')) return 'Role Management';
-    if (path.includes('/saccos')) return 'SACCO Management';
-    if (path.includes('/authorities')) return 'Authority Accounts';
-    if (path.includes('/vehicles')) return 'Vehicle Management';
-    if (path.includes('/trips')) return 'Trip Explorer';
-    if (path.includes('/analytics')) return 'Platform Analytics';
-    if (path.includes('/reports')) return 'Reports & Digests';
-    if (path.includes('/moderation')) return 'Moderation Queue & Trust Engine';
-    if (path.includes('/audit-logs')) return 'Governance Audit Logs';
-    if (path.includes('/monitoring')) return 'API Health & Error Monitoring';
-    if (path.includes('/integrations')) return 'System Integrations';
-    if (path.includes('/feature-flags')) return 'Feature Flags & System Config';
-    if (path.includes('/system-health')) return 'System Health & Telemetry';
-    if (path.includes('/settings')) return 'Platform Settings & Security';
-    if (path.includes('/maintenance')) return 'Maintenance Mode Controls';
-    if (path.includes('/docs')) return 'System Documentation & Runbooks';
-    if (path.includes('/profile')) return 'System Administrator Profile';
-    return 'Admin Console';
+    if (path === '/admin') return t('admin.breadcrumbs.dashboard');
+    if (path.includes('/users')) return t('admin.breadcrumbs.users');
+    if (path.includes('/roles')) return t('admin.breadcrumbs.roles');
+    if (path.includes('/saccos')) return t('admin.breadcrumbs.saccos');
+    if (path.includes('/authorities')) return t('admin.breadcrumbs.authorities');
+    if (path.includes('/vehicles')) return t('admin.breadcrumbs.vehicles');
+    if (path.includes('/trips')) return t('admin.breadcrumbs.trips');
+    if (path.includes('/analytics')) return t('admin.breadcrumbs.analytics');
+    if (path.includes('/reports')) return t('admin.breadcrumbs.reports');
+    if (path.includes('/moderation')) return t('admin.breadcrumbs.moderation');
+    if (path.includes('/audit-logs')) return t('admin.breadcrumbs.auditLogs');
+    if (path.includes('/monitoring')) return t('admin.breadcrumbs.monitoring');
+    if (path.includes('/integrations')) return t('admin.breadcrumbs.integrations');
+    if (path.includes('/feature-flags')) return t('admin.breadcrumbs.featureFlags');
+    if (path.includes('/system-health')) return t('admin.breadcrumbs.systemHealth');
+    if (path.includes('/settings')) return t('admin.breadcrumbs.settings');
+    if (path.includes('/maintenance')) return t('admin.breadcrumbs.maintenance');
+    if (path.includes('/docs')) return t('admin.breadcrumbs.docs');
+    if (path.includes('/profile')) return t('admin.breadcrumbs.profile');
+    return t('admin.breadcrumbs.adminConsole');
   };
 
   const handleGlobalSearchSubmit = (e: React.FormEvent) => {
@@ -144,7 +146,7 @@ export const AdminShell: React.FC = () => {
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="material-symbols-outlined text-[13px] text-amber-400">vpn_key</span>
                   <span className="font-label-mono text-[10px] text-emerald-300 uppercase tracking-wider font-semibold">
-                    SYS_ADMIN CONSOLE
+                    {t('admin.shell.console')}
                   </span>
                 </div>
               </div>
@@ -190,11 +192,11 @@ export const AdminShell: React.FC = () => {
                 </div>
                 <div>
                   <p className="font-body-sm text-xs font-bold text-emerald-100 leading-tight">
-                    {user?.displayName || 'System Admin'}
+                    {user?.displayName || t('admin.shell.systemAdmin')}
                   </p>
                   <span className="inline-flex items-center gap-1 font-label-mono text-[9px] text-emerald-400">
                     <span className="material-symbols-outlined text-[10px]">key</span>
-                    Unrestricted
+                    {t('admin.shell.unrestricted')}
                   </span>
                 </div>
               </div>
@@ -207,7 +209,7 @@ export const AdminShell: React.FC = () => {
             <div className="pt-1 border-t border-emerald-800/30 flex items-center justify-between">
               <LanguageToggle />
               <span className="font-label-mono text-[9px] text-emerald-400/60 uppercase">
-                24/7 OPS
+                {t('admin.shell.ops')}
               </span>
             </div>
           </div>
@@ -220,7 +222,7 @@ export const AdminShell: React.FC = () => {
             {/* Breadcrumb */}
             <div className="flex items-center gap-2">
               <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-                Platform Admin
+                {t('admin.shell.platformAdmin')}
               </span>
               <span className="text-outline text-xs">/</span>
               <span className="font-headline-lg-mobile text-sm text-on-surface font-bold">
@@ -237,7 +239,7 @@ export const AdminShell: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search users, SACCOs, vehicles, trips, logs..."
+                placeholder={t('admin.shell.searchPlaceholder')}
                 className="w-full bg-surface-container border border-outline-variant/30 rounded-xl pl-9 pr-3 py-1.5 text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-body-sm"
               />
             </form>
@@ -247,7 +249,7 @@ export const AdminShell: React.FC = () => {
               {/* Unrestricted Scope Chip */}
               <div className="hidden lg:flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded-full font-label-mono text-[10px] font-bold">
                 <span className="material-symbols-outlined text-sm">public</span>
-                <span>All SACCOs · All Counties</span>
+                <span>{t('admin.shell.allScope')}</span>
               </div>
 
               {/* Notification Bell */}
@@ -255,7 +257,8 @@ export const AdminShell: React.FC = () => {
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="p-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-surface-container relative"
-                  title="Notifications"
+                  title={t('admin.shell.systemNotifications')}
+                  aria-label={t('admin.shell.systemNotifications')}
                 >
                   <span className="material-symbols-outlined text-xl">notifications</span>
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
@@ -265,28 +268,28 @@ export const AdminShell: React.FC = () => {
                   <div className="absolute right-0 mt-2 w-80 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl p-md z-50 text-xs space-y-2">
                     <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
                       <span className="font-headline-lg-mobile text-xs font-bold text-on-surface">
-                        System Notifications
+                        {t('admin.shell.systemNotifications')}
                       </span>
-                      <span className="font-label-mono text-[10px] text-primary">2 Unread</span>
+                      <span className="font-label-mono text-[10px] text-primary">{t('admin.shell.unreadCount', { count: 2 })}</span>
                     </div>
 
                     <div className="space-y-2 max-h-60 overflow-y-auto">
                       <div className="p-2 rounded-lg bg-surface-container-low border border-outline-variant/20 space-y-1">
                         <p className="font-bold text-on-surface text-[11px]">
-                          Pending SACCO Verification
+                          {t('admin.shell.pendingSaccoVerification')}
                         </p>
                         <p className="text-on-surface-variant text-[10px]">
-                          MetroLink Express submitted compliance documents.
+                          {t('admin.shell.pendingSaccoDesc')}
                         </p>
                         <span className="font-label-mono text-[9px] text-outline">10m ago</span>
                       </div>
 
                       <div className="p-2 rounded-lg bg-surface-container-low border border-outline-variant/20 space-y-1">
                         <p className="font-bold text-rose-600 text-[11px]">
-                          Cloud Function Latency Elevated
+                          {t('admin.shell.cloudFunctionLatency')}
                         </p>
                         <p className="text-on-surface-variant text-[10px]">
-                          p95 latency spike detected on GPS ingestion pipeline.
+                          {t('admin.shell.cloudFunctionDesc')}
                         </p>
                         <span className="font-label-mono text-[9px] text-outline">25m ago</span>
                       </div>
@@ -312,7 +315,7 @@ export const AdminShell: React.FC = () => {
                 {showUserMenu && (
                   <div className="absolute right-0 mt-2 w-52 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-xl p-sm z-50 text-xs space-y-1">
                     <div className="p-2 border-b border-outline-variant/20">
-                      <p className="font-bold text-on-surface">{user?.displayName || 'System Admin'}</p>
+                      <p className="font-bold text-on-surface">{user?.displayName || t('admin.shell.systemAdmin')}</p>
                       <p className="font-label-mono text-[10px] text-outline">{user?.email}</p>
                     </div>
 
@@ -324,7 +327,7 @@ export const AdminShell: React.FC = () => {
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container flex items-center gap-2 font-label-mono"
                     >
                       <span className="material-symbols-outlined text-base">account_circle</span>
-                      <span>Admin Profile</span>
+                      <span>{t('admin.shell.menuProfile')}</span>
                     </button>
 
                     <button
@@ -335,7 +338,7 @@ export const AdminShell: React.FC = () => {
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-surface-container flex items-center gap-2 font-label-mono"
                     >
                       <span className="material-symbols-outlined text-base">settings</span>
-                      <span>Platform Settings</span>
+                      <span>{t('admin.shell.menuSettings')}</span>
                     </button>
 
                     <button
@@ -347,7 +350,7 @@ export const AdminShell: React.FC = () => {
                       className="w-full text-left px-3 py-2 rounded-xl hover:bg-rose-500/10 text-rose-600 flex items-center gap-2 font-label-mono"
                     >
                       <span className="material-symbols-outlined text-base">logout</span>
-                      <span>Sign Out</span>
+                      <span>{t('admin.shell.menuSignOut')}</span>
                     </button>
                   </div>
                 )}
@@ -365,7 +368,7 @@ export const AdminShell: React.FC = () => {
                       progress_activity
                     </span>
                     <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-                      Loading Admin console...
+                      {t('admin.shell.loadingConsole')}
                     </span>
                   </div>
                 </div>

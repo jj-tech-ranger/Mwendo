@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
+import { enforceRateLimit } from '../lib/rateLimit';
 
 export interface EmergencyContact {
   name: string;
@@ -174,6 +175,11 @@ export async function processSendSosLogic(
   const timestamp = payload.timestamp || new Date().toISOString();
   const location = payload.location || { lat: -1.286389, lng: 36.817223 };
   const speedKmH = payload.speedKmH || 0;
+
+  // 0. SEC-005: Enforce per-user rate limit (Max 3 SOS triggers per hour)
+  if (typeof db.runTransaction === 'function' && userId && userId !== 'anonymous') {
+    await enforceRateLimit(db, userId, 'sos');
+  }
 
   // 1. Fetch user's registered profile and emergency contacts
   let userDisplayName = 'Passenger';
@@ -415,6 +421,9 @@ export const sendSOS = onCall(async (request) => {
   try {
     return await processSendSosLogic(db, messagingProvider, smsProvider, payload);
   } catch (err: any) {
+    if (err instanceof HttpsError) {
+      throw err;
+    }
     console.error('[sendSOS] Execution failed:', err);
     throw new HttpsError('internal', err?.message || 'Emergency SOS dispatch failed.');
   }

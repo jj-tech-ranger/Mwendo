@@ -96,6 +96,7 @@ export const saccoRepository = new SaccoRepository();
 export const tripRepository = new TripRepository();
 export const blackSpotRepository = new BlackSpotRepository();
 export const alertRepository = new AlertRepository();
+export const safetyAlertRepository = alertRepository;
 export const vehicleRepository = new VehicleRepository();
 export const driverRepository = new DriverRepository();
 export const violationRepository = new ViolationRepository();

@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { auditLogRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
 import { MfaEnrollmentScreen } from '../auth/MfaEnrollmentScreen';
+import { db } from '../../lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
+
+interface BackupSnapshot {
+  id: string;
+  timestamp: string;
+  sizeBytes?: number;
+  status: string;
+}
 
 export const AdminSecurityScreen: React.FC = () => {
   const { user: currentAdmin } = useAuthStore();
@@ -14,6 +25,19 @@ export const AdminSecurityScreen: React.FC = () => {
   const [selectedBackupToRestore, setSelectedBackupToRestore] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const { data: backups = [], isLoading: isLoadingBackups } = useQuery<BackupSnapshot[]>({
+    queryKey: ['systemBackups'],
+    queryFn: async () => {
+      try {
+        const snap = await getDocs(collection(db, 'system_backups'));
+        return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BackupSnapshot));
+      } catch {
+        return [];
+      }
+    },
+    enabled: activeTab === 'backup',
+  });
 
   async function handleConfirmRestore() {
     if (!selectedBackupToRestore) return;
@@ -151,56 +175,57 @@ export const AdminSecurityScreen: React.FC = () => {
               <h3 className="text-base font-bold text-emerald-400 uppercase tracking-widest">
                 Firestore Point-in-Time Backup & Disaster Recovery
               </h3>
-              <p className="text-xs text-slate-400 mt-1">SLO: RPO &lt; 15 mins • RTO &lt; 1 hour</p>
+              <p className="text-xs text-slate-400 mt-1">GCP Cloud Firestore Backup Schedules and Disaster Recovery Ledger</p>
             </div>
-            <Badge variant="success">Daily Snapshots Active</Badge>
+            <Badge variant="neutral">Cloud Managed</Badge>
           </div>
 
-          {/* Backup History Table */}
-          <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-xs font-label-mono">
-              <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
-                <tr>
-                  <th className="p-md">Snapshot ID</th>
-                  <th className="p-md">Created Timestamp</th>
-                  <th className="p-md">Snapshot Size</th>
-                  <th className="p-md text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                <tr>
-                  <td className="p-md font-bold text-emerald-400">snap-2026-08-08-0000</td>
-                  <td className="p-md text-slate-300">2026-08-08 00:00:00 UTC</td>
-                  <td className="p-md text-slate-300">1.42 GB</td>
-                  <td className="p-md text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-amber-700/50 text-amber-400 hover:bg-amber-950/50"
-                      onClick={() => setSelectedBackupToRestore('snap-2026-08-08-0000')}
-                    >
-                      Restore Snapshot
-                    </Button>
-                  </td>
-                </tr>
-                <tr>
-                  <td className="p-md font-bold text-emerald-400">snap-2026-08-07-0000</td>
-                  <td className="p-md text-slate-300">2026-08-07 00:00:00 UTC</td>
-                  <td className="p-md text-slate-300">1.38 GB</td>
-                  <td className="p-md text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-amber-700/50 text-amber-400 hover:bg-amber-950/50"
-                      onClick={() => setSelectedBackupToRestore('snap-2026-08-07-0000')}
-                    >
-                      Restore Snapshot
-                    </Button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          {/* Backup History Content */}
+          {isLoadingBackups ? (
+            <div className="p-8 text-center text-xs text-slate-400 font-mono animate-pulse">
+              Querying backup snapshots from Firestore storage...
+            </div>
+          ) : backups.length === 0 ? (
+            <div className="bg-[#111827] border border-slate-800 rounded-xl p-8">
+              <EmptyState
+                icon="cloud_sync"
+                title="No Automated Cloud Backups Found"
+                description="No custom snapshot manifests have been registered in the database. Automated backups can be scheduled using Google Cloud Platform Firestore Scheduled Backups."
+              />
+            </div>
+          ) : (
+            <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-xs font-label-mono">
+                <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
+                  <tr>
+                    <th className="p-md">Snapshot ID</th>
+                    <th className="p-md">Created Timestamp</th>
+                    <th className="p-md">Status</th>
+                    <th className="p-md text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {backups.map((b) => (
+                    <tr key={b.id}>
+                      <td className="p-md font-bold text-emerald-400">{b.id}</td>
+                      <td className="p-md text-slate-300">{new Date(b.timestamp).toLocaleString()}</td>
+                      <td className="p-md text-slate-300 uppercase">{b.status}</td>
+                      <td className="p-md text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-700/50 text-amber-400 hover:bg-amber-950/50"
+                          onClick={() => setSelectedBackupToRestore(b.id)}
+                        >
+                          Restore Snapshot
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

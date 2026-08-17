@@ -41,7 +41,7 @@ export const SaccoFleetScreen: React.FC = () => {
   // Provisional vehicles state (unclaimed vehicles for this sacco)
   const [provisionalVehicles, setProvisionalVehicles] = useState<any[]>([]);
 
-  const { data: vehicles = [], isLoading: loading } = useQuery({
+  const { data: vehicles = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoVehicles', saccoId],
     queryFn: async () => {
       if (!saccoId) return [];
@@ -135,6 +135,21 @@ export const SaccoFleetScreen: React.FC = () => {
         icon="error"
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Fleet Data"
+        description={
+          (error as Error)?.message ||
+          'Unable to retrieve vehicles and registration records for this SACCO. Please try again.'
+        }
+        secondaryCtaLabel="Retry Fleet Fetch"
+        onSecondaryCta={() => refetch()}
       />
     );
   }

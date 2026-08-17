@@ -4,6 +4,7 @@ import { auditLogRepository } from '../../repositories';
 import { AuditLog } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 export const AuthoritySettingsScreen: React.FC = () => {
   const { user, setUser } = useAuthStore();
@@ -21,26 +22,28 @@ export const AuthoritySettingsScreen: React.FC = () => {
   // Audit logs
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
+  const [isErrorLogs, setIsErrorLogs] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadLogs() {
-      setIsLoadingLogs(true);
-      try {
-        const fetchedLogs = await auditLogRepository.getAll();
-        if (isMounted) setLogs(fetchedLogs);
-      } catch (err) {
-        console.error('Failed to load audit logs:', err);
-      } finally {
-        if (isMounted) setIsLoadingLogs(false);
-      }
+  const loadLogs = async () => {
+    setIsLoadingLogs(true);
+    setIsErrorLogs(false);
+    setErrorMessage(null);
+    try {
+      const fetchedLogs = await auditLogRepository.getAll();
+      setLogs(fetchedLogs);
+    } catch (err: any) {
+      console.error('Failed to load audit logs:', err);
+      setIsErrorLogs(true);
+      setErrorMessage(err?.message || 'Failed to retrieve inspector audit trail.');
+    } finally {
+      setIsLoadingLogs(false);
     }
+  };
 
+  useEffect(() => {
     loadLogs();
-    return () => {
-      isMounted = false;
-    };
   }, []);
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -248,20 +251,38 @@ export const AuthoritySettingsScreen: React.FC = () => {
           <Badge variant="neutral">{logs.length} Actions Recorded</Badge>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-body-sm">
-            <thead>
-              <tr className="border-b border-outline-variant/20 text-on-surface-variant font-label-mono uppercase">
-                <th className="py-2.5 px-3">Timestamp</th>
-                <th className="py-2.5 px-3">Inspector / Actor</th>
-                <th className="py-2.5 px-3">Action</th>
-                <th className="py-2.5 px-3">Target / Vehicle</th>
-                <th className="py-2.5 px-3">SACCO Scope</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-              {logs.length > 0 ? (
-                logs.slice(0, 10).map((log) => (
+        {isLoadingLogs ? (
+          <div className="py-8 text-center text-xs text-on-surface-variant font-mono animate-pulse">
+            Loading inspector audit trail...
+          </div>
+        ) : isErrorLogs ? (
+          <EmptyState
+            icon="error"
+            title="Failed to Load Audit Logs"
+            description={errorMessage || 'Unable to retrieve inspector activity trail from the server.'}
+            secondaryCtaLabel="Retry"
+            onSecondaryCta={loadLogs}
+          />
+        ) : logs.length === 0 ? (
+          <EmptyState
+            icon="history_toggle_off"
+            title="No Audit Activity Recorded Yet"
+            description="Official regulatory actions, fine issuances, and black spot verifications will appear here in the audit trail."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-body-sm">
+              <thead>
+                <tr className="border-b border-outline-variant/20 text-on-surface-variant font-label-mono uppercase">
+                  <th className="py-2.5 px-3">Timestamp</th>
+                  <th className="py-2.5 px-3">Inspector / Actor</th>
+                  <th className="py-2.5 px-3">Action</th>
+                  <th className="py-2.5 px-3">Target / Vehicle</th>
+                  <th className="py-2.5 px-3">SACCO Scope</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/10 text-on-surface">
+                {logs.slice(0, 10).map((log) => (
                   <tr key={log.id} className="hover:bg-surface-container-low/50">
                     <td className="py-3 px-3 font-label-mono text-outline">
                       {new Date(log.timestamp).toLocaleString()}
@@ -271,40 +292,11 @@ export const AuthoritySettingsScreen: React.FC = () => {
                     <td className="py-3 px-3 font-label-mono">{log.target}</td>
                     <td className="py-3 px-3 text-on-surface-variant">{log.saccoId}</td>
                   </tr>
-                ))
-              ) : (
-                [
-                  {
-                    id: 'a-1',
-                    timestamp: new Date().toISOString(),
-                    actorName: 'Inspector Omondi (NTSA-882)',
-                    action: 'Issued KES 15,000 Speeding Fine to MetroLink Express',
-                    target: 'Vehicle KCG 482B',
-                    saccoId: 'MetroLink Express',
-                  },
-                  {
-                    id: 'a-2',
-                    timestamp: new Date(Date.now() - 3600000).toISOString(),
-                    actorName: 'Inspector Omondi (NTSA-882)',
-                    action: 'Verified & Published Blackspot Hazard',
-                    target: 'A104 Waiyaki Way',
-                    saccoId: 'NTSA',
-                  },
-                ].map((log) => (
-                  <tr key={log.id} className="hover:bg-surface-container-low/50">
-                    <td className="py-3 px-3 font-label-mono text-outline">
-                      {new Date(log.timestamp).toLocaleString()}
-                    </td>
-                    <td className="py-3 px-3 font-bold text-on-surface">{log.actorName}</td>
-                    <td className="py-3 px-3 text-on-surface font-medium">{log.action}</td>
-                    <td className="py-3 px-3 font-label-mono">{log.target}</td>
-                    <td className="py-3 px-3 text-on-surface-variant">{log.saccoId}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

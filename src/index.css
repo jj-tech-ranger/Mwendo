@@ -94,11 +94,25 @@
   /* Authority Variant (Link Blue / NTSA Blue Accent) */
   .theme-authority {
     --color-primary: #0f4c81;
+    --color-on-primary: #ffffff;
     --color-primary-container: #1d3557;
     --color-on-primary-container: #a8dadc;
     --color-secondary: #0077b6;
+    --color-on-secondary: #ffffff;
     --color-secondary-container: #caf0f8;
     --color-on-secondary-container: #03045e;
+  }
+
+  .dark .theme-authority,
+  .dark.theme-authority {
+    --color-primary: #72b0f4;
+    --color-on-primary: #00305f;
+    --color-primary-container: #004785;
+    --color-on-primary-container: #d2e4ff;
+    --color-secondary: #8ecbf8;
+    --color-on-secondary: #00344f;
+    --color-secondary-container: #004c70;
+    --color-on-secondary-container: #cbe6ff;
   }
 
   /* Admin Ops Console Variant (Dark Ops, Mono-leaning) */

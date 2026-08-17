@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { BRAND_ASSETS } from '../assets/BrandAssets';
 import { OfflineBanner } from '../common/OfflineBanner';
@@ -10,6 +11,7 @@ import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoShell: React.FC = () => {
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
@@ -27,35 +29,35 @@ export const SaccoShell: React.FC = () => {
   };
 
   const navItems = [
-    { path: '/sacco', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/sacco/fleet', label: 'Fleet', icon: 'directions_bus' },
-    { path: '/sacco/vehicles', label: 'Vehicles', icon: 'minor_crash' },
-    { path: '/sacco/drivers', label: 'Drivers', icon: 'badge' },
-    { path: '/sacco/live-trips', label: 'Live Trips', icon: 'alt_route' },
-    { path: '/sacco/violations', label: 'Violations', icon: 'speed' },
-    { path: '/sacco/black-spots', label: 'Black Spots', icon: 'warning' },
-    { path: '/sacco/reports', label: 'Reports', icon: 'analytics' },
-    { path: '/sacco/analytics', label: 'Analytics', icon: 'insights' },
-    { path: '/sacco/notifications', label: 'Notifications', icon: 'notifications' },
-    { path: '/sacco/users', label: 'Users', icon: 'group' },
-    { path: '/sacco/settings', label: 'Settings', icon: 'settings' },
+    { path: '/sacco', label: t('sacco.nav.dashboard'), icon: 'dashboard' },
+    { path: '/sacco/fleet', label: t('sacco.nav.fleet'), icon: 'directions_bus' },
+    { path: '/sacco/vehicles', label: t('sacco.nav.vehicles'), icon: 'minor_crash' },
+    { path: '/sacco/drivers', label: t('sacco.nav.drivers'), icon: 'badge' },
+    { path: '/sacco/live-trips', label: t('sacco.nav.liveTrips'), icon: 'alt_route' },
+    { path: '/sacco/violations', label: t('sacco.nav.violations'), icon: 'speed' },
+    { path: '/sacco/black-spots', label: t('sacco.nav.blackSpots'), icon: 'warning' },
+    { path: '/sacco/reports', label: t('sacco.nav.reports'), icon: 'analytics' },
+    { path: '/sacco/analytics', label: t('sacco.nav.analytics'), icon: 'insights' },
+    { path: '/sacco/notifications', label: t('sacco.nav.notifications'), icon: 'notifications' },
+    { path: '/sacco/users', label: t('sacco.nav.users'), icon: 'group' },
+    { path: '/sacco/settings', label: t('sacco.nav.settings'), icon: 'settings' },
   ];
 
   const getBreadcrumb = () => {
     const path = location.pathname;
-    if (path === '/sacco') return 'Dashboard Overview';
-    if (path.includes('/fleet')) return 'Fleet Overview';
-    if (path.includes('/vehicles')) return 'Vehicle Management';
-    if (path.includes('/drivers')) return 'Driver Directory';
-    if (path.includes('/live-trips')) return 'Live Operations Monitor';
-    if (path.includes('/violations')) return 'Violation Management';
-    if (path.includes('/black-spots')) return 'Black Spot Moderation';
-    if (path.includes('/reports')) return 'Reports Hub';
-    if (path.includes('/analytics')) return 'Safety & Fleet Analytics';
-    if (path.includes('/notifications')) return 'Notifications Center';
-    if (path.includes('/users')) return 'User & Role Management';
-    if (path.includes('/settings')) return 'Organization Settings';
-    return 'SACCO Operations';
+    if (path === '/sacco') return t('sacco.breadcrumbs.dashboard');
+    if (path.includes('/fleet')) return t('sacco.breadcrumbs.fleet');
+    if (path.includes('/vehicles')) return t('sacco.breadcrumbs.vehicles');
+    if (path.includes('/drivers')) return t('sacco.breadcrumbs.drivers');
+    if (path.includes('/live-trips')) return t('sacco.breadcrumbs.liveTrips');
+    if (path.includes('/violations')) return t('sacco.breadcrumbs.violations');
+    if (path.includes('/black-spots')) return t('sacco.breadcrumbs.blackSpots');
+    if (path.includes('/reports')) return t('sacco.breadcrumbs.reports');
+    if (path.includes('/analytics')) return t('sacco.breadcrumbs.analytics');
+    if (path.includes('/notifications')) return t('sacco.breadcrumbs.notifications');
+    if (path.includes('/users')) return t('sacco.breadcrumbs.users');
+    if (path.includes('/settings')) return t('sacco.breadcrumbs.settings');
+    return t('sacco.breadcrumbs.operations');
   };
 
   return (
@@ -80,14 +82,14 @@ export const SaccoShell: React.FC = () => {
                     Mwendo Salama
                   </h1>
                   <span className="font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider block">
-                    SACCO Manager
+                    {t('sacco.shell.manager')}
                   </span>
                 </div>
               )}
             </div>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={isCollapsed ? t('sacco.shell.expandSidebar') : t('sacco.shell.collapseSidebar')}
               className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container"
             >
               <span className="material-symbols-outlined text-xl">
@@ -106,7 +108,7 @@ export const SaccoShell: React.FC = () => {
               <select
                 value={currentSaccoId}
                 onChange={(e) => handleSwitchSacco(e.target.value)}
-                aria-label="Switch Active SACCO"
+                aria-label={t('sacco.shell.switchSacco')}
                 className="text-[10px] bg-surface text-on-surface border border-outline-variant/40 rounded px-1 py-0.5 cursor-pointer font-mono"
               >
                 <option value="sacco_metrolink">MetroLink</option>
@@ -145,7 +147,7 @@ export const SaccoShell: React.FC = () => {
             </div>
             {!isCollapsed && (
               <div className="text-center font-mono text-[9px] text-on-surface-variant/70 uppercase">
-                {currentSaccoId} • SACCO Portal
+                {currentSaccoId} • {t('sacco.shell.portal')}
               </div>
             )}
           </div>
@@ -170,13 +172,17 @@ export const SaccoShell: React.FC = () => {
                 </span>
                 <input
                   type="text"
-                  placeholder="Search vehicles, drivers, plates..."
+                  placeholder={t('sacco.shell.searchPlaceholder')}
                   className="pl-8 pr-3 py-1.5 bg-surface-container text-xs rounded-lg border border-outline-variant/40 w-64 focus:outline-hidden focus:border-primary"
                 />
               </div>
 
               {/* Notification Bell */}
-              <button className="relative p-2 rounded-lg hover:bg-surface-container text-on-surface-variant">
+              <button
+                className="relative p-2 rounded-lg hover:bg-surface-container text-on-surface-variant"
+                aria-label={t('sacco.shell.notifications')}
+                title={t('sacco.shell.notifications')}
+              >
                 <span className="material-symbols-outlined text-xl">notifications</span>
                 <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-error" />
               </button>
@@ -190,7 +196,7 @@ export const SaccoShell: React.FC = () => {
                 </div>
                 <div className="hidden sm:block text-left text-xs">
                   <div className="font-bold text-on-surface leading-none">
-                    {user?.displayName || 'SACCO Manager'}
+                    {user?.displayName || t('sacco.shell.defaultUser')}
                   </div>
                   <div className="text-[10px] text-on-surface-variant font-mono">
                     {currentSaccoName}
@@ -209,7 +215,7 @@ export const SaccoShell: React.FC = () => {
                       progress_activity
                     </span>
                     <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-                      Loading SACCO workspace...
+                      {t('sacco.shell.loadingWorkspace')}
                     </span>
                   </div>
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -7,6 +8,10 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { BRAND_ASSETS } from '../../components/assets/BrandAssets';
 import { useToast } from '../../components/ui/Toast';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { vehicleRepository, violationRepository, tripRepository, complaintRepository } from '../../repositories';
+import { where } from 'firebase/firestore';
+import { calculateSaccoSafetyScore } from '../../lib/engine';
+import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoReportsScreen: React.FC = () => {
   const { showToast } = useToast();
@@ -17,6 +22,47 @@ export const SaccoReportsScreen: React.FC = () => {
   const [reportReady, setReportReady] = useState(false);
   const [selectedReportType, setSelectedReportType] = useState('Weekly Fleet Safety Summary');
 
+  const { data: reportData, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ['saccoReportData', saccoId],
+    queryFn: async () => {
+      if (!saccoId) {
+        return {
+          vehicles: [],
+          violations: [],
+          trips: [],
+          complaints: [],
+          safetyScore: 100,
+        };
+      }
+
+      const [vehicles, violations, trips, complaints] = await Promise.all([
+        vehicleRepository.getAll([where('saccoId', '==', saccoId)]),
+        violationRepository.getAll([where('saccoId', '==', saccoId)]),
+        tripRepository.getAll([where('saccoId', '==', saccoId)]),
+        complaintRepository.getAll([where('saccoId', '==', saccoId)]),
+      ]);
+
+      const vehicleScores = vehicles.map((v) => (typeof v.riskScore === 'number' ? v.riskScore : 85));
+      const unresolvedComplaintsCount = complaints.filter((c) => c.status !== 'resolved').length;
+      const calculatedScore = calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount);
+
+      return {
+        vehicles,
+        violations,
+        trips,
+        complaints,
+        safetyScore: calculatedScore,
+      };
+    },
+    enabled: !!saccoId,
+    staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
+  });
+
+  const vehicles = reportData?.vehicles || [];
+  const violations = reportData?.violations || [];
+  const trips = reportData?.trips || [];
+  const safetyScore = reportData?.safetyScore ?? 100;
+
   const handleGenerate = (type: string) => {
     setSelectedReportType(type);
     setGenerating(true);
@@ -25,7 +71,51 @@ export const SaccoReportsScreen: React.FC = () => {
     setTimeout(() => {
       setGenerating(false);
       setReportReady(true);
-    }, 1500);
+    }, 600);
+  };
+
+  const handleExportCSV = () => {
+    if (!saccoId) return;
+    const dateStr = new Date().toISOString().split('T')[0];
+    const headers = ['Vehicle Registration', 'Capacity', 'Status', 'Risk Score', 'Insurance Expiry', 'Inspection Expiry'];
+    const rows = vehicles.map((v) => [
+      v.regNumber,
+      v.capacity,
+      v.status,
+      v.riskScore ?? 85,
+      v.insuranceExpiry || 'N/A',
+      v.inspectionExpiry || 'N/A',
+    ]);
+
+    const csvContent = [
+      `# Mwendo Salama - ${selectedReportType}`,
+      `# SACCO: ${getSaccoName(saccoId)} (${saccoId})`,
+      `# Generated: ${new Date().toISOString()}`,
+      `# Overall Safety Score: ${safetyScore}/100`,
+      `# Active Vehicles: ${vehicles.length}`,
+      `# Recorded Violations: ${violations.length}`,
+      `# Total Trips: ${trips.length}`,
+      '',
+      headers.join(','),
+      ...rows.map((row) => row.map((val) => `"${val}"`).join(',')),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `${saccoId}_safety_report_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('success', 'CSV Export Complete', `Downloaded ${saccoId}_safety_report_${dateStr}.csv`);
+  };
+
+  const handlePrintPDF = () => {
+    window.print();
+    showToast('info', 'Print Dialog Opened', 'Select "Save as PDF" in your print options to save.');
   };
 
   if (!saccoId) {
@@ -34,6 +124,21 @@ export const SaccoReportsScreen: React.FC = () => {
         icon="error"
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Report Data"
+        description={
+          (error as Error)?.message ||
+          'Unable to query vehicle records and safety violation ledgers for report compilation. Please try again.'
+        }
+        secondaryCtaLabel="Retry"
+        onSecondaryCta={() => refetch()}
       />
     );
   }
@@ -92,38 +197,76 @@ export const SaccoReportsScreen: React.FC = () => {
             </div>
 
             <Badge variant="success" className="font-mono text-xs py-1 px-3">
-              Verified PDF Document
+              Verified Audit Document
             </Badge>
           </div>
 
-          {/* Document Summary Section */}
+          {/* Document Summary Section with Real Data */}
           <div className="space-y-4 text-xs">
             <h3 className="font-bold text-sm uppercase tracking-wider font-mono text-primary">1. Executive Summary</h3>
             <div className="grid grid-cols-3 gap-4 text-center p-4 bg-slate-100 dark:bg-slate-800 rounded-xl font-mono">
               <div>
                 <span className="text-[10px] text-slate-500 uppercase block">Active Fleet</span>
-                <span className="text-lg font-bold">24 Vehicles</span>
+                <span className="text-lg font-bold">{vehicles.length} Vehicles</span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 uppercase block">Compliance Score</span>
-                <span className="text-lg font-bold text-emerald-600">82 / 100</span>
+                <span className={`text-lg font-bold ${safetyScore >= 80 ? 'text-emerald-600' : safetyScore >= 60 ? 'text-amber-600' : 'text-rose-600'}`}>
+                  {safetyScore} / 100
+                </span>
               </div>
               <div>
                 <span className="text-[10px] text-slate-500 uppercase block">Violations Recorded</span>
-                <span className="text-lg font-bold text-amber-600">14 Events</span>
+                <span className="text-lg font-bold text-amber-600">{violations.length} Events</span>
               </div>
             </div>
           </div>
 
+          {/* Itemized Vehicle Roster Preview */}
+          <div className="space-y-2 text-xs">
+            <h3 className="font-bold text-sm uppercase tracking-wider font-mono text-primary">2. Fleet Roster Breakdown</h3>
+            {vehicles.length === 0 ? (
+              <p className="text-xs text-slate-500 py-3">No vehicles currently registered in this SACCO.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs border border-slate-200 dark:border-slate-700">
+                  <thead className="bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className="p-2">Reg Number</th>
+                      <th className="p-2">Capacity</th>
+                      <th className="p-2">Status</th>
+                      <th className="p-2">Risk Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {vehicles.slice(0, 5).map((v) => (
+                      <tr key={v.id}>
+                        <td className="p-2 font-bold">{v.regNumber}</td>
+                        <td className="p-2">{v.capacity} pax</td>
+                        <td className="p-2 uppercase">{v.status}</td>
+                        <td className="p-2">{v.riskScore ?? 85}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {vehicles.length > 5 && (
+                  <p className="text-[10px] text-slate-500 mt-1 italic">Showing first 5 of {vehicles.length} vehicles. Export full CSV for complete list.</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Download Action Bar */}
-          <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-800">
-            <span className="text-xs font-mono text-slate-500">File: {saccoId}_safety_report_{Date.now()}.pdf</span>
-            <Button
-              className="font-bold text-xs"
-              onClick={() => showToast('success', 'PDF Downloaded', 'PDF export downloaded successfully!')}
-            >
-              <span className="material-symbols-outlined text-base mr-1">download</span> Download PDF Export
-            </Button>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <span className="text-xs font-mono text-slate-500">Document ID: {saccoId}_safety_{Date.now()}</span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="font-bold text-xs" onClick={handleExportCSV}>
+                <span className="material-symbols-outlined text-base mr-1">csv</span> Export CSV Ledger
+              </Button>
+              <Button size="sm" className="font-bold text-xs" onClick={handlePrintPDF}>
+                <span className="material-symbols-outlined text-base mr-1">print</span> Print / Save PDF
+              </Button>
+            </div>
           </div>
         </Card>
       )}

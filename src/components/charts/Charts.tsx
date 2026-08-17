@@ -38,6 +38,15 @@ const CHART_COLORS = {
   pieColors: ['#1A5C2E', '#0F6E56', '#E67E22', '#185FA5', '#C0392B', '#94A3B8'],
 };
 
+const CHART_TOOLTIP_STYLE: React.CSSProperties = {
+  backgroundColor: 'var(--color-surface-container-highest, #28332b)',
+  borderColor: 'var(--color-outline-variant, #404940)',
+  borderRadius: '12px',
+  color: 'var(--color-on-surface, #fcf9f8)',
+  fontSize: '12px',
+  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+};
+
 /* ==========================================
  * 1. LineChartWrapper
  * ========================================== */
@@ -72,15 +81,7 @@ export const LineChartWrapper: React.FC<LineChartProps> = ({
           <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} stroke="#888888" />
           <YAxis tick={{ fontSize: 11 }} stroke="#888888" />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#111111',
-              borderColor: '#333333',
-              borderRadius: '12px',
-              color: '#ffffff',
-              fontSize: '12px',
-            }}
-          />
+          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
           {lines.map((l, i) => {
             const strokeColor = l.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length] || '#1A5C2E';
@@ -149,15 +150,7 @@ export const AreaChartWrapper: React.FC<AreaChartProps> = ({
           <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} stroke="#888888" />
           <YAxis tick={{ fontSize: 11 }} stroke="#888888" />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#111111',
-              borderColor: '#333333',
-              borderRadius: '12px',
-              color: '#ffffff',
-              fontSize: '12px',
-            }}
-          />
+          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
           {areas.map((a, i) => {
             const color = a.color || CHART_COLORS.pieColors[i % CHART_COLORS.pieColors.length] || '#1A5C2E';
@@ -215,15 +208,7 @@ export const BarChartWrapper: React.FC<BarChartProps> = ({
           <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} stroke="#888888" />
           <YAxis tick={{ fontSize: 11 }} stroke="#888888" />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#111111',
-              borderColor: '#333333',
-              borderRadius: '12px',
-              color: '#ffffff',
-              fontSize: '12px',
-            }}
-          />
+          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
           {bars.map((b, i) => (
             <Bar
@@ -285,15 +270,7 @@ export const DonutChartWrapper: React.FC<DonutChartProps> = ({
               />
             ))}
           </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#111111',
-              borderColor: '#333333',
-              borderRadius: '12px',
-              color: '#ffffff',
-              fontSize: '12px',
-            }}
-          />
+          <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
           <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
         </RePieChart>
       </ResponsiveContainer>

@@ -13,7 +13,13 @@ const registerSchema = z.object({
   fullName: z.string().min(2, 'Please enter your display or full name'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
+  // SEC-002: Consent must be an affirmative, un-prechecked action
   terms: z.boolean().refine((val) => val === true, 'You must agree to the Terms and Privacy Policy'),
+  // SEC-003: Mandatory age confirmation gate
+  ageConfirmed: z.boolean().refine(
+    (val) => val === true,
+    'You must confirm you are 18 years or older, or a parent/guardian has provided consent'
+  ),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -34,7 +40,8 @@ export const RegisterScreen: React.FC = () => {
     defaultValues: {
       fullName: currentUser?.displayName && !currentUser?.isAnonymous ? currentUser.displayName : '',
       email: currentUser?.email || '',
-      terms: true,
+      terms: false,
+      ageConfirmed: false,
     },
   });
 
@@ -155,6 +162,21 @@ export const RegisterScreen: React.FC = () => {
           </div>
           {errors.terms && (
             <p className="text-xs text-error font-body-sm">{errors.terms.message}</p>
+          )}
+
+          <div className="flex items-start gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="ageConfirmed"
+              className="mt-1 h-4 w-4 rounded border-outline text-primary focus:ring-primary"
+              {...register('ageConfirmed')}
+            />
+            <label htmlFor="ageConfirmed" className="text-xs text-on-surface-variant leading-tight">
+              I confirm I am 18 years or older, or a parent/guardian has provided consent on behalf of a minor completing this registration.
+            </label>
+          </div>
+          {errors.ageConfirmed && (
+            <p className="text-xs text-error font-body-sm">{errors.ageConfirmed.message}</p>
           )}
 
           <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>

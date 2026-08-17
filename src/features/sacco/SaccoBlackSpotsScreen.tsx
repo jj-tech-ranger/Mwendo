@@ -18,7 +18,7 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
 
   const [selectedSpot, setSelectedSpot] = useState<BlackSpot | null>(null);
 
-  const { data: spots = [], isLoading: loading } = useQuery({
+  const { data: spots = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['blackSpots'],
     queryFn: async () => {
       return blackSpotRepository.getAll();
@@ -46,6 +46,21 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
     );
   }
 
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Hazard Reports"
+        description={
+          (error as Error)?.message ||
+          'Unable to retrieve black spot and commuter hazard submissions from the database. Please try again.'
+        }
+        secondaryCtaLabel="Retry Sync"
+        onSecondaryCta={() => refetch()}
+      />
+    );
+  }
+
   const saccoName = getSaccoName(saccoId);
 
   return (
@@ -61,36 +76,44 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {spots.map((spot) => (
-          <Card key={spot.id} className="p-5 space-y-4">
-            <div className="flex justify-between items-start">
-              <div>
-                <Badge
-                  variant={spot.severity === 'critical' ? 'danger' : spot.severity === 'high' ? 'warning' : 'neutral'}
-                  className="uppercase text-[10px] mb-1"
-                >
-                  {spot.hazardType || 'Hazard'}
+      {spots.length === 0 ? (
+        <EmptyState
+          icon="check_circle"
+          title="No Hazard Reports Pending"
+          description="There are currently no commuter hazard submissions or black spots awaiting moderation on your routes."
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {spots.map((spot) => (
+            <Card key={spot.id} className="p-5 space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <Badge
+                    variant={spot.severity === 'critical' ? 'danger' : spot.severity === 'high' ? 'warning' : 'neutral'}
+                    className="uppercase text-[10px] mb-1"
+                  >
+                    {spot.hazardType || 'Hazard'}
+                  </Badge>
+                  <h3 className="font-bold text-sm text-on-surface">{spot.name}</h3>
+                  <span className="text-xs font-mono text-on-surface-variant">{spot.routeName}</span>
+                </div>
+                <Badge variant={spot.status === 'published' ? 'success' : spot.status === 'rejected' ? 'danger' : 'warning'}>
+                  {(spot.status || 'pending').toUpperCase()}
                 </Badge>
-                <h3 className="font-bold text-sm text-on-surface">{spot.name}</h3>
-                <span className="text-xs font-mono text-on-surface-variant">{spot.routeName}</span>
               </div>
-              <Badge variant={spot.status === 'published' ? 'success' : spot.status === 'rejected' ? 'danger' : 'warning'}>
-                {(spot.status || 'pending').toUpperCase()}
-              </Badge>
-            </div>
 
-            <p className="text-xs text-on-surface-variant line-clamp-2">{spot.hazardDescription}</p>
+              <p className="text-xs text-on-surface-variant line-clamp-2">{spot.hazardDescription}</p>
 
-            <div className="flex items-center justify-between text-xs pt-2 border-t border-outline-variant/20 font-mono">
-              <span>{spot.corroborationCount || 1} Corroborations</span>
-              <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedSpot(spot)}>
-                Review Hazard
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+              <div className="flex items-center justify-between text-xs pt-2 border-t border-outline-variant/20 font-mono">
+                <span>{spot.corroborationCount || 1} Corroborations</span>
+                <Button size="sm" variant="outline" className="text-xs" onClick={() => setSelectedSpot(spot)}>
+                  Review Hazard
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* DETAIL MODAL */}
       {selectedSpot && (

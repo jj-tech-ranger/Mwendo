@@ -113,6 +113,9 @@ service cloud.firestore {
     // in the Firestore users document are display/UI-convenience fields ONLY. They must NEVER be treated as an
     // authorization source in Firestore security rules or backend services — the ONLY authorization source
     // for security rules is request.auth.token.activeRole (custom claim).
+    // COMPLIANCE NOTICE (SEC-002, SEC-003, SEC-004): termsAccepted, privacyPolicyVersion, termsAcceptedAt,
+    // ageConfirmed, and ageConfirmedAt are write-once at registration creation and strictly omitted from
+    // client-updatable affectedKeys(), guaranteeing immutable consent audit ledgers.
     match /users/{userId} {
       allow read: if isSignedIn() && (
         isOwner(userId) || isAdmin() || isAuthority() ||
@@ -138,7 +141,9 @@ service cloud.firestore {
             'language',
             'photoURL',
             'emergencyContacts',
-            'updatedAt'
+            'updatedAt',
+            'analyticsConsent',
+            'analyticsConsentAt'
           ])
         )
       );
@@ -307,6 +312,11 @@ service cloud.firestore {
         resource.data.saccoId == request.auth.token.saccoId
       );
       allow write: if isAdmin() || isAuthority() || hasActiveRole('sacco_manager') || isSignedIn();
+    }
+
+    // User Rate Limits (SEC-005)
+    match /rate_limits/{userId} {
+      allow read, write: if isSignedIn() && (isOwner(userId) || isAdmin());
     }
   }
 }

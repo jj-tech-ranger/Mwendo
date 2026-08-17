@@ -28,7 +28,7 @@ export const SaccoDriversScreen: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [assignedVehicleReg, setAssignedVehicleReg] = useState('');
 
-  const { data: drivers = [], isLoading: loading } = useQuery({
+  const { data: drivers = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoDrivers', saccoId],
     queryFn: async () => {
       if (!saccoId) return [];
@@ -79,6 +79,21 @@ export const SaccoDriversScreen: React.FC = () => {
         icon="error"
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Driver Directory"
+        description={
+          (error as Error)?.message ||
+          'Unable to retrieve drivers registered under this SACCO. Please try again.'
+        }
+        secondaryCtaLabel="Retry Drivers Fetch"
+        onSecondaryCta={() => refetch()}
       />
     );
   }

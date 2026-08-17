@@ -20,11 +20,15 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserProfile, UserRole, UserClaims } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
+import { analyticsService } from './analyticsService';
 
 export interface MfaAuthError extends Error {
   code?: string;
   resolver?: unknown;
 }
+
+// SEC-004: Current legal consent policy version ledger
+export const CURRENT_PRIVACY_POLICY_VERSION = '1.0.0';
 
 export const authService = {
   // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
@@ -52,6 +56,7 @@ export const authService = {
 
         const profile = await this.fetchOrInitUserProfile(firebaseUser, 'passenger', claims);
         useAuthStore.getState().setUser(profile, claims);
+        analyticsService.syncConsentFromProfile(profile);
       } catch (err) {
         console.error('Error loading user profile or token claims:', err);
         // Fallback user object if firestore or token fails temporarily
@@ -137,10 +142,17 @@ export const authService = {
         updatedAt: new Date().toISOString(),
         isAnonymous: firebaseUser.isAnonymous,
         trustScore: data.trustScore ?? 50,
+        // SEC-004: Consent ledger
+        termsAccepted: data.termsAccepted,
+        privacyPolicyVersion: data.privacyPolicyVersion,
+        termsAcceptedAt: data.termsAcceptedAt,
+        ageConfirmed: data.ageConfirmed,
+        ageConfirmedAt: data.ageConfirmedAt,
       };
     }
 
     // Initialize brand new user profile in Firestore
+    const nowIso = new Date().toISOString();
     const newProfile: UserProfile = {
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
@@ -163,8 +175,14 @@ export const authService = {
       isActive: claimedIsSuspended !== true,
       isMfaEnrolled: false,
       isMfaVerified: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
+      termsAccepted: true,
+      privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION,
+      termsAcceptedAt: nowIso,
+      ageConfirmed: true,
+      ageConfirmedAt: nowIso,
+      createdAt: nowIso,
+      updatedAt: nowIso,
       isAnonymous: firebaseUser.isAnonymous,
       trustScore: firebaseUser.isAnonymous ? 30 : 50,
     };
@@ -233,6 +251,7 @@ export const authService = {
     }
 
     const profileRef = doc(db, 'users', updatedUser.uid);
+    const nowIso = new Date().toISOString();
     const updatedProfile: UserProfile = {
       id: updatedUser.uid,
       uid: updatedUser.uid,
@@ -241,8 +260,14 @@ export const authService = {
       role,
       isVerified: updatedUser.emailVerified,
       isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
+      termsAccepted: true,
+      privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION,
+      termsAcceptedAt: nowIso,
+      ageConfirmed: true,
+      ageConfirmedAt: nowIso,
+      createdAt: nowIso,
+      updatedAt: nowIso,
       isAnonymous: false,
       trustScore: 60,
     };
@@ -270,6 +295,7 @@ export const authService = {
     } catch (e) {
       console.warn('Anonymous signin fallback to guest offline profile:', e);
       const fallbackClaims: UserClaims = { activeRole: 'passenger' };
+      const nowIso = new Date().toISOString();
       const guestUser: UserProfile = {
         id: `guest_${Date.now()}`,
         uid: `guest_${Date.now()}`,
@@ -282,8 +308,8 @@ export const authService = {
         isActive: true,
         isVerified: true,
         isAnonymous: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: nowIso,
+        updatedAt: nowIso,
       };
       useAuthStore.getState().setUser(guestUser, fallbackClaims);
       return guestUser;
@@ -335,6 +361,11 @@ export const authService = {
       authorityScope: _authorityScope,
       isActive: _isActive,
       trustScore: _trustScore,
+      termsAccepted: _termsAccepted,
+      privacyPolicyVersion: _privacyPolicyVersion,
+      termsAcceptedAt: _termsAcceptedAt,
+      ageConfirmed: _ageConfirmed,
+      ageConfirmedAt: _ageConfirmedAt,
       ...safeProfileData
     } = data as Record<string, unknown>;
 

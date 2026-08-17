@@ -17,7 +17,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
   // Form State for New Vehicle Inspection
   const [showModal, setShowModal] = useState(false);
   const [plate, setPlate] = useState('');
-  const [saccoName, setSaccoName] = useState('MetroLink Express');
+  const [saccoName, setSaccoName] = useState('');
   const [county, setCounty] = useState(user?.county || 'Nairobi');
   const [speedGovernor, setSpeedGovernor] = useState<'valid' | 'tampered' | 'expired' | 'missing'>('valid');
   const [brakeStatus, setBrakeStatus] = useState<'pass' | 'fail'>('pass');
@@ -30,7 +30,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'inspections' | 'impounded'>('inspections');
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const { data: inspectionData, isLoading } = useQuery({
+  const { data: inspectionData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['inspectionsData'],
     queryFn: async () => {
       const [fetchedReports, fetchedVehicles] = await Promise.all([
@@ -112,6 +112,21 @@ export const AuthorityInspectionsScreen: React.FC = () => {
       showToast('error', 'Save Failed', 'Error saving inspection report.');
     }
   };
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Inspection Records"
+        description={
+          (error as Error)?.message ||
+          'Unable to query vehicle mechanical inspection reports and compliance records. Please try again.'
+        }
+        secondaryCtaLabel="Retry"
+        onSecondaryCta={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-lg">

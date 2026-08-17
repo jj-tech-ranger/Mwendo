@@ -330,11 +330,15 @@ const router = createBrowserRouter([
     element: withFullPageSuspense(<MfaChallengeScreen />),
   },
 
-  // System Layouts
-  {
-    path: '/dev/components',
-    element: withFullPageSuspense(<ComponentShowcaseScreen />),
-  },
+  // System Layouts (Dev-only routes conditionally mounted)
+  ...(import.meta.env.DEV
+    ? [
+        {
+          path: '/dev/components',
+          element: withFullPageSuspense(<ComponentShowcaseScreen />),
+        },
+      ]
+    : []),
   {
     path: '/maintenance',
     element: withFullPageSuspense(<MaintenanceModeScreen />),

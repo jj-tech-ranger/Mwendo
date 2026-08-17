@@ -88,7 +88,7 @@ export const AuthorityDashboard: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  const { data: authorityData, isLoading } = useQuery({
+  const { data: authorityData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['authorityDashboardData'],
     queryFn: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -276,6 +276,21 @@ export const AuthorityDashboard: React.FC = () => {
     }
     return Object.values(counts);
   }, [violations]);
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Authority Metrics"
+        description={
+          (error as Error)?.message ||
+          'Unable to retrieve national transit violations, blackspot hazard registry, or fleet audit logs. Please try again.'
+        }
+        secondaryCtaLabel="Retry Data Fetch"
+        onSecondaryCta={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-lg">

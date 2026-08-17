@@ -6,6 +6,7 @@ import { AppRoutes } from './routes';
 import { authService } from './services/authService';
 import { offlineSyncService } from './services/offlineSyncService';
 import { MaintenanceGate } from './components/MaintenanceGate';
+import { DpaConsentBanner } from './components/common/DpaConsentBanner';
 import { ToastProvider } from './components/ui/Toast';
 import { usePwaStore } from './store/usePwaStore';
 import { UpdateAvailableScreen } from './features/common/UpdateAvailableScreen';
@@ -29,6 +30,7 @@ export function App() {
       <ToastProvider>
         <MaintenanceGate>
           <AppRoutes />
+          <DpaConsentBanner />
           {isUpdateAvailable && <UpdateAvailableScreen />}
         </MaintenanceGate>
       </ToastProvider>

@@ -40,6 +40,15 @@ export interface UserProfile {
   isMfaVerified?: boolean | undefined;
   isAnonymous?: boolean | undefined;
   trustScore?: number | undefined;
+  // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
+  termsAccepted?: boolean | undefined;
+  privacyPolicyVersion?: string | undefined;
+  termsAcceptedAt?: string | undefined;
+  ageConfirmed?: boolean | undefined;
+  ageConfirmedAt?: string | undefined;
+  // SEC-006, SEC-007: Kenya DPA 2019 Analytics Consent
+  analyticsConsent?: boolean | undefined;
+  analyticsConsentAt?: string | undefined;
   emergencyContacts?: Array<{ name: string; phone: string; relationship: string }> | undefined;
   notificationPreferences?: {
     overspeedAlerts: boolean;
@@ -279,5 +288,13 @@ export interface InspectionReport {
   expiryDate?: string | undefined;
   notes?: string | undefined;
   createdAt: string;
+}
+
+export interface UserRateLimitDoc {
+  id: string;
+  userId: string;
+  sosTimestamps?: number[];
+  blackSpotTimestamps?: number[];
+  updatedAt: string;
 }
 

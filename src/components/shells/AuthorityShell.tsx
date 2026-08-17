@@ -19,14 +19,14 @@ export const AuthorityShell: React.FC = () => {
   }, [setVariant]);
 
   const navItems = [
-    { path: '/authority', label: t('nav.overview', 'Overview'), icon: 'policy' },
-    { path: '/authority/compliance', label: t('nav.compliance', 'Compliance & Violations'), icon: 'verified' },
-    { path: '/authority/black-spots', label: t('nav.blackSpots', 'Black Spots & Map'), icon: 'warning' },
-    { path: '/authority/inspections', label: t('nav.inspections', 'Vehicle Inspections'), icon: 'fact_check' },
-    { path: '/authority/emergency', label: t('nav.emergency', 'SOS & Emergency'), icon: 'e911_emergency' },
-    { path: '/authority/complaints', label: t('nav.complaints', 'Complaints'), icon: 'rate_review' },
-    { path: '/authority/reports', label: t('nav.reports', 'Reports & Downloads'), icon: 'analytics' },
-    { path: '/authority/settings', label: t('nav.settings', 'Authority Settings'), icon: 'settings' },
+    { path: '/authority', label: t('authority.nav.overview', 'National Overview'), icon: 'policy' },
+    { path: '/authority/compliance', label: t('authority.nav.compliance', 'Compliance & Violations'), icon: 'verified' },
+    { path: '/authority/black-spots', label: t('authority.nav.blackSpots', 'Black Spots & Map'), icon: 'warning' },
+    { path: '/authority/inspections', label: t('authority.nav.inspections', 'Vehicle Inspections'), icon: 'fact_check' },
+    { path: '/authority/emergency', label: t('authority.nav.emergency', 'SOS & Emergency'), icon: 'e911_emergency' },
+    { path: '/authority/complaints', label: t('authority.nav.complaints', 'Complaints'), icon: 'rate_review' },
+    { path: '/authority/reports', label: t('authority.nav.reports', 'Reports & Downloads'), icon: 'analytics' },
+    { path: '/authority/settings', label: t('authority.nav.settings', 'Authority Settings'), icon: 'settings' },
   ];
 
   return (
@@ -48,16 +48,17 @@ export const AuthorityShell: React.FC = () => {
               {!isCollapsed && (
                 <div>
                   <h1 className="font-headline-lg-mobile text-sm text-primary leading-tight">
-                    NTSA Authority
+                    {t('authority.shell.title')}
                   </h1>
                   <span className="font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider">
-                    National Safety
+                    {t('authority.shell.subtitle')}
                   </span>
                 </div>
               )}
             </div>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
+              aria-label={isCollapsed ? t('authority.shell.expandSidebar') : t('authority.shell.collapseSidebar')}
               className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container"
             >
               <span className="material-symbols-outlined text-xl">
@@ -96,7 +97,7 @@ export const AuthorityShell: React.FC = () => {
             </div>
             {!isCollapsed && (
               <div className="text-center font-label-mono text-[10px] text-outline">
-                NTSA REGULATORY CONSOLE
+                {t('authority.shell.consoleTag')}
               </div>
             )}
           </div>
@@ -106,9 +107,9 @@ export const AuthorityShell: React.FC = () => {
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
           <header className="h-16 border-b border-outline-variant/20 bg-surface-container-lowest px-lg flex items-center justify-between sticky top-0 z-20">
             <div className="flex items-center gap-md">
-              <span className="font-headline-lg-mobile text-on-surface">National PSV Safety Monitor</span>
+              <span className="font-headline-lg-mobile text-on-surface">{t('authority.shell.monitorTitle')}</span>
               <span className="bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-label-mono text-xs">
-                NTSA LIVE
+                {t('authority.shell.liveBadge')}
               </span>
             </div>
           </header>
@@ -122,7 +123,7 @@ export const AuthorityShell: React.FC = () => {
                       progress_activity
                     </span>
                     <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-                      Loading Authority module...
+                      {t('authority.shell.loadingModule')}
                     </span>
                   </div>
                 </div>

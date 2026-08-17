@@ -32,6 +32,7 @@ export const EmergencySosScreen: React.FC = () => {
     fcmTargets: string[];
     alertId?: string;
   } | null>(null);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
   // Initialize strictly as empty array with no fabricated sample data
   const [contacts, setContacts] = useState<ContactItem[]>([]);
@@ -67,6 +68,7 @@ export const EmergencySosScreen: React.FC = () => {
    */
   const dispatchSosAlert = async () => {
     setIsDispatching(true);
+    setRateLimitError(null);
     const alertId = `sos_${Date.now()}`;
     const userId = user?.uid || user?.id || 'passenger_me';
     const location = { lat: -1.286389, lng: 36.817223 };
@@ -89,7 +91,12 @@ export const EmergencySosScreen: React.FC = () => {
         fcmTargets: ['SACCO Operations Dispatch', 'NTSA Safety Control Center'],
         alertId,
       });
-    } catch (fnErr) {
+    } catch (fnErr: any) {
+      if (fnErr.message?.includes('RATE_LIMIT_EXCEEDED') || fnErr.code === 'RATE_LIMIT_EXCEEDED') {
+        setIsDispatching(false);
+        setRateLimitError(fnErr.message || 'Rate limit exceeded: Maximum 3 SOS triggers per hour allowed.');
+        return;
+      }
       console.warn('[EmergencySosScreen] sendSOS function error, local fallback active:', fnErr);
       setDispatchedSummary({
         contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
@@ -380,6 +387,16 @@ export const EmergencySosScreen: React.FC = () => {
                   Tap the red SOS button below if you feel unsafe or are in a vehicle accident.
                 </p>
               </div>
+
+              {rateLimitError && (
+                <div className="p-3 bg-error/10 border border-error/30 rounded-xl text-error text-xs text-left space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    <span>SOS Dispatch Limit Reached</span>
+                  </div>
+                  <p>{rateLimitError}</p>
+                </div>
+              )}
 
               {/* Big Red SOS Button */}
               <button

@@ -5,9 +5,9 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { BrandMark } from '../../components/assets/BrandAssets';
-import { blackSpotRepository } from '../../repositories';
 import { offlineStorage } from '../../services/offlineStorage';
 import { offlineSyncService } from '../../services/offlineSyncService';
+import { functionsService } from '../../services/functionsService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export const ReportBlackSpotScreen: React.FC = () => {
@@ -23,6 +23,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
   const [hasPhoto, setHasPhoto] = useState(false);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,6 +39,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setRateLimitError(null);
     const reportId = `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newReport = {
       id: reportId,
@@ -59,18 +61,25 @@ export const ReportBlackSpotScreen: React.FC = () => {
 
     try {
       if (navigator.onLine) {
-        await blackSpotRepository.save(newReport as any);
+        // SEC-005: Enforce Cloud Function rate limiting (Max 10 reports per 24h)
+        await functionsService.reportBlackSpot(newReport as any);
+        setStep(4);
       } else {
         await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
         await offlineSyncService.updatePendingCount();
+        setStep(4);
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message?.includes('RATE_LIMIT_EXCEEDED') || err.code === 'RATE_LIMIT_EXCEEDED') {
+        setRateLimitError(err.message || 'Rate limit exceeded: Maximum 10 hazard reports per 24 hours allowed.');
+        return;
+      }
       console.warn('Network write failed, saving to offline buffer:', err);
       await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
       await offlineSyncService.updatePendingCount();
+      setStep(4);
     } finally {
       setIsSubmitting(false);
-      setStep(4);
     }
   };
 
@@ -304,6 +313,16 @@ export const ReportBlackSpotScreen: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {rateLimitError && (
+            <div className="p-3 bg-error/10 border border-error/30 rounded-xl text-error text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <span className="material-symbols-outlined text-sm">error</span>
+                <span>Submission Limit Reached</span>
+              </div>
+              <p>{rateLimitError}</p>
+            </div>
+          )}
 
           <Button
             className="w-full h-11 font-bold text-sm"

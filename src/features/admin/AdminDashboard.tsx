@@ -6,12 +6,13 @@ import { AreaChartWrapper } from '../../components/charts/Charts';
 import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
 import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: dashboardData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['adminDashboardData'],
     queryFn: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -47,6 +48,21 @@ export const AdminDashboard: React.FC = () => {
   const logs = dashboardData?.logs || [];
   const complaints = dashboardData?.complaints || [];
   const stats = dashboardData?.stats || { userCount: 0, saccoCount: 0, tripCount: 0 };
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Admin Operations Data"
+        description={
+          (error as Error)?.message ||
+          'Unable to load cross-tenant platform statistics, user directories, and audit logs. Please try again.'
+        }
+        secondaryCtaLabel="Retry Data Sync"
+        onSecondaryCta={() => refetch()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-lg">
