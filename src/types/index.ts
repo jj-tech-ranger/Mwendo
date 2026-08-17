@@ -50,6 +50,8 @@ export interface UserProfile {
   analyticsConsent?: boolean | undefined;
   analyticsConsentAt?: string | undefined;
   emergencyContacts?: Array<{ name: string; phone: string; relationship: string }> | undefined;
+  language?: 'en' | 'sw' | undefined;
+  theme?: 'light' | 'dark' | 'system' | undefined;
   notificationPreferences?: {
     overspeedAlerts: boolean;
     blackspotWarnings: boolean;

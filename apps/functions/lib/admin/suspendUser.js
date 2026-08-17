@@ -4,8 +4,12 @@ exports.reactivateUser = exports.suspendUser = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
+const env_1 = require("../lib/env");
 /**
- * Verify caller is an active admin by inspecting Firestore users/{uid} and Auth token claims.
+ * Verify caller is an active admin by inspecting Auth token claims.
+ * SEC-004 & SEC-009: Auth custom claims (auth.token.activeRole === 'admin') are the sole source
+ * of truth for authorization. Firestore document fields (role/activeRole) are display-only and
+ * must never grant administrative privileges.
  */
 async function verifyAdminCaller(auth) {
     if (!auth) {
@@ -13,24 +17,31 @@ async function verifyAdminCaller(auth) {
     }
     const callerUid = auth.uid;
     const tokenClaimRole = auth.token?.activeRole;
-    // Live Firestore check
-    const db = (0, firestore_1.getFirestore)();
-    const userSnap = await db.collection('users').doc(callerUid).get();
-    if (!userSnap.exists) {
-        throw new https_1.HttpsError('permission-denied', 'Caller user record not found in Firestore.');
-    }
-    const userData = userSnap.data() || {};
-    const isDocAdmin = userData.role === 'admin' || userData.activeRole === 'admin';
-    const isClaimAdmin = tokenClaimRole === 'admin';
-    if (!isDocAdmin && !isClaimAdmin) {
+    // SEC-004: Custom claim is the sole authorization source
+    if (tokenClaimRole !== 'admin') {
         throw new https_1.HttpsError('permission-denied', 'Caller does not possess administrative privileges.');
+    }
+    let displayName = auth.token?.name || 'System Admin';
+    try {
+        // Read Firestore document only for displayName in audit logging if available
+        const db = (0, firestore_1.getFirestore)();
+        const userSnap = await db.collection('users').doc(callerUid).get();
+        if (userSnap.exists) {
+            const userData = userSnap.data() || {};
+            if (userData.displayName) {
+                displayName = userData.displayName;
+            }
+        }
+    }
+    catch {
+        // Fallback gracefully to token name / default without blocking admin execution
     }
     return {
         uid: callerUid,
-        displayName: userData.displayName || auth.token?.name || 'System Admin',
+        displayName,
     };
 }
-exports.suspendUser = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.suspendUser = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     const caller = await verifyAdminCaller(request.auth);
     const targetUid = request.data?.targetUid;
     const reason = request.data?.reason || 'Administrative action';
@@ -70,7 +81,7 @@ exports.suspendUser = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_EN
         throw new https_1.HttpsError('internal', err.message || 'Failed to complete user suspension sequence.');
     }
 });
-exports.reactivateUser = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.reactivateUser = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     const caller = await verifyAdminCaller(request.auth);
     const targetUid = request.data?.targetUid;
     if (!targetUid || typeof targetUid !== 'string') {

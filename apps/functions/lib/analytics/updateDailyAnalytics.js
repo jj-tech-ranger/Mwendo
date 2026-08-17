@@ -4,6 +4,7 @@ exports.updateDailyAnalytics = void 0;
 exports.processUpdateDailyAnalyticsLogic = processUpdateDailyAnalyticsLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
+const env_1 = require("../lib/env");
 async function processUpdateDailyAnalyticsLogic(db, dateStr) {
     const tripsSnap = await db.collection('trips').get();
     const violSnap = await db.collection('violations').get();
@@ -47,7 +48,7 @@ async function processUpdateDailyAnalyticsLogic(db, dateStr) {
     await db.collection('analytics').doc(docId).set(payload, { merge: true });
     return payload;
 }
-exports.updateDailyAnalytics = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.updateDailyAnalytics = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
     }

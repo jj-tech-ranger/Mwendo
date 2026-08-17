@@ -305,13 +305,22 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Distributed SACCO Sharded Counters (AN-003)
+    // Distributed SACCO Sharded Counters (AN-003) (SEC-003: Tenant-scoped write rules, no isSignedIn catch-all)
     match /saccoCounters/{counterId} {
       allow read: if isAdmin() || isAuthority() || (
         hasActiveRole('sacco_manager') &&
         resource.data.saccoId == request.auth.token.saccoId
       );
-      allow write: if isAdmin() || isAuthority() || hasActiveRole('sacco_manager') || isSignedIn();
+      allow create: if (isAdmin() || isAuthority() || (
+        hasActiveRole('sacco_manager') &&
+        request.resource.data.saccoId == request.auth.token.saccoId
+      )) && request.resource.data.keys().hasOnly(['count', 'saccoId', 'metric', 'shardId', 'updatedAt']);
+      allow update: if (isAdmin() || isAuthority() || (
+        hasActiveRole('sacco_manager') &&
+        resource.data.saccoId == request.auth.token.saccoId &&
+        request.resource.data.saccoId == request.auth.token.saccoId
+      )) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'saccoId', 'metric', 'shardId', 'updatedAt']);
+      allow delete: if isAdmin();
     }
 
     // User Rate Limits (SEC-005)

@@ -124,18 +124,45 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
     });
   });
 
-  it('rejects caller when caller user record is missing in Firestore', async () => {
-    const missingCallerRequest = {
+  it('SEC-004: rejects caller when token.activeRole is not admin even if Firestore document has role: admin', async () => {
+    // Seed user with admin role in Firestore doc but non-admin token claim
+    mockFirestoreData['users/spoofed_admin_01'] = {
+      uid: 'spoofed_admin_01',
+      displayName: 'Spoofed Admin',
+      role: 'admin',
+      activeRole: 'admin',
+    };
+
+    const spoofedRequest = {
       data: { targetUid: 'target_user_01' },
       auth: {
-        uid: 'ghost_admin_99',
-        token: { activeRole: 'admin' },
+        uid: 'spoofed_admin_01',
+        token: { activeRole: 'passenger' },
       },
     } as any;
 
-    await expect(suspendUser.run(missingCallerRequest)).rejects.toMatchObject({
+    await expect(suspendUser.run(spoofedRequest)).rejects.toMatchObject({
       code: 'permission-denied',
     });
+
+    await expect(reactivateUser.run(spoofedRequest)).rejects.toMatchObject({
+      code: 'permission-denied',
+    });
+  });
+
+  it('SEC-004: caller with token.activeRole === admin succeeds even with no matching Firestore document', async () => {
+    const missingCallerRequest = {
+      data: { targetUid: 'target_user_01', reason: 'Emergency suspension' },
+      auth: {
+        uid: 'ghost_admin_99',
+        token: { activeRole: 'admin', name: 'Ghost Admin' },
+      },
+    } as any;
+
+    const result = await suspendUser.run(missingCallerRequest);
+    expect(result.success).toBe(true);
+    expect(mockFirestoreData['users/target_user_01'].isActive).toBe(false);
+    expect(mockUserClaims['target_user_01']).toEqual({ isSuspended: true });
   });
 
   it('rejects execution when targetUid is missing or invalid', async () => {

@@ -5,6 +5,7 @@ exports.processRebuildSaccoAnalyticsLogic = processRebuildSaccoAnalyticsLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const engine_1 = require("../lib/engine");
+const env_1 = require("../lib/env");
 async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     const vehiclesSnap = await db.collection('vehicles').where('saccoId', '==', saccoId).get();
     const scores = vehiclesSnap.docs.map((d) => d.data().riskScore ?? 85);
@@ -40,7 +41,7 @@ async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     await db.collection('analytics').doc(docId).set(payload, { merge: true });
     return payload;
 }
-exports.rebuildSaccoAnalytics = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.rebuildSaccoAnalytics = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
     }

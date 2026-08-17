@@ -5,6 +5,7 @@ exports.processVehicleRiskLogic = processVehicleRiskLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const engine_1 = require("../lib/engine");
+const env_1 = require("../lib/env");
 async function processVehicleRiskLogic(db, event) {
     const ledgerRef = db.collection('processedEvents').doc(event.eventId);
     // Use a Firestore transaction for atomic idempotency check and write
@@ -103,7 +104,7 @@ async function processVehicleRiskLogic(db, event) {
     });
     return { processed: true, riskScore, riskTier };
 }
-exports.computeVehicleRisk = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.computeVehicleRisk = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
     }

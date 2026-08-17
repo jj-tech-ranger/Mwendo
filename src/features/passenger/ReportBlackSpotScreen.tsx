@@ -8,6 +8,7 @@ import { BrandMark } from '../../components/assets/BrandAssets';
 import { offlineStorage } from '../../services/offlineStorage';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { functionsService } from '../../services/functionsService';
+import { storageService } from '../../services/storageService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export const ReportBlackSpotScreen: React.FC = () => {
@@ -22,12 +23,14 @@ export const ReportBlackSpotScreen: React.FC = () => {
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high'>('high');
   const [hasPhoto, setHasPhoto] = useState(false);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoDataUrl(reader.result as string);
@@ -61,8 +64,17 @@ export const ReportBlackSpotScreen: React.FC = () => {
 
     try {
       if (navigator.onLine) {
-        // SEC-005: Enforce Cloud Function rate limiting (Max 10 reports per 24h)
+        // SEC-005: Create black spot doc first, then upload evidence file under spotId
         await functionsService.reportBlackSpot(newReport as any);
+
+        if (photoFile) {
+          try {
+            await storageService.uploadBlackSpotPhoto(photoFile, reportId);
+          } catch (storageErr) {
+            console.warn('Storage upload error for black spot photo:', storageErr);
+          }
+        }
+
         setStep(4);
       } else {
         await offlineStorage.setItem(`offline_report_${reportId}`, newReport);

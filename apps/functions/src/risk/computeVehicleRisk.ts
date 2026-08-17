@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
+import { APP_CHECK_ENFORCED } from '../lib/env';
 
 export interface VehicleRiskEventPayload {
   eventId: string;
@@ -136,7 +137,7 @@ export async function processVehicleRiskLogic(
 }
 
 export const computeVehicleRisk = onCall(
-  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  { enforceAppCheck: APP_CHECK_ENFORCED },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated.');

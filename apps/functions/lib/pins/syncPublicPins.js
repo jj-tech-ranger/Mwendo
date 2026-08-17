@@ -4,6 +4,7 @@ exports.syncPublicPins = void 0;
 exports.processSyncPublicPinsLogic = processSyncPublicPinsLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
+const env_1 = require("../lib/env");
 async function processSyncPublicPinsLogic(db) {
     const [spotsSnap, existingPinsSnap] = await Promise.all([
         db.collection('black_spots').get(),
@@ -45,7 +46,7 @@ async function processSyncPublicPinsLogic(db) {
     }
     return { syncedCount, deletedCount };
 }
-exports.syncPublicPins = (0, https_1.onCall)({ enforceAppCheck: process.env.NODE_ENV === 'production' }, async (request) => {
+exports.syncPublicPins = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
     if (!request.auth) {
         throw new https_1.HttpsError('unauthenticated', 'User must be authenticated.');
     }

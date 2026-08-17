@@ -15,4 +15,13 @@ i18n.use(initReactI18next).init({
   },
 });
 
+if (typeof document !== 'undefined') {
+  document.documentElement.lang = i18n.language || 'en';
+  i18n.on('languageChanged', (lng) => {
+    if (document.documentElement) {
+      document.documentElement.lang = lng;
+    }
+  });
+}
+
 export default i18n;

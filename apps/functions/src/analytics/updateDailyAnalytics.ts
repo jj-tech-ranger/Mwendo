@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { APP_CHECK_ENFORCED } from '../lib/env';
 
 export async function processUpdateDailyAnalyticsLogic(
   db: Firestore,
@@ -51,7 +52,7 @@ export async function processUpdateDailyAnalyticsLogic(
 }
 
 export const updateDailyAnalytics = onCall(
-  { enforceAppCheck: process.env.NODE_ENV === 'production' },
+  { enforceAppCheck: APP_CHECK_ENFORCED },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'User must be authenticated.');

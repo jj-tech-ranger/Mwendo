@@ -7,6 +7,7 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
+    "check:bundle-security": "node scripts/check-bundle-security.js",
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
     "test:emulator": "firebase emulators:exec --only firestore --project demo-mwendo-salama-audit \"vitest run\"",

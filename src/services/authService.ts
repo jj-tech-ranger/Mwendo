@@ -20,6 +20,8 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { UserProfile, UserRole, UserClaims } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
+import { useLanguageStore } from '../store/useLanguageStore';
+import { useThemeStore } from '../store/useThemeStore';
 import { analyticsService } from './analyticsService';
 
 export interface MfaAuthError extends Error {
@@ -33,13 +35,13 @@ export const CURRENT_PRIVACY_POLICY_VERSION = '1.0.0';
 export const authService = {
   // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
   initAuthListener() {
-    if (typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
+    if (import.meta.env.DEV && typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
       useAuthStore.getState().setLoading(false);
       return () => {};
     }
     useAuthStore.getState().setLoading(true);
     return onAuthStateChanged(auth, async (firebaseUser) => {
-      if (typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
+      if (import.meta.env.DEV && typeof window !== 'undefined' && (window as unknown as { __TEST_AUTH_OVERRIDE__?: boolean }).__TEST_AUTH_OVERRIDE__) {
         useAuthStore.getState().setLoading(false);
         return;
       }
@@ -109,6 +111,19 @@ export const authService = {
 
     if (snap.exists()) {
       const data = snap.data();
+
+      // UX-001: Reconcile Firestore language & theme preferences (Firestore wins for signed-in user)
+      if (data.language && (data.language === 'en' || data.language === 'sw')) {
+        if (useLanguageStore.getState().language !== data.language) {
+          useLanguageStore.getState().setLanguage(data.language, false);
+        }
+      }
+      if (data.theme && (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system')) {
+        if (useThemeStore.getState().mode !== data.theme) {
+          useThemeStore.getState().setMode(data.theme, false);
+        }
+      }
+
       return {
         id: firebaseUser.uid,
         uid: firebaseUser.uid,
@@ -138,6 +153,8 @@ export const authService = {
         isActive: data.isActive !== false && claimedIsSuspended !== true,
         isMfaEnrolled: Boolean(data.isMfaEnrolled),
         isMfaVerified: Boolean(data.isMfaVerified),
+        language: data.language,
+        theme: data.theme,
         createdAt: data.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         isAnonymous: firebaseUser.isAnonymous,

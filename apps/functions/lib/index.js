@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.sendSOS = exports.syncPublicPins = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
+exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
 if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
@@ -20,6 +20,8 @@ var syncPublicPins_1 = require("./pins/syncPublicPins");
 Object.defineProperty(exports, "syncPublicPins", { enumerable: true, get: function () { return syncPublicPins_1.syncPublicPins; } });
 var sendSOS_1 = require("./alerts/sendSOS");
 Object.defineProperty(exports, "sendSOS", { enumerable: true, get: function () { return sendSOS_1.sendSOS; } });
+var reportBlackSpot_1 = require("./reports/reportBlackSpot");
+Object.defineProperty(exports, "reportBlackSpot", { enumerable: true, get: function () { return reportBlackSpot_1.reportBlackSpot; } });
 var dailyPurge_1 = require("./scheduled/dailyPurge");
 Object.defineProperty(exports, "dailyPurge", { enumerable: true, get: function () { return dailyPurge_1.dailyPurge; } });
 var weeklyReport_1 = require("./scheduled/weeklyReport");

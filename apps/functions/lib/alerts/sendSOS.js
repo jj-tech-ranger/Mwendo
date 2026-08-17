@@ -6,6 +6,7 @@ exports.processSendSosLogic = processSendSosLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const messaging_1 = require("firebase-admin/messaging");
+const rateLimit_1 = require("../lib/rateLimit");
 /**
  * Default SMS Dispatcher (Twilio API integration with fallback simulator)
  */
@@ -119,6 +120,10 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
     const timestamp = payload.timestamp || new Date().toISOString();
     const location = payload.location || { lat: -1.286389, lng: 36.817223 };
     const speedKmH = payload.speedKmH || 0;
+    // 0. SEC-005: Enforce per-user rate limit (Max 3 SOS triggers per hour)
+    if (typeof db.runTransaction === 'function' && userId && userId !== 'anonymous') {
+        await (0, rateLimit_1.enforceRateLimit)(db, userId, 'sos');
+    }
     // 1. Fetch user's registered profile and emergency contacts
     let userDisplayName = 'Passenger';
     let userPhone = '';
@@ -345,6 +350,9 @@ exports.sendSOS = (0, https_1.onCall)(async (request) => {
         return await processSendSosLogic(db, messagingProvider, smsProvider, payload);
     }
     catch (err) {
+        if (err instanceof https_1.HttpsError) {
+            throw err;
+        }
         console.error('[sendSOS] Execution failed:', err);
         throw new https_1.HttpsError('internal', err?.message || 'Emergency SOS dispatch failed.');
     }

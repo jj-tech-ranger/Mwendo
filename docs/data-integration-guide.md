@@ -232,11 +232,22 @@ This document serves as the comprehensive single source of truth for data integr
 
 | Function Name | Trigger | Idempotency Ledger | Retry / DLQ | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
+| `suspendUser` | Callable (Admin) | Audit Log | Direct retry | Suspends user profile, revokes tokens, sets custom claims |
+| `reactivateUser` | Callable (Admin) | Audit Log | Direct retry | Restores user active status and updates claims |
 | `computeVehicleRisk` | Callable / Event | `processedEvents/{eventId}` | 5 attempts / `dlq_notifications` | Applies 30-day half-life decay risk score updates to vehicles |
 | `onVehicleClaimed` | Callable | N/A (Batch) | ≤450 ops batching | Two-phase paginated backfill of provisional vehicles to SACCOs |
 | `syncPublicPins` | Scheduled / Callable | N/A (Overwrite) | Direct retry | Syncs verified black spots to `/public_pins` collection |
 | `updateDailyAnalytics` | Scheduled / Callable | N/A (Merge) | Direct retry | CQRS daily aggregation of platform statistics |
 | `rebuildSaccoAnalytics` | Callable / Event | N/A (Merge) | Direct retry | Recalculates SACCO safety score and fleet risk |
+
+### 3.1 App Check Enforcement Policy (SEC-002)
+
+All callable 2nd-gen Cloud Functions enforce Firebase App Check by default (`APP_CHECK_ENFORCED = process.env.APP_CHECK_ENFORCED !== 'false'`). 
+
+* **Default-Enforced Policy:** Enforcement is decoupled from runtime-inferred `NODE_ENV`. In production and staging deployments, all incoming requests without a valid App Check token are rejected with `401 Unauthorized` / `UNAUTHENTICATED (AppCheck missing)`.
+* **CI & Production Environments:** App Check tokens are required. App Check debug tokens must be registered in the Firebase Console under **App Check > Apps > Manage debug tokens** for automated environments.
+* **Local Emulator & Test Bypass:** For local emulator runs or testing where debug tokens are unavailable, set `APP_CHECK_ENFORCED=false` in `.env.local` (or `apps/functions/.env.local`). Never deploy with `APP_CHECK_ENFORCED=false` in production.
+
 
 ---
 

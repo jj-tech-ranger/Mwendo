@@ -250,24 +250,100 @@ function evaluateFirestoreRules(
     if (action === 'create' || action === 'update' || action === 'delete') return false;
   }
 
+  if (collection === 'saccoCounters') {
+    if (action === 'read') {
+      if (isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId) return true;
+      return false;
+    }
+    if (action === 'create') {
+      if (isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && data?.saccoId === auth.token?.saccoId) {
+        const allowedKeys = ['count', 'saccoId', 'metric', 'shardId', 'updatedAt'];
+        const updatedKeys = Object.keys(data || {});
+        return updatedKeys.every((k) => allowedKeys.includes(k));
+      }
+      return false;
+    }
+    if (action === 'update') {
+      if (isAdmin || isAuthority) return true;
+      if (
+        activeRole === 'sacco_manager' &&
+        data?.saccoId === auth.token?.saccoId &&
+        (!existingData || existingData.saccoId === auth.token?.saccoId)
+      ) {
+        const allowedKeys = ['count', 'saccoId', 'metric', 'shardId', 'updatedAt'];
+        const updatedKeys = Object.keys(data || {});
+        return updatedKeys.every((k) => allowedKeys.includes(k));
+      }
+      return false;
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
   return false;
 }
 
 function evaluateStorageRules(
-  action: 'read' | 'write',
+  action: 'read' | 'write' | 'create' | 'update' | 'delete',
   path: string,
   auth: { uid: string; token: Record<string, any> } | null
 ): boolean {
+  if (action === 'read' && path.startsWith('black_spots/')) {
+    return true;
+  }
+
   if (!auth) return false;
   if (auth.token?.isSuspended === true) return false;
 
   const parts = path.split('/').filter(Boolean);
   const root = parts[0];
+  const activeRole = auth.token?.activeRole;
+
+  if (root === 'black_spots') {
+    const spotId = parts[1];
+    if (action === 'read') return true;
+    if (action === 'write' || action === 'create') {
+      if (activeRole === 'admin' || activeRole === 'authority') return true;
+      const spotDoc = offlineStore[`black_spots/${spotId}`];
+      if (spotDoc && (spotDoc.reportedByUid === auth.uid || spotDoc.reportedByUserId === auth.uid)) {
+        return true;
+      }
+      return false;
+    }
+    if (action === 'update' || action === 'delete') {
+      return activeRole === 'admin' || activeRole === 'authority';
+    }
+    return false;
+  }
+
   if (root === 'evidence') {
     const saccoId = parts[1];
-    const activeRole = auth.token?.activeRole;
-    if (activeRole === 'admin' || activeRole === 'authority') return true;
-    if (activeRole === 'sacco_manager' && auth.token?.saccoId === saccoId) return true;
+    const complaintId = parts[2];
+
+    if (action === 'read') {
+      if (activeRole === 'admin' || activeRole === 'authority') return true;
+      if (activeRole === 'sacco_manager' && auth.token?.saccoId === saccoId) return true;
+      const complaintDoc = offlineStore[`complaints/${complaintId}`];
+      if (complaintDoc && (complaintDoc.reportedByUid === auth.uid || complaintDoc.reportedByUserId === auth.uid)) {
+        return true;
+      }
+      return false;
+    }
+
+    if (action === 'write' || action === 'create') {
+      if (activeRole === 'admin' || activeRole === 'authority') return true;
+      const complaintDoc = offlineStore[`complaints/${complaintId}`];
+      if (complaintDoc && (complaintDoc.reportedByUid === auth.uid || complaintDoc.reportedByUserId === auth.uid)) {
+        return true;
+      }
+      return false;
+    }
+
+    if (action === 'update' || action === 'delete') {
+      return activeRole === 'admin' || activeRole === 'authority';
+    }
+
     return false;
   }
   return false;
@@ -321,6 +397,11 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
         put: async () => {
           const allowed = evaluateStorageRules('write', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
+          return true;
+        },
+        delete: async () => {
+          const allowed = evaluateStorageRules('delete', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked delete');
           return true;
         },
       }),
@@ -917,19 +998,77 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     await assertSucceeds(admin.firestore().collection('processedEvents').doc('event_123').get());
   });
 
-  it('SEC-006: user with stale saccoId claim but non-manager activeRole cannot access evidence storage', async () => {
+  it('SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction', async () => {
     // User with a leftover saccoId claim but activeRole: 'passenger'
     const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
-    // Legitimate SACCO manager
+    // Legitimate SACCO manager for sacco_A
     const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    // Complainant who filed complaint_1 for sacco_A
+    const complainant = getContext('complainant_1', { activeRole: 'passenger' });
+    // Another unrelated passenger
+    const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
+    // Authority
+    const authority = getContext('auth_user_1', { activeRole: 'authority' });
 
-    // 1. Stale claim user access denied
+    // Seed the complaint document in firestore
+    offlineStore['complaints/complaint_1'] = {
+      id: 'complaint_1',
+      saccoId: 'sacco_A',
+      reportedByUid: 'complainant_1',
+      reportedByUserId: 'complainant_1',
+      status: 'submitted',
+    };
+
+    // 1. Stale claim user access denied for read and write
     await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
     await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
 
-    // 2. Legitimate manager access succeeds
+    // 2. Unrelated passenger access denied for read and write
+    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+
+    // 3. Complainant can upload evidence and read their uploaded evidence
+    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+
+    // 4. Legitimate manager can read evidence for their SACCO, but CANNOT delete or update it
     await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
-    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+    await assertFails((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
+
+    // 5. Authority and Admin have full read and delete access
+    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
+  });
+
+  it('SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites', async () => {
+    const reporter = getContext('reporter_spot_1', { activeRole: 'passenger' });
+    const imposter = getContext('imposter_user_2', { activeRole: 'passenger' });
+    const authority = getContext('auth_user_2', { activeRole: 'authority' });
+
+    // Seed the black_spots document in firestore
+    offlineStore['black_spots/spot_100'] = {
+      id: 'spot_100',
+      title: 'Pothole Cluster',
+      reportedByUid: 'reporter_spot_1',
+      reportedByUserId: 'reporter_spot_1',
+      severity: 'high',
+      status: 'pending',
+    };
+
+    // 1. Any user (including imposter) can read black spot photos (public read)
+    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').get() as Promise<any>);
+
+    // 2. Imposter attempting to upload evidence to spot_100 -> FAILS (ownership mismatch)
+    await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
+
+    // 3. Reporter uploading evidence to spot_100 -> SUCCEEDS (reportedByUid matches auth.uid)
+    await assertSucceeds((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
+
+    // 4. Reporter attempting to delete or overwrite -> FAILS (update/delete restricted to authority/admin)
+    await assertFails((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').delete() as Promise<any>);
+
+    // 5. Authority can delete evidence
+    await assertSucceeds((authority as any).storage().ref('black_spots/spot_100/photo.jpg').delete() as Promise<any>);
   });
 
   it('BE-001 / SEC-004: suspended user with isSuspended claim is denied Firestore writes', async () => {
@@ -1154,6 +1293,111 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
         latitude: -1.286389,
         longitude: 36.817223,
         timestamp: validTime,
+      })
+    );
+  });
+
+  it('SEC-003: Sharded saccoCounters write isolation & tenant restrictions', async () => {
+    const saccoAManager = getContext('sacco_mgr_A', {
+      activeRole: 'sacco_manager',
+      saccoId: 'sacco_A',
+    });
+    const saccoBManager = getContext('sacco_mgr_B', {
+      activeRole: 'sacco_manager',
+      saccoId: 'sacco_B',
+    });
+    const passenger = getContext('passenger_user_1', {
+      activeRole: 'passenger',
+    });
+    const driver = getContext('driver_user_1', {
+      activeRole: 'driver',
+    });
+    const admin = getContext('admin_user_1', {
+      activeRole: 'admin',
+    });
+    const unauth = getContext(undefined);
+
+    // 1. SACCO A manager writing SACCO A counter -> SUCCEEDS
+    await assertSucceeds(
+      saccoAManager.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').set({
+        count: 5,
+        saccoId: 'sacco_A',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    // 2. SACCO A manager reading SACCO A counter -> SUCCEEDS
+    await assertSucceeds(
+      saccoAManager.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').get()
+    );
+
+    // 3. SACCO A manager attempting to write SACCO B counter -> FAILS (Cross-tenant forbidden)
+    await assertFails(
+      saccoAManager.firestore().collection('saccoCounters').doc('sacco_B_trips_shard_0').set({
+        count: 10,
+        saccoId: 'sacco_B',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    // 4. SACCO B manager attempting to read SACCO A counter -> FAILS
+    await assertFails(
+      saccoBManager.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').get()
+    );
+
+    // 5. Passenger attempting any write to saccoCounters -> FAILS (No isSignedIn catch-all)
+    await assertFails(
+      passenger.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').set({
+        count: 999,
+        saccoId: 'sacco_A',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    // 6. Passenger attempting any read to saccoCounters -> FAILS
+    await assertFails(
+      passenger.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').get()
+    );
+
+    // 7. Driver attempting any write to saccoCounters -> FAILS
+    await assertFails(
+      driver.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').set({
+        count: 1,
+        saccoId: 'sacco_A',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+
+    // 8. Unauthenticated user attempting any write or read -> FAILS
+    await assertFails(
+      unauth.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').set({
+        count: 1,
+        saccoId: 'sacco_A',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+    await assertFails(
+      unauth.firestore().collection('saccoCounters').doc('sacco_A_trips_shard_0').get()
+    );
+
+    // 9. Admin writing counters -> SUCCEEDS
+    await assertSucceeds(
+      admin.firestore().collection('saccoCounters').doc('sacco_B_trips_shard_0').set({
+        count: 20,
+        saccoId: 'sacco_B',
+        metric: 'trips',
+        shardId: 0,
+        updatedAt: new Date().toISOString(),
       })
     );
   });
