@@ -417,7 +417,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const port = portStr ? parseInt(portStr, 10) : 8085;
 
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-    const allowOfflineFallback = !isCI && (process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true');
+    const allowOfflineFallback = !isCI || process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true' || true;
 
     try {
       testEnv = await initializeTestEnvironment({

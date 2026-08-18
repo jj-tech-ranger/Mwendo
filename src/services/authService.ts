@@ -107,9 +107,14 @@ export const authService = {
     const claimedIsSuspended = tokenClaims?.isSuspended as boolean | undefined;
 
     const userRef = doc(db, 'users', firebaseUser.uid);
-    const snap = await getDoc(userRef);
+    let snap;
+    try {
+      snap = await getDoc(userRef);
+    } catch (e) {
+      console.warn('[authService] Could not read user document from Firestore (offline or unavailable):', e);
+    }
 
-    if (snap.exists()) {
+    if (snap && snap.exists()) {
       const data = snap.data();
 
       // UX-001: Reconcile Firestore language & theme preferences (Firestore wins for signed-in user)
@@ -204,11 +209,15 @@ export const authService = {
       trustScore: firebaseUser.isAnonymous ? 30 : 50,
     };
 
-    await setDoc(userRef, {
-      ...newProfile,
-      activeRole: defaultRole,
-      roles: [defaultRole],
-    });
+    try {
+      await setDoc(userRef, {
+        ...newProfile,
+        activeRole: defaultRole,
+        roles: [defaultRole],
+      });
+    } catch (e) {
+      console.warn('[authService] Could not persist new user profile to Firestore (offline mode active):', e);
+    }
 
     return newProfile;
   },

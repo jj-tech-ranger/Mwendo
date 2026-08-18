@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,6 +26,7 @@ const registerSchema = z.object({
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export const RegisterScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const currentUser = useAuthStore((s) => s.user);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -88,11 +90,11 @@ export const RegisterScreen: React.FC = () => {
       <div className="w-full max-w-sm space-y-lg">
         <div className="flex flex-col items-center text-center space-y-md">
           <PrimaryLogo className="h-12 w-auto mb-2" />
-          <h1 className="font-headline-lg text-primary">Create Your Account</h1>
+          <h1 className="font-headline-lg text-primary">{t('auth.register.title')}</h1>
           <p className="font-body-md text-on-surface-variant">
             {currentUser?.isAnonymous
-              ? 'Upgrade your guest account to save your trips & safety score permanently.'
-              : 'Join thousands of Kenyan commuters travelling safer every day.'}
+              ? t('auth.register.guestUpgradeSubtitle')
+              : t('auth.register.subtitle')}
           </p>
         </div>
 
@@ -104,17 +106,17 @@ export const RegisterScreen: React.FC = () => {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-md">
           <Input
-            label="Display / Full Name"
-            placeholder="Passenger #104 or Juma Mwangi"
+            label={t('auth.register.fullNameLabel')}
+            placeholder={t('auth.register.fullNamePlaceholder')}
             icon="person"
             error={errors.fullName?.message}
             {...register('fullName')}
           />
 
           <Input
-            label="Email Address"
+            label={t('auth.register.emailLabel')}
             type="email"
-            placeholder="juma@example.com"
+            placeholder={t('auth.register.emailPlaceholder')}
             icon="mail"
             error={errors.email?.message}
             {...register('email')}
@@ -122,9 +124,9 @@ export const RegisterScreen: React.FC = () => {
 
           <div className="space-y-1">
             <Input
-              label="Password"
+              label={t('auth.register.passwordLabel')}
               type="password"
-              placeholder="••••••••"
+              placeholder={t('auth.register.passwordPlaceholder')}
               icon="lock"
               error={errors.password?.message}
               {...register('password')}
@@ -138,7 +140,7 @@ export const RegisterScreen: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-between text-[11px] font-label-bold text-on-surface-variant">
-                  <span>Password strength</span>
+                  <span>{t('auth.register.passwordStrength')}</span>
                   <span className="capitalize">{strength.label}</span>
                 </div>
               </div>
@@ -155,7 +157,7 @@ export const RegisterScreen: React.FC = () => {
             <label htmlFor="terms" className="text-xs text-on-surface-variant leading-tight">
               I agree to the Mwendo Salama{' '}
               <a href="/passenger/profile" className="text-primary font-label-bold underline">
-                Terms of Service
+                {t('auth.register.termsLink')}
               </a>{' '}
               and Privacy Policy.
             </label>
@@ -172,7 +174,7 @@ export const RegisterScreen: React.FC = () => {
               {...register('ageConfirmed')}
             />
             <label htmlFor="ageConfirmed" className="text-xs text-on-surface-variant leading-tight">
-              I confirm I am 18 years or older, or a parent/guardian has provided consent on behalf of a minor completing this registration.
+              {t('auth.register.ageConfirmation')}
             </label>
           </div>
           {errors.ageConfirmed && (
@@ -180,7 +182,7 @@ export const RegisterScreen: React.FC = () => {
           )}
 
           <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-            {currentUser?.isAnonymous ? 'Save & Register Account' : 'Create Account'}
+            {currentUser?.isAnonymous ? t('auth.register.upgradeButton') : t('auth.register.registerButton')}
           </Button>
         </form>
 
@@ -190,7 +192,7 @@ export const RegisterScreen: React.FC = () => {
           </div>
           <div className="relative flex justify-center text-xs font-label-mono">
             <span className="bg-surface px-2 text-on-surface-variant uppercase">
-              or continue with
+              {t('auth.login.orContinueWith')}
             </span>
           </div>
         </div>
@@ -203,14 +205,14 @@ export const RegisterScreen: React.FC = () => {
           isLoading={isGoogleLoading}
         >
           <span className="material-symbols-outlined text-xl text-primary">account_circle</span>
-          Sign up with Google
+          {t('auth.register.googleSignUp')}
         </Button>
 
         <div className="text-center pt-md border-t border-outline-variant/30">
           <p className="font-body-sm text-on-surface-variant">
-            Already have an account?{' '}
+            {t('auth.register.hasAccount')}{' '}
             <Link to="/auth/login" className="font-label-bold text-primary hover:underline">
-              Log In
+              {t('auth.register.signIn')}
             </Link>
           </p>
         </div>

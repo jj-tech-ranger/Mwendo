@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 
 export const OtpVerificationScreen: React.FC = () => {
+  const { t } = useTranslation();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const navigate = useNavigate();
 
@@ -29,9 +31,9 @@ export const OtpVerificationScreen: React.FC = () => {
       <div className="w-full max-w-sm space-y-lg bg-surface-container-lowest p-lg sm:p-xl rounded-2xl border border-outline-variant/30 shadow-sm">
         <PrimaryLogo className="h-10 w-auto mx-auto mb-2" />
         <span className="material-symbols-outlined text-5xl text-secondary">phonelink_lock</span>
-        <h1 className="font-headline-lg text-on-surface">Enter OTP Code</h1>
+        <h1 className="font-headline-lg text-on-surface">{t('auth.otp.title')}</h1>
         <p className="font-body-md text-on-surface-variant">
-          Enter the 6-digit verification code sent to your phone number.
+          {t('auth.otp.codeLabel')}
         </p>
 
         <div className="flex justify-center gap-2 py-2">
@@ -54,7 +56,7 @@ export const OtpVerificationScreen: React.FC = () => {
           onClick={handleVerify}
           disabled={otp.some((d) => !d)}
         >
-          Verify Code
+          {t('auth.otp.verifyButton')}
         </Button>
       </div>
     </div>

@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 
 export const EmailVerificationScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -11,23 +13,23 @@ export const EmailVerificationScreen: React.FC = () => {
       <div className="w-full max-w-sm space-y-lg bg-surface-container-lowest p-lg sm:p-xl rounded-2xl border border-outline-variant/30 shadow-sm">
         <PrimaryLogo className="h-10 w-auto mx-auto mb-2" />
         <span className="material-symbols-outlined text-5xl text-primary">mark_email_unread</span>
-        <h1 className="font-headline-lg text-on-surface">Verify Your Email</h1>
+        <h1 className="font-headline-lg text-on-surface">{t('auth.emailVerification.title')}</h1>
         <p className="font-body-md text-on-surface-variant leading-relaxed">
-          We’ve sent a verification link to your email address. Please click the link in the email to activate your account.
+          {t('auth.emailVerification.checkInbox')}
         </p>
 
         <div className="space-y-md pt-2">
           <Button variant="primary" className="w-full" onClick={() => navigate('/auth/login')}>
-            Proceed to Login
+            {t('auth.forgotPassword.backToLogin')}
           </Button>
           <Button variant="ghost" className="w-full">
-            Resend Email
+            {t('auth.emailVerification.resendEmail')}
           </Button>
         </div>
 
         <div className="pt-2">
           <Link to="/auth/login" className="font-label-bold text-xs text-outline hover:underline">
-            Back to Sign In
+            {t('auth.emailVerification.backToLogin')}
           </Link>
         </div>
       </div>

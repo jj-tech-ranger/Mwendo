@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { HorizontalLogo, ShieldSpeedometerMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
+import { LanguageToggle } from '../../components/common/LanguageToggle';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { useThemeStore } from '../../store/useThemeStore';
 
@@ -34,36 +35,30 @@ export const WelcomeScreen: React.FC = () => {
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-on-surface-variant uppercase tracking-wider">
             <button onClick={() => scrollToSection('how-it-works')} className="hover:text-primary transition-colors">
-              How It Works
+              {t('welcome.nav.howItWorks')}
             </button>
             <button onClick={() => scrollToSection('safety')} className="hover:text-primary transition-colors">
-              Passenger Safety
+              {t('welcome.nav.passengerSafety')}
             </button>
             <button onClick={() => scrollToSection('saccos')} className="hover:text-primary transition-colors">
-              For SACCOs
+              {t('welcome.nav.forSaccos')}
             </button>
             <button onClick={() => scrollToSection('about')} className="hover:text-primary transition-colors">
-              About
+              {t('welcome.nav.about')}
             </button>
           </nav>
 
           {/* Desktop Right Controls */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Language Toggle */}
-            <button
-              onClick={toggleLanguage}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-outline-variant/30 text-xs font-label-mono text-on-surface-variant hover:bg-surface-container-high transition-colors"
-              title="Toggle Language"
-            >
-              <span className="material-symbols-outlined text-base">language</span>
-              <span className="font-bold uppercase">{language}</span>
-            </button>
+            {/* Language Segmented Toggle */}
+            <LanguageToggle />
 
             {/* Theme Toggle */}
             <button
               onClick={toggleDarkMode}
-              className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center"
+              className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center cursor-pointer"
               title="Toggle Theme"
+              aria-label="Toggle theme"
             >
               <span className="material-symbols-outlined text-base">
                 {mode === 'dark' ? 'light_mode' : 'dark_mode'}
@@ -72,27 +67,23 @@ export const WelcomeScreen: React.FC = () => {
 
             {/* Log In */}
             <Button variant="outline" size="sm" onClick={() => navigate('/auth/login')}>
-              Log In
+              {t('welcome.nav.logIn')}
             </Button>
 
             {/* Get Started */}
             <Button variant="primary" size="sm" onClick={() => navigate('/location-permission')}>
-              Get Started
+              {t('welcome.nav.getStarted')}
             </Button>
           </div>
 
           {/* Mobile Right Controls & Hamburger */}
           <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={toggleLanguage}
-              className="p-1.5 rounded-lg border border-outline-variant/30 text-xs font-label-mono text-on-surface-variant"
-            >
-              <span className="font-bold uppercase">{language}</span>
-            </button>
+            <LanguageToggle />
 
             <button
               onClick={toggleDarkMode}
-              className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant"
+              className="p-1.5 rounded-lg border border-outline-variant/30 text-on-surface-variant cursor-pointer"
+              aria-label="Toggle theme"
             >
               <span className="material-symbols-outlined text-base">
                 {mode === 'dark' ? 'light_mode' : 'dark_mode'}
@@ -119,34 +110,34 @@ export const WelcomeScreen: React.FC = () => {
                 onClick={() => scrollToSection('how-it-works')}
                 className="text-left py-2 px-3 rounded-lg hover:bg-surface-container"
               >
-                How It Works
+                {t('welcome.nav.howItWorks')}
               </button>
               <button
                 onClick={() => scrollToSection('safety')}
                 className="text-left py-2 px-3 rounded-lg hover:bg-surface-container"
               >
-                Passenger Safety
+                {t('welcome.nav.passengerSafety')}
               </button>
               <button
                 onClick={() => scrollToSection('saccos')}
                 className="text-left py-2 px-3 rounded-lg hover:bg-surface-container"
               >
-                For SACCOs
+                {t('welcome.nav.forSaccos')}
               </button>
               <button
                 onClick={() => scrollToSection('about')}
                 className="text-left py-2 px-3 rounded-lg hover:bg-surface-container"
               >
-                About
+                {t('welcome.nav.about')}
               </button>
             </nav>
 
             <div className="pt-3 border-t border-outline-variant/20 flex flex-col gap-2">
               <Button variant="outline" className="w-full justify-center" onClick={() => navigate('/auth/login')}>
-                Log In
+                {t('welcome.nav.logIn')}
               </Button>
               <Button variant="primary" className="w-full justify-center" onClick={() => navigate('/location-permission')}>
-                Start a Safe Trip
+                {t('welcome.nav.startSafeTrip')}
               </Button>
             </div>
           </div>
@@ -161,15 +152,15 @@ export const WelcomeScreen: React.FC = () => {
             <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-mono text-xs font-bold uppercase tracking-wider">
                 <span className="material-symbols-outlined text-sm">shield</span>
-                <span>SAFER JOURNEYS. SMARTER TRANSPORT.</span>
+                <span>{t('welcome.hero.badge')}</span>
               </div>
 
               <h1 className="font-display font-extrabold text-3xl sm:text-4xl lg:text-5xl text-on-surface tracking-tight leading-[1.15]">
-                Travel safer with <span className="text-primary">Mwendo Salama</span>.
+                {t('welcome.hero.title')} <span className="text-primary">Mwendo Salama</span>.
               </h1>
 
               <p className="text-on-surface-variant text-base sm:text-lg max-w-2xl leading-relaxed font-body">
-                Empowering Kenyan commuters with real-time speed awareness and road hazard alerts, while giving transport operators transparent fleet safety intelligence.
+                {t('welcome.hero.description')}
               </p>
 
               {/* CTAs */}
@@ -180,7 +171,7 @@ export const WelcomeScreen: React.FC = () => {
                   onClick={() => navigate('/location-permission')}
                   className="shadow-md hover:shadow-lg transition-all"
                 >
-                  <span>Start a Safe Trip</span>
+                  <span>{t('welcome.hero.startSafeTrip')}</span>
                   <span className="material-symbols-outlined text-lg ml-1">arrow_forward</span>
                 </Button>
 
@@ -191,7 +182,7 @@ export const WelcomeScreen: React.FC = () => {
                   className="border-outline-variant/50"
                 >
                   <span className="material-symbols-outlined text-lg mr-1 text-primary">map</span>
-                  <span>Explore Safety Map</span>
+                  <span>{t('welcome.hero.exploreSafetyMap')}</span>
                 </Button>
               </div>
 
@@ -199,15 +190,15 @@ export const WelcomeScreen: React.FC = () => {
               <div className="pt-4 border-t border-outline-variant/20 flex flex-wrap items-center gap-y-2 gap-x-6 text-xs font-medium text-on-surface-variant font-label-mono">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                  <span>Real-time trip safety</span>
+                  <span>{t('welcome.hero.trustTripSafety')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                  <span>Speed limit awareness</span>
+                  <span>{t('welcome.hero.trustSpeedAwareness')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-sm">check_circle</span>
-                  <span>Hazard & black spot reporting</span>
+                  <span>{t('welcome.hero.trustHazardReporting')}</span>
                 </div>
               </div>
             </div>
@@ -223,21 +214,21 @@ export const WelcomeScreen: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <ShieldSpeedometerMark className="h-7 w-7" />
                     <div>
-                      <span className="font-bold text-xs text-on-surface block">A104 Waiyaki Way Corridor</span>
-                      <span className="text-[10px] text-on-surface-variant font-mono">PSV Route Safety Monitoring</span>
+                      <span className="font-bold text-xs text-on-surface block">{t('welcome.hero.visualCorridor')}</span>
+                      <span className="text-[10px] text-on-surface-variant font-mono">{t('welcome.hero.visualMonitoring')}</span>
                     </div>
                   </div>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-mono text-[11px] font-bold">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Active Trip
+                    {t('welcome.hero.visualActiveTrip')}
                   </span>
                 </div>
 
                 {/* Speed Meter Simulation */}
                 <div className="bg-surface-container rounded-2xl p-4 border border-outline-variant/20 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-on-surface-variant">Live Speed Awareness</span>
-                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">Within Limit</span>
+                    <span className="text-on-surface-variant">{t('welcome.hero.visualLiveSpeed')}</span>
+                    <span className="text-emerald-700 dark:text-emerald-400 font-bold">{t('welcome.hero.visualWithinLimit')}</span>
                   </div>
 
                   <div className="flex items-baseline justify-between">
@@ -246,7 +237,7 @@ export const WelcomeScreen: React.FC = () => {
                       <span className="font-mono text-xs text-on-surface-variant">km/h</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-on-surface-variant block uppercase font-mono">Corridor Speed Limit</span>
+                      <span className="text-[10px] text-on-surface-variant block uppercase font-mono">{t('welcome.hero.visualSpeedLimitLabel')}</span>
                       <span className="font-mono font-bold text-xs text-on-surface">80 km/h</span>
                     </div>
                   </div>
@@ -264,18 +255,18 @@ export const WelcomeScreen: React.FC = () => {
                   </span>
                   <div className="space-y-0.5 text-xs">
                     <span className="font-bold text-amber-900 dark:text-amber-200 block">
-                      Approaching Unmarked Speed Bump (500m)
+                      {t('welcome.hero.visualWarningTitle')}
                     </span>
                     <span className="text-amber-800/80 dark:text-amber-300/80 block text-[11px]">
-                      Community-reported hazard. Slow down for safe passage.
+                      {t('welcome.hero.visualWarningDesc')}
                     </span>
                   </div>
                 </div>
 
                 {/* Commuter Safety Badge */}
                 <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant pt-1">
-                  <span>Vehicle: Super Metro PSV</span>
-                  <span className="font-bold text-primary">Mwendo Salama Protected</span>
+                  <span>{t('welcome.hero.visualVehicle')}</span>
+                  <span className="font-bold text-primary">{t('welcome.hero.visualProtected')}</span>
                 </div>
               </div>
             </div>
@@ -288,13 +279,13 @@ export const WelcomeScreen: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="font-mono text-xs font-bold text-primary uppercase tracking-widest block">
-              SIMPLE THREE-STEP SAFETY
+              {t('welcome.howItWorks.tag')}
             </span>
             <h2 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-surface tracking-tight">
-              How Mwendo Salama Works
+              {t('welcome.howItWorks.title')}
             </h2>
             <p className="text-on-surface-variant text-sm sm:text-base font-body leading-relaxed">
-              Designed specifically for everyday public transport commuters in Kenya to keep journeys transparent and safe.
+              {t('welcome.howItWorks.subtitle')}
             </p>
           </div>
 
@@ -304,9 +295,9 @@ export const WelcomeScreen: React.FC = () => {
               <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-mono font-bold text-lg">
                 01
               </div>
-              <h3 className="font-bold text-lg text-on-surface">Start Your Journey</h3>
+              <h3 className="font-bold text-lg text-on-surface">{t('welcome.howItWorks.step1Title')}</h3>
               <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                Select or scan your PSV details or let location awareness guide your ride. Your trip safety monitoring starts instantly.
+                {t('welcome.howItWorks.step1Desc')}
               </p>
             </div>
 
@@ -315,9 +306,9 @@ export const WelcomeScreen: React.FC = () => {
               <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-mono font-bold text-lg">
                 02
               </div>
-              <h3 className="font-bold text-lg text-on-surface">Monitor Your Trip</h3>
+              <h3 className="font-bold text-lg text-on-surface">{t('welcome.howItWorks.step2Title')}</h3>
               <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                Receive gentle real-time speed limit awareness, corridor alerts, and approach notifications for known road black spots.
+                {t('welcome.howItWorks.step2Desc')}
               </p>
             </div>
 
@@ -326,9 +317,9 @@ export const WelcomeScreen: React.FC = () => {
               <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-mono font-bold text-lg">
                 03
               </div>
-              <h3 className="font-bold text-lg text-on-surface">Travel With Awareness</h3>
+              <h3 className="font-bold text-lg text-on-surface">{t('welcome.howItWorks.step3Title')}</h3>
               <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-                Submit anonymous road hazard feedback and contribute to community safety intelligence across Kenyan transit corridors.
+                {t('welcome.howItWorks.step3Desc')}
               </p>
             </div>
           </div>
@@ -339,13 +330,13 @@ export const WelcomeScreen: React.FC = () => {
       <section id="safety" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <span className="font-mono text-xs font-bold text-primary uppercase tracking-widest block">
-            PASSENGER SAFETY FEATURES
+            {t('welcome.safety.tag')}
           </span>
           <h2 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-surface tracking-tight">
-            Built for Every Commuter in Kenya
+            {t('welcome.safety.title')}
           </h2>
           <p className="text-on-surface-variant text-sm sm:text-base font-body leading-relaxed">
-            Essential tools to help you travel with confidence, awareness, and peace of mind.
+            {t('welcome.safety.subtitle')}
           </p>
         </div>
 
@@ -355,9 +346,9 @@ export const WelcomeScreen: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-2xl">speed</span>
             </div>
-            <h3 className="font-bold text-xl text-on-surface">Real-Time Speedometer & Limit Awareness</h3>
+            <h3 className="font-bold text-xl text-on-surface">{t('welcome.safety.f1Title')}</h3>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              Clear visual speed gauge indicating current vehicle speed against official NTSA route speed limits during your trip.
+              {t('welcome.safety.f1Desc')}
             </p>
           </div>
 
@@ -366,9 +357,9 @@ export const WelcomeScreen: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-2xl">map</span>
             </div>
-            <h3 className="font-bold text-xl text-on-surface">Verified Road Hazard & Black Spot Map</h3>
+            <h3 className="font-bold text-xl text-on-surface">{t('welcome.safety.f2Title')}</h3>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              Community-verified map highlighting dangerous curves, pothole clusters, unlit road sections, and frequent accident spots.
+              {t('welcome.safety.f2Desc')}
             </p>
           </div>
 
@@ -377,9 +368,9 @@ export const WelcomeScreen: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-2xl">sos</span>
             </div>
-            <h3 className="font-bold text-xl text-on-surface">Rapid Emergency SOS Assistance</h3>
+            <h3 className="font-bold text-xl text-on-surface">{t('welcome.safety.f3Title')}</h3>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              One-tap direct access to emergency response contacts and location sharing during critical events on the road.
+              {t('welcome.safety.f3Desc')}
             </p>
           </div>
 
@@ -388,9 +379,9 @@ export const WelcomeScreen: React.FC = () => {
             <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
               <span className="material-symbols-outlined text-2xl">rate_review</span>
             </div>
-            <h3 className="font-bold text-xl text-on-surface">Direct SACCO Feedback & Accountability</h3>
+            <h3 className="font-bold text-xl text-on-surface">{t('welcome.safety.f4Title')}</h3>
             <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed">
-              Submit constructive feedback directly to SACCO management to encourage driver compliance and vehicle roadworthiness.
+              {t('welcome.safety.f4Desc')}
             </p>
           </div>
         </div>
@@ -401,38 +392,38 @@ export const WelcomeScreen: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-2xl mx-auto space-y-3">
             <span className="font-mono text-xs font-bold text-primary uppercase tracking-widest block">
-              COMMUNITY-DRIVEN ROAD SAFETY
+              {t('welcome.about.tag')}
             </span>
             <h2 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-surface tracking-tight">
-              Turning Citizen Reports into Safer Corridors
+              {t('welcome.about.title')}
             </h2>
             <p className="text-on-surface-variant text-sm sm:text-base font-body leading-relaxed">
-              Combining passenger vigilance with transport operator insights to reduce speed infractions and protect lives.
+              {t('welcome.about.subtitle')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 space-y-3">
               <span className="material-symbols-outlined text-3xl text-primary">groups</span>
-              <h3 className="font-bold text-base text-on-surface">Crowdsourced Intelligence</h3>
+              <h3 className="font-bold text-base text-on-surface">{t('welcome.about.c1Title')}</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Verified passenger hazard reports create a dynamic safety picture across Nairobi, Kiambu, Nakuru, and national corridors.
+                {t('welcome.about.c1Desc')}
               </p>
             </div>
 
             <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 space-y-3">
               <span className="material-symbols-outlined text-3xl text-primary">assured_workload</span>
-              <h3 className="font-bold text-base text-on-surface">Transparent Oversight</h3>
+              <h3 className="font-bold text-base text-on-surface">{t('welcome.about.c2Title')}</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                NTSA inspectors and county traffic teams gain objective data on high-risk road sections and repeat speed violations.
+                {t('welcome.about.c2Desc')}
               </p>
             </div>
 
             <div className="bg-surface p-6 rounded-2xl border border-outline-variant/30 space-y-3">
               <span className="material-symbols-outlined text-3xl text-primary">directions_bus</span>
-              <h3 className="font-bold text-base text-on-surface">Smarter PSV Operations</h3>
+              <h3 className="font-bold text-base text-on-surface">{t('welcome.about.c3Title')}</h3>
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Helps SACCO officials identify driver risk patterns early, reward safe driving standards, and maintain vehicle roadworthiness.
+                {t('welcome.about.c3Desc')}
               </p>
             </div>
           </div>
@@ -443,59 +434,59 @@ export const WelcomeScreen: React.FC = () => {
       <section id="saccos" className="py-16 sm:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <div className="text-center max-w-2xl mx-auto space-y-3">
           <span className="font-mono text-xs font-bold text-primary uppercase tracking-widest block">
-            FOR SACCO MANAGERS & FLEET OPERATORS
+            {t('welcome.saccos.tag')}
           </span>
           <h2 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-surface tracking-tight">
-            Complete Visibility Over Your Fleet Safety
+            {t('welcome.saccos.title')}
           </h2>
           <p className="text-on-surface-variant text-sm sm:text-base font-body leading-relaxed">
-            Modern tools for transport operators to maintain route compliance, protect vehicle investments, and uphold NTSA safety standards.
+            {t('welcome.saccos.subtitle')}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 space-y-3">
             <span className="material-symbols-outlined text-2xl text-primary">analytics</span>
-            <h3 className="font-bold text-base text-on-surface">Fleet Safety Scorecards</h3>
+            <h3 className="font-bold text-base text-on-surface">{t('welcome.saccos.s1Title')}</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Track driver safety ratings and fleet compliance across assigned routes.
+              {t('welcome.saccos.s1Desc')}
             </p>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 space-y-3">
             <span className="material-symbols-outlined text-2xl text-primary">report_problem</span>
-            <h3 className="font-bold text-base text-on-surface">Overspeed Exception Logs</h3>
+            <h3 className="font-bold text-base text-on-surface">{t('welcome.saccos.s2Title')}</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Review automated overspeed alerts with timestamped GPS location data.
+              {t('welcome.saccos.s2Desc')}
             </p>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 space-y-3">
             <span className="material-symbols-outlined text-2xl text-primary">badge</span>
-            <h3 className="font-bold text-base text-on-surface">Driver & Vehicle Registry</h3>
+            <h3 className="font-bold text-base text-on-surface">{t('welcome.saccos.s3Title')}</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Maintain registered driver credentials, PSV badges, and vehicle status.
+              {t('welcome.saccos.s3Desc')}
             </p>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-6 space-y-3">
             <span className="material-symbols-outlined text-2xl text-primary">gavel</span>
-            <h3 className="font-bold text-base text-on-surface">NTSA Inspection Alignment</h3>
+            <h3 className="font-bold text-base text-on-surface">{t('welcome.saccos.s4Title')}</h3>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Prepare for regulatory audits with transparent digital compliance logs.
+              {t('welcome.saccos.s4Desc')}
             </p>
           </div>
         </div>
 
         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left">
           <div className="space-y-1">
-            <h4 className="font-bold text-lg text-on-surface">Are you a SACCO Official or Operator?</h4>
+            <h4 className="font-bold text-lg text-on-surface">{t('welcome.saccos.ctaTitle')}</h4>
             <p className="text-xs sm:text-sm text-on-surface-variant">
-              Access fleet oversight, driver scorecards, and violation management portals.
+              {t('welcome.saccos.ctaDesc')}
             </p>
           </div>
           <Button variant="primary" onClick={() => navigate('/auth/login')}>
-            Go to SACCO Portal
+            {t('welcome.saccos.goToPortal')}
             <span className="material-symbols-outlined text-lg ml-1">login</span>
           </Button>
         </div>
@@ -506,30 +497,30 @@ export const WelcomeScreen: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
           <div className="inline-flex items-center gap-2 text-primary">
             <span className="material-symbols-outlined text-2xl">lock</span>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider">RESPONSIBLE DATA & PRIVACY</span>
+            <span className="font-mono text-xs font-bold uppercase tracking-wider">{t('welcome.privacy.tag')}</span>
           </div>
 
           <h3 className="font-display font-bold text-xl sm:text-2xl text-on-surface">
-            Built Around Commuter Privacy and Data Security
+            {t('welcome.privacy.title')}
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-left pt-2">
             <div className="space-y-1">
-              <span className="font-bold text-xs text-on-surface block">🔒 Trip-Only Location Access</span>
+              <span className="font-bold text-xs text-on-surface block">🔒 {t('welcome.privacy.p1Title')}</span>
               <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                GPS location tracking is active strictly while you monitor a trip.
+                {t('welcome.privacy.p1Desc')}
               </p>
             </div>
             <div className="space-y-1">
-              <span className="font-bold text-xs text-on-surface block">🛡️ Kenya Data Protection Alignment</span>
+              <span className="font-bold text-xs text-on-surface block">🛡️ {t('welcome.privacy.p2Title')}</span>
               <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                Designed in compliance with national data protection regulations.
+                {t('welcome.privacy.p2Desc')}
               </p>
             </div>
             <div className="space-y-1">
-              <span className="font-bold text-xs text-on-surface block">👥 Anonymous Commuter Feedback</span>
+              <span className="font-bold text-xs text-on-surface block">👥 {t('welcome.privacy.p3Title')}</span>
               <p className="text-[11px] text-on-surface-variant leading-relaxed">
-                Passenger reports are de-identified to protect commuter identity.
+                {t('welcome.privacy.p3Desc')}
               </p>
             </div>
           </div>
@@ -539,20 +530,20 @@ export const WelcomeScreen: React.FC = () => {
       {/* SECTION 7: FINAL CTA */}
       <section className="py-16 sm:py-20 max-w-4xl mx-auto px-4 sm:px-6 text-center space-y-6">
         <h2 className="font-display font-extrabold text-2xl sm:text-3xl lg:text-4xl text-on-surface tracking-tight">
-          Make Every Journey More Safety-Aware.
+          {t('welcome.finalCta.title')}
         </h2>
         <p className="text-on-surface-variant text-sm sm:text-base font-body max-w-2xl mx-auto leading-relaxed">
-          Join commuters, SACCO operators, and road safety advocates building safer public transport across Kenya.
+          {t('welcome.finalCta.subtitle')}
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
           <Button variant="primary" size="lg" onClick={() => navigate('/location-permission')}>
-            Start Your Journey
+            {t('welcome.finalCta.startJourney')}
             <span className="material-symbols-outlined text-lg ml-1">arrow_forward</span>
           </Button>
 
           <Button variant="outline" size="lg" onClick={() => scrollToSection('how-it-works')}>
-            Learn How It Works
+            {t('welcome.finalCta.learnHow')}
           </Button>
         </div>
       </section>
@@ -565,54 +556,57 @@ export const WelcomeScreen: React.FC = () => {
             <div className="space-y-3 md:col-span-1">
               <HorizontalLogo className="h-8" />
               <p className="text-xs text-on-surface-variant leading-relaxed">
-                Mwendo Salama — Securing every journey across Kenyan public transport corridors.
+                {t('welcome.footer.tagline')}
               </p>
             </div>
 
             {/* Col 2: Navigation */}
             <div className="space-y-2 text-xs">
-              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">Product</span>
+              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">{t('welcome.footer.product')}</span>
               <ul className="space-y-1.5 text-on-surface-variant">
-                <li><button onClick={() => scrollToSection('how-it-works')} className="hover:text-primary">How It Works</button></li>
-                <li><button onClick={() => navigate('/location-permission')} className="hover:text-primary">Passenger Trip Safety</button></li>
-                <li><button onClick={() => navigate('/safety-map')} className="hover:text-primary">Safety Hazard Map</button></li>
-                <li><button onClick={() => navigate('/auth/login')} className="hover:text-primary">SACCO Portal</button></li>
+                <li><button onClick={() => scrollToSection('how-it-works')} className="hover:text-primary">{t('welcome.footer.howItWorks')}</button></li>
+                <li><button onClick={() => navigate('/location-permission')} className="hover:text-primary">{t('welcome.footer.passengerSafety')}</button></li>
+                <li><button onClick={() => navigate('/safety-map')} className="hover:text-primary">{t('welcome.footer.hazardMap')}</button></li>
+                <li><button onClick={() => navigate('/auth/login')} className="hover:text-primary">{t('welcome.footer.saccoPortal')}</button></li>
               </ul>
             </div>
 
             {/* Col 3: Community & Safety */}
             <div className="space-y-2 text-xs">
-              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">Safety & Impact</span>
+              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">{t('welcome.footer.safetyImpact')}</span>
               <ul className="space-y-1.5 text-on-surface-variant">
-                <li><button onClick={() => navigate('/safety-map')} className="hover:text-primary">Black Spot Reports</button></li>
-                <li><button onClick={() => scrollToSection('about')} className="hover:text-primary">Safety Intelligence</button></li>
-                <li><button onClick={() => navigate('/auth/login')} className="hover:text-primary">Inspector Portal</button></li>
+                <li><button onClick={() => navigate('/safety-map')} className="hover:text-primary">{t('welcome.footer.blackSpotReports')}</button></li>
+                <li><button onClick={() => scrollToSection('about')} className="hover:text-primary">{t('welcome.footer.safetyIntelligence')}</button></li>
+                <li><button onClick={() => navigate('/auth/login')} className="hover:text-primary">{t('welcome.footer.inspectorPortal')}</button></li>
               </ul>
             </div>
 
             {/* Col 4: Legal & Contact */}
             <div className="space-y-2 text-xs">
-              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">Legal & Support</span>
+              <span className="font-bold text-on-surface block uppercase font-mono tracking-wider">{t('welcome.footer.legalSupport')}</span>
               <ul className="space-y-1.5 text-on-surface-variant">
-                <li><span className="text-on-surface-variant/80">Privacy Policy</span></li>
-                <li><span className="text-on-surface-variant/80">Terms of Service</span></li>
-                <li><span className="text-on-surface-variant/80">Data Protection</span></li>
-                <li><span className="text-on-surface-variant/80">Emergency Contact: 999 / 112</span></li>
+                <li><span className="text-on-surface-variant/80">{t('welcome.footer.privacyPolicy')}</span></li>
+                <li><span className="text-on-surface-variant/80">{t('welcome.footer.termsOfService')}</span></li>
+                <li><span className="text-on-surface-variant/80">{t('welcome.footer.dataProtection')}</span></li>
+                <li><span className="text-on-surface-variant/80">{t('welcome.footer.emergencyContact')}</span></li>
               </ul>
             </div>
           </div>
 
           {/* Bottom Bar */}
           <div className="pt-6 border-t border-outline-variant/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-on-surface-variant">
-            <span>© 2026 Mwendo Salama. All rights reserved.</span>
+            <span>© 2026 Mwendo Salama. {t('welcome.footer.allRightsReserved')}</span>
 
-            <div className="flex items-center gap-4">
-              <button onClick={toggleLanguage} className="hover:text-primary uppercase font-bold">
-                Language: {language.toUpperCase()}
-              </button>
-              <span>•</span>
-              <button onClick={toggleDarkMode} className="hover:text-primary font-bold">
-                Theme: {mode.toUpperCase()}
+            <div className="flex items-center gap-3">
+              <LanguageToggle />
+              <button
+                onClick={toggleDarkMode}
+                className="p-1 rounded-lg border border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-high transition-colors flex items-center justify-center cursor-pointer"
+                title="Toggle Theme"
+              >
+                <span className="material-symbols-outlined text-sm">
+                  {mode === 'dark' ? 'light_mode' : 'dark_mode'}
+                </span>
               </button>
             </div>
           </div>

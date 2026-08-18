@@ -183,20 +183,26 @@ export const PassengerProfileScreen: React.FC = () => {
 
               <div className="flex gap-1 bg-surface-container p-1 rounded-lg">
                 <button
+                  type="button"
                   onClick={() => setLanguage('en')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                    language === 'en' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
+                  className={`px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer ${
+                    language === 'en' ? 'bg-primary text-on-primary shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
                   }`}
+                  aria-pressed={language === 'en'}
                 >
-                  EN
+                  <span>EN</span>
+                  <span className="text-[10px] font-medium opacity-90">English</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setLanguage('sw')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-bold ${
-                    language === 'sw' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'
+                  className={`px-3 py-1 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer ${
+                    language === 'sw' ? 'bg-primary text-on-primary shadow-xs' : 'text-on-surface-variant hover:text-on-surface'
                   }`}
+                  aria-pressed={language === 'sw'}
                 >
-                  SW
+                  <span>SW</span>
+                  <span className="text-[10px] font-medium opacity-90">Kiswahili</span>
                 </button>
               </div>
             </div>

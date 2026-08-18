@@ -6,6 +6,7 @@ import {
   Firestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  setLogLevel,
 } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
@@ -53,6 +54,11 @@ try {
 }
 
 export const db: Firestore = dbInstance;
+try {
+  setLogLevel('error');
+} catch {
+  // Ignored if unsupported or already configured
+}
 
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app);
@@ -83,15 +89,36 @@ isAnalyticsSupported().then((supported) => {
 export const getAnalyticsInstance = () => analyticsInstance;
 
 let appCheckInstance: AppCheck | null = null;
-if (import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
+if (
+  typeof window !== 'undefined' &&
+  import.meta.env.MODE !== 'test' &&
+  typeof indexedDB !== 'undefined' &&
+  import.meta.env.VITE_RECAPTCHA_SITE_KEY
+) {
   try {
+    const isDebugEnv =
+      import.meta.env.DEV ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('.run.app') ||
+      window.location.hostname.includes('.web.app') ||
+      Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN);
+
+    if (isDebugEnv) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN =
+        import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || true;
+    }
+
     const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-    appCheckInstance = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(siteKey),
-      isTokenAutoRefreshEnabled: true,
-    });
+    if (siteKey && siteKey !== 'undefined' && siteKey !== 'your-recaptcha-key') {
+      appCheckInstance = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: !isDebugEnv,
+      });
+    }
   } catch (e) {
-    console.warn('[AppCheck] App Check initialization skipped/failed:', e);
+    console.warn('[AppCheck] App Check initialization skipped/handled:', e);
   }
 }
 export const getAppCheckInstance = () => appCheckInstance;

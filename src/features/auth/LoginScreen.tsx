@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PrimaryLogo, BRAND_ASSETS } from '../../components/assets/BrandAssets';
+import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { authService } from '../../services/authService';
@@ -16,6 +17,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export const LoginScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -53,7 +55,7 @@ export const LoginScreen: React.FC = () => {
         return;
       }
       console.error('Sign in error:', err);
-      setErrorMsg(err.message || 'Invalid email or password');
+      setErrorMsg(err.message || t('auth.login.invalidCredentials'));
     }
   };
 
@@ -103,7 +105,7 @@ export const LoginScreen: React.FC = () => {
   const handleSendMagicLink = async () => {
     const email = getValues('email');
     if (!email) {
-      setErrorMsg('Please enter your email above to receive a login link.');
+      setErrorMsg(t('auth.login.emailPlaceholder'));
       return;
     }
     setErrorMsg(null);
@@ -121,9 +123,9 @@ export const LoginScreen: React.FC = () => {
       <div className="w-full max-w-sm space-y-lg">
         <div className="flex flex-col items-center text-center space-y-md">
           <PrimaryLogo className="h-12 w-auto mb-2" />
-          <h1 className="font-headline-lg text-primary">Welcome back</h1>
+          <h1 className="font-headline-lg text-primary">{t('auth.login.title')}</h1>
           <p className="font-body-md text-on-surface-variant">
-            Sign in to access your safety dashboard and trip history.
+            {t('auth.login.subtitle')}
           </p>
         </div>
 
@@ -135,24 +137,24 @@ export const LoginScreen: React.FC = () => {
 
         {magicLinkSent && (
           <div className="p-md rounded-xl bg-sage-light text-primary text-body-sm text-center">
-            Magic login link sent to your email! Please check your inbox.
+            {t('auth.login.magicLinkSent')}
           </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-md">
           <Input
-            label="Email Address"
+            label={t('auth.login.emailLabel')}
             type="email"
-            placeholder="juma@example.com"
+            placeholder={t('auth.login.emailPlaceholder')}
             icon="mail"
             error={errors.email?.message}
             {...register('email')}
           />
 
           <Input
-            label="Password"
+            label={t('auth.login.passwordLabel')}
             type="password"
-            placeholder="••••••••"
+            placeholder={t('auth.login.passwordPlaceholder')}
             icon="lock"
             error={errors.password?.message}
             {...register('password')}
@@ -163,12 +165,12 @@ export const LoginScreen: React.FC = () => {
               to="/auth/forgot-password"
               className="font-label-bold text-xs text-secondary hover:underline"
             >
-              Forgot Password?
+              {t('auth.login.forgotPassword')}
             </Link>
           </div>
 
           <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-            Log In
+            {t('auth.login.signInButton')}
           </Button>
         </form>
 
@@ -178,7 +180,7 @@ export const LoginScreen: React.FC = () => {
           </div>
           <div className="relative flex justify-center text-xs font-label-mono">
             <span className="bg-surface px-2 text-on-surface-variant uppercase">
-              or continue with
+              {t('auth.login.orContinueWith')}
             </span>
           </div>
         </div>
@@ -192,7 +194,7 @@ export const LoginScreen: React.FC = () => {
             isLoading={isGoogleLoading}
           >
             <span className="material-symbols-outlined text-xl text-primary">account_circle</span>
-            Sign in with Google
+            {t('auth.login.googleSignIn')}
           </Button>
 
           <Button
@@ -201,7 +203,7 @@ export const LoginScreen: React.FC = () => {
             className="w-full text-xs"
             onClick={handleSendMagicLink}
           >
-            Email me a magic login link
+            {t('auth.login.magicLink')}
           </Button>
 
           <button
@@ -210,15 +212,15 @@ export const LoginScreen: React.FC = () => {
             disabled={isGuestLoading}
             className="w-full py-2 text-center text-xs font-label-bold text-on-surface-variant hover:text-primary transition-colors"
           >
-            {isGuestLoading ? 'Loading Guest Mode...' : 'Continue as Anonymous Guest'}
+            {isGuestLoading ? t('common.loading') : t('auth.login.continueAsGuest')}
           </button>
         </div>
 
         <div className="text-center pt-md border-t border-outline-variant/30">
           <p className="font-body-sm text-on-surface-variant">
-            Don't have an account?{' '}
+            {t('auth.login.noAccount')}{' '}
             <Link to="/auth/register" className="font-label-bold text-primary hover:underline">
-              Sign up
+              {t('auth.login.createOne')}
             </Link>
           </p>
         </div>

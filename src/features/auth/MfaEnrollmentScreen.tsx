@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { auth } from '../../lib/firebase';
@@ -17,6 +18,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null);
@@ -77,7 +79,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
       }
     } catch (err: any) {
       console.error('MFA Enrollment error:', err);
-      setErrorMsg(err.message || 'Invalid 6-digit TOTP code.');
+      setErrorMsg(err.message || t('auth.mfa.invalidCode'));
     } finally {
       setIsSubmitting(false);
     }
@@ -97,10 +99,10 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
         <div className="flex flex-col items-center text-center space-y-xs">
           <PrimaryLogo className="h-10 w-auto mb-2" />
           <h1 className="font-headline-lg text-lg text-primary font-bold">
-            Mandatory MFA Enrollment
+            {t('auth.mfa.enrollmentTitle')}
           </h1>
           <p className="font-body-sm text-xs text-on-surface-variant max-w-sm">
-            Platform security policy (SEC-008) requires TOTP Multi-Factor Authentication for Admin & Authority accounts.
+            {t('auth.mfa.mandatoryNote')}
           </p>
         </div>
       )}
@@ -109,10 +111,10 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
         <div className="flex items-center justify-between border-b border-outline-variant/20 pb-md">
           <div>
             <h2 className="font-headline-lg text-base text-on-surface font-bold">
-              Set Up TOTP Multi-Factor Authentication
+              {t('auth.mfa.enrollmentTitle')}
             </h2>
             <p className="font-body-sm text-xs text-on-surface-variant">
-              Scan the QR code using Google Authenticator, Authy, or 1Password.
+              {t('auth.mfa.enrollmentSubtitle')}
             </p>
           </div>
           {onClose && (
@@ -138,7 +140,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
             sync
           </span>
           <span className="font-label-mono text-xs text-on-surface-variant">
-            Generating TOTP Secret Key...
+            {t('common.loading')}
           </span>
         </div>
       ) : setupData ? (
@@ -146,7 +148,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
           {/* Step 1: Scan QR Code */}
           <div className="space-y-sm bg-surface-container-low p-md rounded-2xl border border-outline-variant/20">
             <span className="font-label-mono text-[10px] uppercase font-bold text-primary block">
-              Step 1: Scan QR Code with Authenticator App
+              {t('auth.mfa.step1')}
             </span>
 
             <div className="flex flex-col sm:flex-row items-center gap-md">
@@ -162,7 +164,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
 
               <div className="flex-1 space-y-1 text-xs">
                 <p className="font-body-sm text-on-surface-variant text-[11px]">
-                  Or enter key manually in your app:
+                  {t('auth.mfa.secretKeyLabel')}
                 </p>
                 <div className="flex items-center gap-1">
                   <code className="bg-surface-container border border-outline-variant/30 px-2 py-1 rounded-lg font-mono text-xs font-bold text-primary tracking-wider select-all">
@@ -172,7 +174,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
                     type="button"
                     onClick={handleCopySecret}
                     className="p-1 rounded-lg hover:bg-surface-container text-on-surface-variant hover:text-primary transition-colors"
-                    title="Copy Secret Key"
+                    title={t('auth.mfa.copied')}
                   >
                     <span className="material-symbols-outlined text-base">
                       {copiedKey ? 'check' : 'content_copy'}
@@ -181,7 +183,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
                 </div>
                 {copiedKey && (
                   <span className="font-label-mono text-[10px] text-emerald-600 font-bold block">
-                    Copied to clipboard!
+                    {t('auth.mfa.copied')}
                   </span>
                 )}
               </div>
@@ -191,7 +193,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
           {/* Step 2: Verification Code */}
           <div className="space-y-2">
             <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant block">
-              Step 2: Enter 6-Digit Authenticator Code
+              {t('auth.mfa.step2')}
             </label>
             <input
               type="text"
@@ -211,7 +213,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
               className="w-full py-3"
               isLoading={isSubmitting}
             >
-              Verify & Complete MFA Enrollment
+              {t('auth.mfa.verifyButton')}
             </Button>
 
             {isModal && onClose && (
@@ -221,7 +223,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
                 className="w-full"
                 onClick={onClose}
               >
-                Cancel
+                {t('common.cancel')}
               </Button>
             )}
           </div>
