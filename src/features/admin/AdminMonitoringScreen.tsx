@@ -9,10 +9,10 @@ export const AdminMonitoringScreen: React.FC = () => {
         <div>
           <h2 className="text-base text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-2">
             <span className="material-symbols-outlined text-xl text-emerald-400">insights</span>
-            API & Error Telemetry Monitoring
+            System Health & Error Monitoring
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time API performance breakdown, crash tracking, and Sentry-compatible exception feeds.
+            Real-time performance breakdown and operational exception feeds.
           </p>
         </div>
 
@@ -26,7 +26,7 @@ export const AdminMonitoringScreen: React.FC = () => {
         <EmptyState
           icon="monitoring"
           title="Monitoring Integration Not Yet Connected"
-          description="External APM / error tracking integrations (such as Sentry or Google Cloud Monitoring) have not been attached to this deployment. Once configured, real-time exception stack traces and API throughput telemetry will appear here."
+          description="External monitoring integrations have not been attached to this deployment. Once configured, real-time status and throughput metrics will appear here."
         />
       </div>
 

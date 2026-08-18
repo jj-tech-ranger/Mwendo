@@ -266,7 +266,7 @@ export const AdminFeatureFlagsScreen: React.FC = () => {
 
               <div>
                 <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant">
-                  Telemetry Retention (Days)
+                  Trip Data Retention (Days)
                 </label>
                 <input
                   type="number"

@@ -36,87 +36,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
     queryKey: ['blackSpots'],
     queryFn: async () => {
       const data = await blackSpotRepository.getAll();
-      if (data.length > 0) {
-        return data;
-      }
-      return [
-        {
-          id: 'bs-salgaa-01',
-          name: 'Salgaa Deceleration Incline Blackspot',
-          title: 'Salgaa Deceleration Incline Blackspot',
-          routeName: 'Nakuru - Eldoret Highway (A104)',
-          county: 'Nakuru',
-          latitude: -0.2185,
-          longitude: 35.8821,
-          severity: 'critical' as const,
-          hazardType: 'accident_prone' as const,
-          accidentCount12M: 28,
-          hazardDescription: 'Steep hill descent with runaway truck risk and sharp blind crest.',
-          description: 'Steep hill descent with runaway truck risk and sharp blind crest.',
-          reportedByUid: 'ntsa-official',
-          verifiedByAuthority: true,
-          status: 'published' as const,
-          confidenceScore: 0.98,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'bs-kinungi-02',
-          name: 'Kinungi Flyover Crash Zone',
-          title: 'Kinungi Flyover Crash Zone',
-          routeName: 'Nairobi - Naivasha Highway (A104)',
-          county: 'Nakuru',
-          latitude: -0.8351,
-          longitude: 36.4678,
-          severity: 'high' as const,
-          hazardType: 'accident_prone' as const,
-          accidentCount12M: 19,
-          hazardDescription: 'High velocity overtake conflict area near Kinungi market exit.',
-          description: 'High velocity overtake conflict area near Kinungi market exit.',
-          reportedByUid: 'ntsa-official',
-          verifiedByAuthority: true,
-          status: 'published' as const,
-          confidenceScore: 0.95,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'bs-waiyaki-03',
-          name: 'Waiyaki Way Kangemi U-Turn Hazard',
-          title: 'Waiyaki Way Kangemi U-Turn Hazard',
-          routeName: 'Waiyaki Way Corridor',
-          county: 'Nairobi',
-          latitude: -1.2612,
-          longitude: 36.7865,
-          severity: 'high' as const,
-          hazardType: 'unmarked_bump' as const,
-          accidentCount12M: 14,
-          hazardDescription: 'Sudden deceleration zone and frequent pedestrian crossing.',
-          description: 'Sudden deceleration zone and frequent pedestrian crossing.',
-          reportedByUid: 'ntsa-official',
-          verifiedByAuthority: true,
-          status: 'published' as const,
-          confidenceScore: 0.92,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'bs-mombasa-04',
-          name: 'Mombasa Road City Cabanas Junction',
-          title: 'Mombasa Road City Cabanas Junction',
-          routeName: 'Mombasa Road (A109)',
-          county: 'Nairobi',
-          latitude: -1.3321,
-          longitude: 36.8794,
-          severity: 'medium' as const,
-          hazardType: 'pothole' as const,
-          accidentCount12M: 9,
-          hazardDescription: 'Heavy axle freight merging lane with severe surface wear.',
-          description: 'Heavy axle freight merging lane with severe surface wear.',
-          reportedByUid: 'ntsa-official',
-          verifiedByAuthority: true,
-          status: 'published' as const,
-          confidenceScore: 0.88,
-          createdAt: new Date().toISOString(),
-        },
-      ];
+      return data;
     },
     staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
   });
@@ -373,7 +293,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="py-3 px-3 font-label-mono font-bold text-rose-600">
-                        {spot.accidentCount12M || 12}
+                        {spot.accidentCount12M ?? 0}
                       </td>
                       <td className="py-3 px-3">
                         <Badge variant="success">VERIFIED & LIVE</Badge>

@@ -9,43 +9,6 @@ import { useToast } from '../../components/ui/Toast';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 
-const DEFAULT_EMERGENCY_ALERTS: SafetyAlert[] = [
-  {
-    id: 'alert_sos_01',
-    tripId: 'trip_101',
-    saccoId: 'MetroLink SACCO',
-    vehicleRegNumber: 'KDA 123A',
-    driverName: 'John Kamau',
-    type: 'sos' as const,
-    severity: 'critical' as const,
-    message: 'Passenger SOS Triggered: Reckless overtaking near Roysambu overpass',
-    latitude: -1.2185,
-    longitude: 36.8875,
-    speedKmH: 94,
-    status: 'active' as const,
-    acknowledgedBySacco: false,
-    acknowledgedByAuthority: false,
-    timestamp: new Date().toISOString(),
-  },
-  {
-    id: 'alert_sos_02',
-    tripId: 'trip_102',
-    saccoId: 'SuperMetro',
-    vehicleRegNumber: 'KCC 456B',
-    driverName: 'David Kariuki',
-    type: 'overspeeding' as const,
-    severity: 'high' as const,
-    message: 'Speed telemetry violation: 88 km/h on urban zone (Waiyaki Way)',
-    latitude: -1.2612,
-    longitude: 36.7865,
-    speedKmH: 88,
-    status: 'active' as const,
-    acknowledgedBySacco: false,
-    acknowledgedByAuthority: false,
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-  },
-];
-
 export const AuthorityEmergencyScreen: React.FC = () => {
   const { showToast } = useToast();
   const user = useAuthStore((s) => s.user);
@@ -68,13 +31,13 @@ export const AuthorityEmergencyScreen: React.FC = () => {
           })) as SafetyAlert[];
           setAlerts(fetchedAlerts);
         } else {
-          setAlerts(DEFAULT_EMERGENCY_ALERTS);
+          setAlerts([]);
         }
         setIsLoading(false);
       },
       (error) => {
         console.warn('[AuthorityEmergencyScreen] onSnapshot error:', error);
-        setAlerts(DEFAULT_EMERGENCY_ALERTS);
+        setAlerts([]);
         setIsLoading(false);
       }
     );
@@ -268,7 +231,7 @@ export const AuthorityEmergencyScreen: React.FC = () => {
                 <span className="font-bold text-on-surface">{selectedAlert.saccoId}</span>
               </div>
               <div className="flex justify-between border-b border-outline-variant/20 pb-1">
-                <span className="text-on-surface-variant">Telemetry Speed:</span>
+                <span className="text-on-surface-variant">Recorded Speed:</span>
                 <span className="font-bold text-rose-600 font-label-mono">{selectedAlert.speedKmH} km/h</span>
               </div>
               <div className="flex justify-between">

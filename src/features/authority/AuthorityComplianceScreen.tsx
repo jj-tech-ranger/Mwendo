@@ -254,7 +254,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
                 <span className="font-bold text-on-surface">{selectedViolation.saccoId}</span>
               </div>
               <div className="flex justify-between border-b border-outline-variant/20 pb-1">
-                <span className="text-on-surface-variant">Recorded Telemetry Speed:</span>
+                <span className="text-on-surface-variant">Recorded Speed:</span>
                 <span className="font-bold text-rose-600 font-label-mono">
                   {selectedViolation.recordedSpeedKmH} km/h (Limit: {selectedViolation.speedLimitKmH} km/h)
                 </span>

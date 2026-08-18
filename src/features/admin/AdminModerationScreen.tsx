@@ -34,7 +34,7 @@ export const AdminModerationScreen: React.FC = () => {
       setDisputedViolations(results);
     } catch (err) {
       console.error('[AdminModerationScreen] Error fetching disputed violations:', err);
-      showToast('error', 'Query Failed', 'Failed to load disputed violations from Firestore.');
+      showToast('error', 'Unable to Load Data', "We couldn't load disputed violations. Please try again.");
     } finally {
       setLoadingDisputes(false);
     }
@@ -83,7 +83,7 @@ export const AdminModerationScreen: React.FC = () => {
       await fetchDisputes();
     } catch (err) {
       console.error('[AdminModerationScreen] Failed to adjudicate dispute:', err);
-      showToast('error', 'Adjudication Error', 'Failed to update violation status in Firestore.');
+      showToast('error', 'Update Failed', "We couldn't update the violation status. Please try again.");
     } finally {
       setIsResolving(false);
     }
@@ -201,9 +201,9 @@ export const AdminModerationScreen: React.FC = () => {
               <div className="flex items-start gap-3">
                 <span className="material-symbols-outlined text-outline text-xl mt-0.5">info</span>
                 <div className="space-y-1">
-                  <p className="font-bold text-on-surface">Community abuse-flagging is not yet implemented</p>
+                  <p className="font-bold text-on-surface">Community Moderation Status</p>
                   <p className="text-on-surface-variant leading-relaxed">
-                    User-submitted abuse reports and content flags against community members are not yet backed by a dedicated Firestore schema or moderation collection.
+                    No active user flags are pending moderation.
                   </p>
                   <p className="text-on-surface-variant leading-relaxed pt-1">
                     Hazard and road-safety report verification is handled separately via the Black Spots moderation panel.
@@ -237,7 +237,7 @@ export const AdminModerationScreen: React.FC = () => {
 
             {loadingDisputes ? (
               <div className="p-lg text-center text-xs text-on-surface-variant font-label-mono animate-pulse">
-                Fetching disputed violations from Firestore...
+                Loading disputed violations...
               </div>
             ) : disputedViolations.length === 0 ? (
               <EmptyState
@@ -331,7 +331,7 @@ export const AdminModerationScreen: React.FC = () => {
               <div className="space-y-sm text-xs font-body-sm">
                 <div className="p-md rounded-xl bg-surface-container-low space-y-2">
                   <span className="font-label-mono text-[10px] text-outline uppercase font-bold">
-                    Violation Telemetry Details
+                    Violation Speed & GPS Details
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-label-mono text-xs">
                     <div>

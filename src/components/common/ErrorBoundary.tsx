@@ -31,8 +31,8 @@ export class ErrorBoundary extends Component<Props, State> {
           <EmptyState
             icon="error_med"
             title="Something went wrong"
-            description={this.state.error?.message || 'An unexpected runtime error occurred.'}
-            primaryCtaLabel="Reload App"
+            description="We couldn't load this information. Please refresh the page or try again."
+            primaryCtaLabel="Refresh Page"
             onPrimaryCta={() => window.location.reload()}
           />
         </div>

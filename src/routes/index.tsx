@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import { PassengerShell } from '../components/shells/PassengerShell';
 import { SaccoShell } from '../components/shells/SaccoShell';
@@ -6,227 +6,218 @@ import { AuthorityShell } from '../components/shells/AuthorityShell';
 import { AdminShell } from '../components/shells/AdminShell';
 import { RoleGuard } from '../components/common/RoleGuard';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
+import { RouteErrorElement } from '../components/common/RouteErrorElement';
+import { lazyWithRetry } from '../lib/lazyWithRetry';
 
-// Route-based Code Splitting (React.lazy)
-const SplashScreen = lazy(() =>
-  import('../features/common/SplashScreen').then((m) => ({ default: m.SplashScreen }))
-);
-const WelcomeScreen = lazy(() =>
+// Route-based Code Splitting with Auto-Retry
+const WelcomeScreen = lazyWithRetry(() =>
   import('../features/auth/WelcomeScreen').then((m) => ({ default: m.WelcomeScreen }))
-);
-const LocationPermissionPromptScreen = lazy(() =>
-  import('../features/common/LocationPermissionPromptScreen').then((m) => ({
-    default: m.LocationPermissionPromptScreen,
-  }))
 );
 
 // Auth Screens
-const LoginScreen = lazy(() =>
+const LoginScreen = lazyWithRetry(() =>
   import('../features/auth/LoginScreen').then((m) => ({ default: m.LoginScreen }))
 );
-const RegisterScreen = lazy(() =>
+const RegisterScreen = lazyWithRetry(() =>
   import('../features/auth/RegisterScreen').then((m) => ({ default: m.RegisterScreen }))
 );
-const ForgotPasswordScreen = lazy(() =>
+const ForgotPasswordScreen = lazyWithRetry(() =>
   import('../features/auth/ForgotPasswordScreen').then((m) => ({ default: m.ForgotPasswordScreen }))
 );
-const EmailVerificationScreen = lazy(() =>
+const EmailVerificationScreen = lazyWithRetry(() =>
   import('../features/auth/EmailVerificationScreen').then((m) => ({ default: m.EmailVerificationScreen }))
 );
-const OtpVerificationScreen = lazy(() =>
+const OtpVerificationScreen = lazyWithRetry(() =>
   import('../features/auth/OtpVerificationScreen').then((m) => ({ default: m.OtpVerificationScreen }))
 );
-const LoadingAuthScreen = lazy(() =>
+const LoadingAuthScreen = lazyWithRetry(() =>
   import('../features/auth/LoadingAuthScreen').then((m) => ({ default: m.LoadingAuthScreen }))
 );
-const SessionExpiredScreen = lazy(() =>
+const SessionExpiredScreen = lazyWithRetry(() =>
   import('../features/auth/SessionExpiredScreen').then((m) => ({ default: m.SessionExpiredScreen }))
 );
-const AccountSuspendedScreen = lazy(() =>
+const AccountSuspendedScreen = lazyWithRetry(() =>
   import('../features/auth/AccountSuspendedScreen').then((m) => ({ default: m.AccountSuspendedScreen }))
 );
-const UnauthorizedScreen = lazy(() =>
+const UnauthorizedScreen = lazyWithRetry(() =>
   import('../features/auth/UnauthorizedScreen').then((m) => ({ default: m.UnauthorizedScreen }))
 );
-const MfaEnrollmentScreen = lazy(() =>
+const MfaEnrollmentScreen = lazyWithRetry(() =>
   import('../features/auth/MfaEnrollmentScreen').then((m) => ({ default: m.MfaEnrollmentScreen }))
 );
-const MfaChallengeScreen = lazy(() =>
+const MfaChallengeScreen = lazyWithRetry(() =>
   import('../features/auth/MfaChallengeScreen').then((m) => ({ default: m.MfaChallengeScreen }))
 );
 
 // System Error & Full-Page Layouts
-const ComponentShowcaseScreen = lazy(() =>
-  import('../features/dev/ComponentShowcaseScreen').then((m) => ({ default: m.ComponentShowcaseScreen }))
-);
-const MaintenanceModeScreen = lazy(() =>
+const MaintenanceModeScreen = lazyWithRetry(() =>
   import('../features/common/MaintenanceModeScreen').then((m) => ({ default: m.MaintenanceModeScreen }))
 );
-const ScheduledMaintenanceScreen = lazy(() =>
+const ScheduledMaintenanceScreen = lazyWithRetry(() =>
   import('../features/common/ScheduledMaintenanceScreen').then((m) => ({
     default: m.ScheduledMaintenanceScreen,
   }))
 );
-const ServerUnavailableScreen = lazy(() =>
+const ServerUnavailableScreen = lazyWithRetry(() =>
   import('../features/common/ServerUnavailableScreen').then((m) => ({
     default: m.ServerUnavailableScreen,
   }))
 );
-const UpdateRequiredScreen = lazy(() =>
+const UpdateRequiredScreen = lazyWithRetry(() =>
   import('../features/common/UpdateRequiredScreen').then((m) => ({ default: m.UpdateRequiredScreen }))
 );
-const UpdateAvailableScreen = lazy(() =>
+const UpdateAvailableScreen = lazyWithRetry(() =>
   import('../features/common/UpdateAvailableScreen').then((m) => ({ default: m.UpdateAvailableScreen }))
 );
-const NotFound404Screen = lazy(() =>
+const NotFound404Screen = lazyWithRetry(() =>
   import('../features/common/NotFound404Screen').then((m) => ({ default: m.NotFound404Screen }))
 );
 
 // Permissions & Onboarding
-const PermissionsWizardScreen = lazy(() =>
+const PermissionsWizardScreen = lazyWithRetry(() =>
   import('../features/common/PermissionsWizardScreen').then((m) => ({
     default: m.PermissionsWizardScreen,
   }))
 );
 
 // Passenger Feature Screens
-const PassengerDashboard = lazy(() =>
+const PassengerDashboard = lazyWithRetry(() =>
   import('../features/passenger/PassengerDashboard').then((m) => ({ default: m.PassengerDashboard }))
 );
-const ActiveTripScreen = lazy(() =>
+const ActiveTripScreen = lazyWithRetry(() =>
   import('../features/passenger/ActiveTripScreen').then((m) => ({ default: m.ActiveTripScreen }))
 );
-const TripHistoryScreen = lazy(() =>
+const TripHistoryScreen = lazyWithRetry(() =>
   import('../features/passenger/TripHistoryScreen').then((m) => ({ default: m.TripHistoryScreen }))
 );
-const SafetyMapScreen = lazy(() =>
+const SafetyMapScreen = lazyWithRetry(() =>
   import('../features/passenger/SafetyMapScreen').then((m) => ({ default: m.SafetyMapScreen }))
 );
-const ReportBlackSpotScreen = lazy(() =>
+const ReportBlackSpotScreen = lazyWithRetry(() =>
   import('../features/passenger/ReportBlackSpotScreen').then((m) => ({ default: m.ReportBlackSpotScreen }))
 );
-const EmergencySosScreen = lazy(() =>
+const EmergencySosScreen = lazyWithRetry(() =>
   import('../features/passenger/EmergencySosScreen').then((m) => ({ default: m.EmergencySosScreen }))
 );
-const PassengerAlertsScreen = lazy(() =>
+const PassengerAlertsScreen = lazyWithRetry(() =>
   import('../features/passenger/PassengerAlertsScreen').then((m) => ({ default: m.PassengerAlertsScreen }))
 );
-const PassengerProfileScreen = lazy(() =>
+const PassengerProfileScreen = lazyWithRetry(() =>
   import('../features/passenger/PassengerProfileScreen').then((m) => ({ default: m.PassengerProfileScreen }))
 );
-const SaccoDashboard = lazy(() =>
+const SaccoDashboard = lazyWithRetry(() =>
   import('../features/sacco/SaccoDashboard').then((m) => ({ default: m.SaccoDashboard }))
 );
-const SaccoFleetScreen = lazy(() =>
+const SaccoFleetScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoFleetScreen').then((m) => ({ default: m.SaccoFleetScreen }))
 );
-const SaccoDriversScreen = lazy(() =>
+const SaccoDriversScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoDriversScreen').then((m) => ({ default: m.SaccoDriversScreen }))
 );
-const SaccoLiveTripsScreen = lazy(() =>
+const SaccoLiveTripsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoLiveTripsScreen').then((m) => ({ default: m.SaccoLiveTripsScreen }))
 );
-const SaccoViolationsScreen = lazy(() =>
+const SaccoViolationsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoViolationsScreen').then((m) => ({ default: m.SaccoViolationsScreen }))
 );
-const SaccoBlackSpotsScreen = lazy(() =>
+const SaccoBlackSpotsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoBlackSpotsScreen').then((m) => ({ default: m.SaccoBlackSpotsScreen }))
 );
-const SaccoReportsScreen = lazy(() =>
+const SaccoReportsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoReportsScreen').then((m) => ({ default: m.SaccoReportsScreen }))
 );
-const SaccoAnalyticsScreen = lazy(() =>
+const SaccoAnalyticsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoAnalyticsScreen').then((m) => ({ default: m.SaccoAnalyticsScreen }))
 );
-const SaccoNotificationsScreen = lazy(() =>
+const SaccoNotificationsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoNotificationsScreen').then((m) => ({ default: m.SaccoNotificationsScreen }))
 );
-const SaccoUsersScreen = lazy(() =>
+const SaccoUsersScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoUsersScreen').then((m) => ({ default: m.SaccoUsersScreen }))
 );
-const SaccoSettingsScreen = lazy(() =>
+const SaccoSettingsScreen = lazyWithRetry(() =>
   import('../features/sacco/SaccoSettingsScreen').then((m) => ({ default: m.SaccoSettingsScreen }))
 );
 
-const AuthorityDashboard = lazy(() =>
+const AuthorityDashboard = lazyWithRetry(() =>
   import('../features/authority/AuthorityDashboard').then((m) => ({ default: m.AuthorityDashboard }))
 );
-const AuthorityComplianceScreen = lazy(() =>
+const AuthorityComplianceScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityComplianceScreen').then((m) => ({ default: m.AuthorityComplianceScreen }))
 );
-const AuthorityBlackSpotsScreen = lazy(() =>
+const AuthorityBlackSpotsScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityBlackSpotsScreen').then((m) => ({ default: m.AuthorityBlackSpotsScreen }))
 );
-const AuthorityInspectionsScreen = lazy(() =>
+const AuthorityInspectionsScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityInspectionsScreen').then((m) => ({ default: m.AuthorityInspectionsScreen }))
 );
-const AuthorityEmergencyScreen = lazy(() =>
+const AuthorityEmergencyScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityEmergencyScreen').then((m) => ({ default: m.AuthorityEmergencyScreen }))
 );
-const AuthorityComplaintsScreen = lazy(() =>
+const AuthorityComplaintsScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityComplaintsScreen').then((m) => ({ default: m.AuthorityComplaintsScreen }))
 );
-const AuthorityReportsScreen = lazy(() =>
+const AuthorityReportsScreen = lazyWithRetry(() =>
   import('../features/authority/AuthorityReportsScreen').then((m) => ({ default: m.AuthorityReportsScreen }))
 );
-const AuthoritySettingsScreen = lazy(() =>
+const AuthoritySettingsScreen = lazyWithRetry(() =>
   import('../features/authority/AuthoritySettingsScreen').then((m) => ({ default: m.AuthoritySettingsScreen }))
 );
-const AdminDashboard = lazy(() =>
+const AdminDashboard = lazyWithRetry(() =>
   import('../features/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 );
-const AdminUsersScreen = lazy(() =>
+const AdminUsersScreen = lazyWithRetry(() =>
   import('../features/admin/AdminUsersScreen').then((m) => ({ default: m.AdminUsersScreen }))
 );
-const AdminRolesScreen = lazy(() =>
+const AdminRolesScreen = lazyWithRetry(() =>
   import('../features/admin/AdminRolesScreen').then((m) => ({ default: m.AdminRolesScreen }))
 );
-const AdminSaccosScreen = lazy(() =>
+const AdminSaccosScreen = lazyWithRetry(() =>
   import('../features/admin/AdminSaccosScreen').then((m) => ({ default: m.AdminSaccosScreen }))
 );
-const AdminAuthoritiesScreen = lazy(() =>
+const AdminAuthoritiesScreen = lazyWithRetry(() =>
   import('../features/admin/AdminAuthoritiesScreen').then((m) => ({ default: m.AdminAuthoritiesScreen }))
 );
-const AdminVehiclesScreen = lazy(() =>
+const AdminVehiclesScreen = lazyWithRetry(() =>
   import('../features/admin/AdminVehiclesScreen').then((m) => ({ default: m.AdminVehiclesScreen }))
 );
-const AdminTripsScreen = lazy(() =>
+const AdminTripsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminTripsScreen').then((m) => ({ default: m.AdminTripsScreen }))
 );
-const AdminReportsScreen = lazy(() =>
+const AdminReportsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminReportsScreen').then((m) => ({ default: m.AdminReportsScreen }))
 );
-const AdminModerationScreen = lazy(() =>
+const AdminModerationScreen = lazyWithRetry(() =>
   import('../features/admin/AdminModerationScreen').then((m) => ({ default: m.AdminModerationScreen }))
 );
-const AdminFeatureFlagsScreen = lazy(() =>
+const AdminFeatureFlagsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminFeatureFlagsScreen').then((m) => ({ default: m.AdminFeatureFlagsScreen }))
 );
-const AdminSystemHealthScreen = lazy(() =>
+const AdminSystemHealthScreen = lazyWithRetry(() =>
   import('../features/admin/AdminSystemHealthScreen').then((m) => ({ default: m.AdminSystemHealthScreen }))
 );
-const AdminMonitoringScreen = lazy(() =>
+const AdminMonitoringScreen = lazyWithRetry(() =>
   import('../features/admin/AdminMonitoringScreen').then((m) => ({ default: m.AdminMonitoringScreen }))
 );
-const AdminAuditLogsScreen = lazy(() =>
+const AdminAuditLogsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminAuditLogsScreen').then((m) => ({ default: m.AdminAuditLogsScreen }))
 );
-const AdminAnalyticsScreen = lazy(() =>
+const AdminAnalyticsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminAnalyticsScreen').then((m) => ({ default: m.AdminAnalyticsScreen }))
 );
-const AdminNotificationsScreen = lazy(() =>
+const AdminNotificationsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminNotificationsScreen').then((m) => ({ default: m.AdminNotificationsScreen }))
 );
-const AdminIntegrationsScreen = lazy(() =>
+const AdminIntegrationsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminIntegrationsScreen').then((m) => ({ default: m.AdminIntegrationsScreen }))
 );
-const AdminSecurityScreen = lazy(() =>
+const AdminSecurityScreen = lazyWithRetry(() =>
   import('../features/admin/AdminSecurityScreen').then((m) => ({ default: m.AdminSecurityScreen }))
 );
-const AdminMaintenanceScreen = lazy(() =>
+const AdminMaintenanceScreen = lazyWithRetry(() =>
   import('../features/admin/AdminMaintenanceScreen').then((m) => ({ default: m.AdminMaintenanceScreen }))
 );
-const AdminSettingsScreen = lazy(() =>
+const AdminSettingsScreen = lazyWithRetry(() =>
   import('../features/admin/AdminSettingsScreen').then((m) => ({ default: m.AdminSettingsScreen }))
 );
 
@@ -269,104 +260,118 @@ export const ContentSuspenseOutlet: React.FC = () => (
 const router = createBrowserRouter([
   {
     path: '/',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<WelcomeScreen />),
   },
   {
     path: '/onboarding',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<WelcomeScreen />),
   },
   {
     path: '/location-permission',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<PermissionsWizardScreen />),
   },
   {
     path: '/permissions-wizard',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<PermissionsWizardScreen />),
   },
 
   // Auth Layouts
   {
     path: '/auth/login',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<LoginScreen />),
   },
   {
     path: '/auth/register',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<RegisterScreen />),
   },
   {
     path: '/auth/forgot-password',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<ForgotPasswordScreen />),
   },
   {
     path: '/auth/verify-email',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<EmailVerificationScreen />),
   },
   {
     path: '/auth/verify-otp',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<OtpVerificationScreen />),
   },
   {
     path: '/auth/loading',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<LoadingAuthScreen />),
   },
   {
     path: '/auth/session-expired',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<SessionExpiredScreen />),
   },
   {
     path: '/auth/suspended',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<AccountSuspendedScreen />),
   },
   {
     path: '/auth/unauthorized',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<UnauthorizedScreen />),
   },
   {
     path: '/auth/mfa-enrollment',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<MfaEnrollmentScreen />),
   },
   {
     path: '/auth/mfa-challenge',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<MfaChallengeScreen />),
   },
 
-  // System Layouts (Dev-only routes conditionally mounted)
-  ...(import.meta.env.DEV
-    ? [
-        {
-          path: '/dev/components',
-          element: withFullPageSuspense(<ComponentShowcaseScreen />),
-        },
-      ]
-    : []),
+  // System Layouts
   {
     path: '/maintenance',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<MaintenanceModeScreen />),
   },
   {
     path: '/scheduled-maintenance',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<ScheduledMaintenanceScreen />),
   },
   {
     path: '/server-unavailable',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<ServerUnavailableScreen />),
   },
   {
     path: '/update-required',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<UpdateRequiredScreen />),
   },
   {
     path: '/update-available',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<UpdateAvailableScreen />),
   },
 
   // Passenger Shell & Routes
   {
     element: <RoleGuard allowedRoles={['passenger']} />,
+    errorElement: <RouteErrorElement />,
     children: [
       {
         path: '/passenger',
         element: <PassengerShell />,
+        errorElement: <RouteErrorElement />,
         children: [
           {
             index: true,
@@ -408,10 +413,12 @@ const router = createBrowserRouter([
   // SACCO Shell & Routes
   {
     element: <RoleGuard allowedRoles={['sacco_manager']} />,
+    errorElement: <RouteErrorElement />,
     children: [
       {
         path: '/sacco',
         element: <SaccoShell />,
+        errorElement: <RouteErrorElement />,
         children: [
           {
             index: true,
@@ -481,10 +488,12 @@ const router = createBrowserRouter([
   // Authority Shell & Routes
   {
     element: <RoleGuard allowedRoles={['authority']} />,
+    errorElement: <RouteErrorElement />,
     children: [
       {
         path: '/authority',
         element: <AuthorityShell />,
+        errorElement: <RouteErrorElement />,
         children: [
           {
             index: true,
@@ -534,10 +543,12 @@ const router = createBrowserRouter([
   // Admin Shell & Routes
   {
     element: <RoleGuard allowedRoles={['admin']} />,
+    errorElement: <RouteErrorElement />,
     children: [
       {
         path: '/admin',
         element: <AdminShell />,
+        errorElement: <RouteErrorElement />,
         children: [
           {
             index: true,
@@ -635,6 +646,7 @@ const router = createBrowserRouter([
   // Fallback 404
   {
     path: '*',
+    errorElement: <RouteErrorElement />,
     element: withFullPageSuspense(<NotFound404Screen />),
   },
 ]);

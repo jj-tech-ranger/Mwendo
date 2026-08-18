@@ -9,9 +9,9 @@ export const NotFound404Screen: React.FC = () => {
     <div className="min-h-screen bg-background flex items-center justify-center p-md">
       <EmptyState
         icon="map"
-        title="404 - Page Not Found"
-        description="The screen or route you requested does not exist in Mwendo Salama."
-        primaryCtaLabel="Return Home"
+        title="Page Not Found"
+        description="We couldn't find the page you're looking for. It may have moved or is unavailable."
+        primaryCtaLabel="Return to Home"
         onPrimaryCta={() => navigate('/passenger')}
       />
     </div>

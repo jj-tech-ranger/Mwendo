@@ -22,7 +22,8 @@ export const SaccoDashboard: React.FC = () => {
     totalViolations: 0,
     highRiskVehicles: 0,
     activePilots: 0,
-    safetyScore: 85,
+    safetyScore: null,
+    trips: [],
   }, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoDashboardStats', saccoId],
     queryFn: async () => {
@@ -32,7 +33,8 @@ export const SaccoDashboard: React.FC = () => {
           totalViolations: 0,
           highRiskVehicles: 0,
           activePilots: 0,
-          safetyScore: 85,
+          safetyScore: null,
+          trips: [],
         };
       }
 
@@ -45,7 +47,7 @@ export const SaccoDashboard: React.FC = () => {
       ]);
 
       const vehicleScores = vehicles.map((v) =>
-        typeof v.riskScore === 'number' ? v.riskScore : 85
+        typeof v.riskScore === 'number' ? v.riskScore : 100
       );
       const unresolvedComplaintsCount = complaints.filter(
         (c) => c.status !== 'resolved'
@@ -54,7 +56,20 @@ export const SaccoDashboard: React.FC = () => {
       const calculatedSafetyScore =
         precomputedDoc && 'safetyScore' in precomputedDoc && typeof precomputedDoc.safetyScore === 'number'
           ? precomputedDoc.safetyScore
-          : calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount);
+          : vehicles.length > 0
+          ? calculateSaccoSafetyScore(vehicleScores, unresolvedComplaintsCount)
+          : null;
+
+      // Group trips by day for trend
+      const dailyTripsMap: { [key: string]: { count: number; totalSpeed: number } } = {};
+      trips.forEach((t) => {
+        const dateKey = (t.startTime || t.createdAt || '').split('T')[0] || 'today';
+        if (!dailyTripsMap[dateKey]) {
+          dailyTripsMap[dateKey] = { count: 0, totalSpeed: 0 };
+        }
+        dailyTripsMap[dateKey].count += 1;
+        dailyTripsMap[dateKey].totalSpeed += t.avgSpeedKmH || t.currentSpeedKmH || 0;
+      });
 
       return {
         totalTrips: trips.length,
@@ -62,6 +77,7 @@ export const SaccoDashboard: React.FC = () => {
         highRiskVehicles: vehicles.filter((v) => v.status === 'suspended').length,
         activePilots: vehicles.filter((v) => v.status === 'active').length,
         safetyScore: calculatedSafetyScore,
+        trips,
       };
     },
     enabled: !!saccoId,
@@ -82,12 +98,9 @@ export const SaccoDashboard: React.FC = () => {
     return (
       <EmptyState
         icon="error"
-        title="Failed to Load SACCO Dashboard Telemetry"
-        description={
-          (error as Error)?.message ||
-          'Unable to fetch fleet telemetry, violation records, and compliance metrics from the server. Please check your network connection.'
-        }
-        secondaryCtaLabel="Retry Telemetry Sync"
+        title="We couldn't load the dashboard metrics"
+        description="Unable to fetch fleet information and compliance metrics. Please check your connection and try again."
+        secondaryCtaLabel="Try Again"
         onSecondaryCta={() => refetch()}
       />
     );
@@ -105,19 +118,16 @@ export const SaccoDashboard: React.FC = () => {
             <h1 className="text-xl font-black text-on-surface">{saccoName} Safety Command Center</h1>
           </div>
           <p className="text-xs text-on-surface-variant mt-1">
-            Real-time fleet telemetry, risk analytics, and commuter compliance for {saccoName}
+            Real-time fleet operations, risk analytics, and commuter compliance for {saccoName}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
-          <Badge variant="warning" className="font-bold py-1 px-3 text-[10px]">
-            Provisional Scores (Cloud Functions Gen2 Pending)
-          </Badge>
           <Badge variant="success" className="font-bold py-1 px-3">
             Tenant ID: {saccoId}
           </Badge>
           <Badge variant="neutral" className="font-bold py-1 px-3">
-            24/7 NTSA Telemetry Sync
+            24/7 Safety Monitoring Active
           </Badge>
         </div>
       </div>
@@ -130,8 +140,8 @@ export const SaccoDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-primary">route</span>
           </div>
           <div className="text-3xl font-black font-mono text-on-surface">{stats.totalTrips.toLocaleString()}</div>
-          <div className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">trending_up</span> +12.4% vs last month
+          <div className="text-[11px] text-on-surface-variant font-mono">
+            {stats.totalTrips > 0 ? 'Verified GPS Trips' : 'No trips logged yet'}
           </div>
         </Card>
 
@@ -141,8 +151,8 @@ export const SaccoDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-amber-500">warning</span>
           </div>
           <div className="text-3xl font-black font-mono text-amber-600">{stats.totalViolations}</div>
-          <div className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
-            <span className="material-symbols-outlined text-sm">trending_down</span> -8.2% reduction
+          <div className="text-[11px] text-on-surface-variant font-mono">
+            {stats.totalViolations > 0 ? 'Detected infractions' : 'Zero violations recorded'}
           </div>
         </Card>
 
@@ -152,7 +162,9 @@ export const SaccoDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-error">minor_crash</span>
           </div>
           <div className="text-3xl font-black font-mono text-error">{stats.highRiskVehicles}</div>
-          <div className="text-[11px] text-error font-bold">Requires immediate inspection</div>
+          <div className="text-[11px] text-on-surface-variant font-mono">
+            {stats.highRiskVehicles > 0 ? 'Requires inspection' : 'All vehicles compliant'}
+          </div>
         </Card>
 
         <Card className="p-5 space-y-2 border-l-4 border-l-primary">
@@ -161,7 +173,9 @@ export const SaccoDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-primary">badge</span>
           </div>
           <div className="text-3xl font-black font-mono text-on-surface">{stats.activePilots}</div>
-          <div className="text-[11px] text-on-surface-variant font-mono">100% License Verified</div>
+          <div className="text-[11px] text-on-surface-variant font-mono">
+            {stats.activePilots > 0 ? 'Active fleet drivers' : 'No drivers registered'}
+          </div>
         </Card>
       </div>
 
@@ -178,73 +192,93 @@ export const SaccoDashboard: React.FC = () => {
             </Badge>
           </div>
 
-          <div className="h-48 bg-surface-container rounded-xl p-4 flex flex-col justify-between border border-outline-variant/20">
-            <div className="flex justify-between text-[10px] font-mono text-on-surface-variant">
-              <span>Limit: 80 km/h</span>
-              <span className="text-emerald-700 font-bold">Avg Fleet: 61 km/h</span>
-            </div>
+          {stats.trips.length > 0 ? (
+            <div className="h-48 bg-surface-container rounded-xl p-4 flex flex-col justify-between border border-outline-variant/20">
+              <div className="flex justify-between text-[10px] font-mono text-on-surface-variant">
+                <span>Limit: 80 km/h</span>
+                <span className="text-emerald-700 font-bold">Speed Monitoring Active</span>
+              </div>
 
-            <div className="flex items-end justify-between h-32 gap-1 pt-4">
-              {[45, 52, 68, 82, 60, 54, 48, 59, 74, 88, 62, 58, 51, 49, 65, 70, 58, 52, 60, 64].map((v, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                  <div
-                    style={{ height: `${v}%` }}
-                    className={`w-full rounded-t-sm transition-all ${
-                      v > 80 ? 'bg-error' : v > 70 ? 'bg-amber-500' : 'bg-primary'
-                    }`}
-                  />
-                  <div className="absolute -top-7 hidden group-hover:block bg-surface-container-highest text-on-surface text-[9px] font-mono p-1 rounded shadow-md z-10 whitespace-nowrap">
-                    Day {i + 1}: {v} km/h
-                  </div>
-                </div>
-              ))}
-            </div>
+              <div className="flex items-end justify-between h-32 gap-1 pt-4">
+                {stats.trips.slice(-20).map((t: any, i: number) => {
+                  const speed = t.currentSpeedKmH || t.averageSpeedKmH || 40;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                      <div
+                        style={{ height: `${Math.min(100, (speed / 100) * 100)}%` }}
+                        className={`w-full rounded-t-sm transition-all ${
+                          speed > 80 ? 'bg-error' : speed > 70 ? 'bg-amber-500' : 'bg-primary'
+                        }`}
+                      />
+                      <div className="absolute -top-7 hidden group-hover:block bg-surface-container-highest text-on-surface text-[9px] font-mono p-1 rounded shadow-md z-10 whitespace-nowrap">
+                        {t.plateNumber || 'Vehicle'}: {speed} km/h
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-            <div className="flex justify-between text-[10px] font-mono text-on-surface-variant pt-2 border-t border-outline-variant/20">
-              <span>Day 1</span>
-              <span>Day 15</span>
-              <span>Day 30</span>
+              <div className="flex justify-between text-[10px] font-mono text-on-surface-variant pt-2 border-t border-outline-variant/20">
+                <span>Earliest</span>
+                <span>Latest</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="h-48 bg-surface-container/50 rounded-xl p-4 flex items-center justify-center border border-outline-variant/20">
+              <EmptyState
+                icon="speed"
+                title="No Operational Data Available Yet"
+                description="No operational data is available yet."
+              />
+            </div>
+          )}
         </Card>
 
         <Card className="p-6 text-center space-y-4 flex flex-col justify-between">
           <div>
             <h2 className="text-sm font-bold text-on-surface">SACCO Safety Score</h2>
-            <p className="text-xs text-on-surface-variant">Combined rating by NTSA telemetry</p>
+            <p className="text-xs text-on-surface-variant">Combined rating by NTSA safety metrics</p>
           </div>
 
           <div className="w-32 h-32 mx-auto rounded-full border-8 border-primary/20 border-t-primary flex flex-col items-center justify-center relative">
-            <span className="text-4xl font-black font-mono text-primary">{stats.safetyScore}</span>
+            <span className="text-4xl font-black font-mono text-primary">
+              {stats.safetyScore !== null ? stats.safetyScore : '--'}
+            </span>
             <span className="text-[10px] font-mono font-bold text-on-surface-variant uppercase">/ 100</span>
           </div>
 
           <div className="space-y-1">
-            <Badge
-              variant={
-                stats.safetyScore >= 80
-                  ? 'success'
-                  : stats.safetyScore >= 65
-                  ? 'warning'
-                  : 'danger'
-              }
-              className="font-bold"
-            >
-              {stats.safetyScore >= 80
-                ? 'Grade A - Preferred SACCO'
-                : stats.safetyScore >= 65
-                ? 'Grade B - Standard SACCO'
-                : stats.safetyScore >= 50
-                ? 'Grade C - Probationary SACCO'
-                : 'Grade D - High Risk SACCO'}
-            </Badge>
-            <p className="text-[11px] text-on-surface-variant max-w-xs mx-auto">
-              {stats.safetyScore >= 80
-                ? 'Eligible for NTSA Express Lane Corridor privileges'
-                : stats.safetyScore >= 65
-                ? 'Standard commercial operating compliance status'
-                : 'Subject to enhanced NTSA roadside compliance checks'}
-            </p>
+            {stats.safetyScore !== null ? (
+              <>
+                <Badge
+                  variant={
+                    stats.safetyScore >= 80
+                      ? 'success'
+                      : stats.safetyScore >= 65
+                      ? 'warning'
+                      : 'danger'
+                  }
+                  className="font-bold"
+                >
+                  {stats.safetyScore >= 80
+                    ? 'Grade A - Preferred SACCO'
+                    : stats.safetyScore >= 65
+                    ? 'Grade B - Standard SACCO'
+                    : stats.safetyScore >= 50
+                    ? 'Grade C - Probationary SACCO'
+                    : 'Grade D - High Risk SACCO'}
+                </Badge>
+                <p className="text-[11px] text-on-surface-variant max-w-xs mx-auto">
+                  {stats.safetyScore >= 80
+                    ? 'Eligible for NTSA Express Lane Corridor privileges'
+                    : stats.safetyScore >= 65
+                    ? 'Standard commercial operating compliance status'
+                    : 'Subject to enhanced NTSA roadside compliance checks'}
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-on-surface-variant">No operational data is available yet.</p>
+            )}
           </div>
         </Card>
       </div>

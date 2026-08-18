@@ -9,48 +9,6 @@ import { db } from '../../lib/firebase';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 
-const DEFAULT_MOCK_TRIPS = [
-  {
-    id: 'trip_live_1',
-    plateNumber: 'KDA 123A',
-    driverName: 'John Kamau',
-    routeName: 'Nairobi CBD - Thika Road Corridor',
-    currentSpeedKmH: 62,
-    status: 'active',
-    passengers: 28,
-    isOverspeeding: false,
-    latitude: -1.2297,
-    longitude: 36.8832,
-    heading: 45,
-  },
-  {
-    id: 'trip_live_2',
-    plateNumber: 'KCC 789B',
-    driverName: 'Samuel Ochieng',
-    routeName: 'Mombasa Road Express',
-    currentSpeedKmH: 84,
-    status: 'active',
-    passengers: 33,
-    isOverspeeding: true,
-    latitude: -1.3321,
-    longitude: 36.8794,
-    heading: 135,
-  },
-  {
-    id: 'trip_live_3',
-    plateNumber: 'KDE 456C',
-    driverName: 'Peter Mwangi',
-    routeName: 'Waiyaki Way - Kangemi',
-    currentSpeedKmH: 50,
-    status: 'active',
-    passengers: 14,
-    isOverspeeding: false,
-    latitude: -1.2612,
-    longitude: 36.7865,
-    heading: 270,
-  },
-];
-
 export const SaccoLiveTripsScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
@@ -81,33 +39,33 @@ export const SaccoLiveTripsScreen: React.FC = () => {
             const t = docSnap.data();
             return {
               id: docSnap.id,
-              plateNumber: t.plateNumber || t.vehicleRegNumber || 'KDA 123A',
-              driverName: t.driverName || `Driver #${idx + 10}`,
-              routeName: t.routeName || 'Thika Road',
-              currentSpeedKmH: t.currentSpeedKmH || 65,
+              plateNumber: t.plateNumber || t.vehicleRegNumber || 'Vehicle',
+              driverName: t.driverName || 'Assigned Driver',
+              routeName: t.routeName || 'Direct Route',
+              currentSpeedKmH: t.currentSpeedKmH || 0,
               status: t.status,
-              passengers: t.passengerCount || 20,
+              passengers: t.passengerCount || 0,
               isOverspeeding: (t.currentSpeedKmH || 0) > 80,
               latitude:
                 t.currentLocation?.latitude ||
                 t.latitude ||
-                -1.286389 + (idx % 4) * 0.018,
+                -1.286389,
               longitude:
                 t.currentLocation?.longitude ||
                 t.longitude ||
-                36.817223 + (idx % 4) * 0.022,
-              heading: t.heading || (idx * 45) % 360,
+                36.817223,
+              heading: t.heading || 0,
             };
           });
           setTrips(liveTrips);
         } else {
-          setTrips(DEFAULT_MOCK_TRIPS);
+          setTrips([]);
         }
         setIsLoading(false);
       },
       (error) => {
         console.warn('[SaccoLiveTripsScreen] onSnapshot error:', error);
-        setTrips(DEFAULT_MOCK_TRIPS);
+        setTrips([]);
         setIsLoading(false);
       }
     );
@@ -175,7 +133,7 @@ export const SaccoLiveTripsScreen: React.FC = () => {
         </div>
 
         <Badge variant="success" className="font-mono text-xs">
-          Live GPS Telemetry: Connected
+          Live GPS Tracking: Connected
         </Badge>
       </div>
 
@@ -222,7 +180,7 @@ export const SaccoLiveTripsScreen: React.FC = () => {
           <div className="lg:col-span-7 h-full min-h-[400px]">
             <MapComponent
               markers={mapMarkers}
-              centerAddress={`${saccoName} Live Fleet Telemetry`}
+              centerAddress={`${saccoName} Active Fleet`}
               showRouteTrace={true}
               showHeatmapOverlay={false}
               onMarkerClick={(m) => setSelectedTripId(m.id)}

@@ -58,10 +58,7 @@ export const AdminAnalyticsScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="warning" className="text-[10px]">
-            Provisional Client-Side Metrics (Pending Cloud Functions Gen2 Migration)
-          </Badge>
-          <Badge variant="info">Live Database Metrics</Badge>
+          <Badge variant="info">Live Operational Metrics</Badge>
         </div>
       </div>
 

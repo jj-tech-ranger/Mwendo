@@ -71,7 +71,7 @@ export const AdminSecurityScreen: React.FC = () => {
             Platform Security, Backup & Recovery Management
           </h2>
           <p className="font-body-sm text-xs text-on-surface-variant">
-            MFA policies, session timeouts, and automated Firestore point-in-time recovery.
+            MFA policies, session timeouts, and automated point-in-time database recovery.
           </p>
         </div>
 
@@ -173,9 +173,9 @@ export const AdminSecurityScreen: React.FC = () => {
           <div className="flex items-center justify-between border-b border-slate-800 pb-md">
             <div>
               <h3 className="text-base font-bold text-emerald-400 uppercase tracking-widest">
-                Firestore Point-in-Time Backup & Disaster Recovery
+                Database Point-in-Time Backup & Disaster Recovery
               </h3>
-              <p className="text-xs text-slate-400 mt-1">GCP Cloud Firestore Backup Schedules and Disaster Recovery Ledger</p>
+              <p className="text-xs text-slate-400 mt-1">Automated System Backup Schedules and Disaster Recovery Ledger</p>
             </div>
             <Badge variant="neutral">Cloud Managed</Badge>
           </div>
@@ -183,14 +183,14 @@ export const AdminSecurityScreen: React.FC = () => {
           {/* Backup History Content */}
           {isLoadingBackups ? (
             <div className="p-8 text-center text-xs text-slate-400 font-mono animate-pulse">
-              Querying backup snapshots from Firestore storage...
+              Querying backup snapshots from database storage...
             </div>
           ) : backups.length === 0 ? (
             <div className="bg-[#111827] border border-slate-800 rounded-xl p-8">
               <EmptyState
                 icon="cloud_sync"
                 title="No Automated Cloud Backups Found"
-                description="No custom snapshot manifests have been registered in the database. Automated backups can be scheduled using Google Cloud Platform Firestore Scheduled Backups."
+                description="No custom snapshot manifests have been registered in the database. Automated backups are executed on scheduled retention cycles."
               />
             </div>
           ) : (
@@ -239,7 +239,7 @@ export const AdminSecurityScreen: React.FC = () => {
             </div>
 
             <p className="text-slate-300">
-              Restoring snapshot <strong className="text-amber-400">{selectedBackupToRestore}</strong> will overwrite current live Firestore collections. This action is irreversible and requires explicit admin authorization.
+              Restoring snapshot <strong className="text-amber-400">{selectedBackupToRestore}</strong> will overwrite current live database records. This action is irreversible and requires explicit admin authorization.
             </p>
 
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">

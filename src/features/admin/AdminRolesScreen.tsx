@@ -21,7 +21,7 @@ export const AdminRolesScreen: React.FC = () => {
       id: 'cap_suspend_users',
       category: 'IDENTITY',
       label: 'Suspend & Manage Accounts',
-      description: 'Modify user active state, trigger instant Firestore live status revocation.',
+      description: 'Modify user active state and trigger real-time session status revocation.',
     },
     {
       id: 'cap_manage_saccos',
@@ -93,14 +93,14 @@ export const AdminRolesScreen: React.FC = () => {
         <Badge variant="info">4 Platform Roles Defined</Badge>
       </div>
 
-      {/* Architecture Context Callout */}
+      {/* Role Policy Context Callout */}
       <div className="p-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 space-y-2 shadow-xs">
         <div className="flex items-center gap-2 text-primary font-bold text-xs">
           <span className="material-symbols-outlined text-base">info</span>
-          <span>Authorization Architecture Note (<code className="font-label-mono">activeRole</code> vs <code className="font-label-mono">roles[]</code>)</span>
+          <span>Role-Based Access Control Policy</span>
         </div>
         <p className="font-body-sm text-xs text-on-surface-variant leading-relaxed">
-          In Mwendo Salama, a user may hold multiple roles in their token claims (<code className="font-label-mono">roles[]</code>), but authorization checks evaluate the single, explicit <code className="font-label-mono">activeRole</code> claim stored on their live Firestore document. This prevents role-confusion vulnerabilities across SACCO and Authority views.
+          Users may hold multiple assigned role authorizations. Active session permissions are strictly constrained to their currently selected active role, preventing privilege crossover between SACCO and Authority portals.
         </p>
       </div>
 

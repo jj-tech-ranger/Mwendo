@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { BrandMark } from '../../components/assets/BrandAssets';
@@ -8,7 +8,6 @@ import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
-import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 
 export const PassengerDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -17,13 +16,7 @@ export const PassengerDashboard: React.FC = () => {
   const startTrip = useTripStore((s) => s.startTrip);
   const activeTrip = useTripStore((s) => s.activeTrip);
 
-  const [isGuestMode, setIsGuestMode] = useState(() => !!user?.isAnonymous);
-
-  useEffect(() => {
-    if (user) {
-      setIsGuestMode(!!user.isAnonymous);
-    }
-  }, [user]);
+  const isGuestMode = !!user?.isAnonymous;
   const [plateNumber, setPlateNumber] = useState('');
   const [sacco, setSacco] = useState('');
   const [route, setRoute] = useState('');
@@ -40,35 +33,6 @@ export const PassengerDashboard: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
-      {/* Dev Mode Switcher for Guest vs Registered View */}
-      {SHOW_DEV_TOOLS && (
-        <div className="flex items-center justify-between bg-surface-container-low p-2 px-3 rounded-xl border border-outline-variant/30 text-xs">
-          <span className="font-mono text-on-surface-variant">View Mode (Dev Only):</span>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setIsGuestMode(false)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                !isGuestMode
-                  ? 'bg-primary text-on-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Registered
-            </button>
-            <button
-              onClick={() => setIsGuestMode(true)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                isGuestMode
-                  ? 'bg-primary text-on-primary shadow-sm'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Guest
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header Bar */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">

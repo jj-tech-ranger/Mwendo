@@ -158,7 +158,7 @@ export const SaccoUsersScreen: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-outline-variant/20 font-medium">
                 {[
-                  { name: 'View Fleet Telemetry', m: '✓', o: '✓', v: '✓' },
+                  { name: 'View Fleet Trips & Speed', m: '✓', o: '✓', v: '✓' },
                   { name: 'Manage Vehicles & Drivers', m: '✓', o: '✓', v: '—' },
                   { name: 'Claim Provisional Vehicles', m: '✓', o: '—', v: '—' },
                   { name: 'Moderate Black Spot Reports', m: '✓', o: '✓', v: '—' },

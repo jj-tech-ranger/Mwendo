@@ -7,7 +7,6 @@ import { OfflineBanner } from '../common/OfflineBanner';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { LanguageToggle } from '../common/LanguageToggle';
 import { useAuthStore } from '../../store/useAuthStore';
-import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
 export const SaccoShell: React.FC = () => {
@@ -15,18 +14,9 @@ export const SaccoShell: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
-  const setUser = useAuthStore((s) => s.setUser);
 
-  const currentSaccoId = getEffectiveSaccoId(user?.saccoId) || 'sacco_metrolink';
-  const currentSaccoName = getSaccoName(currentSaccoId);
-
-  const handleSwitchSacco = (newSaccoId: string) => {
-    if (!user) return;
-    setUser({
-      ...user,
-      saccoId: newSaccoId,
-    });
-  };
+  const currentSaccoId = getEffectiveSaccoId(user?.saccoId);
+  const currentSaccoName = currentSaccoId ? getSaccoName(currentSaccoId) : null;
 
   const navItems = [
     { path: '/sacco', label: t('sacco.nav.dashboard'), icon: 'dashboard' },
@@ -98,22 +88,11 @@ export const SaccoShell: React.FC = () => {
             </button>
           </div>
 
-          {/* SACCO Active Switcher Badge (Dev Only) */}
-          {SHOW_DEV_TOOLS && !isCollapsed && (
-            <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 overflow-hidden">
-                <span className="material-symbols-outlined text-primary text-base">domain</span>
-                <span className="font-bold text-primary truncate">{currentSaccoName}</span>
-              </div>
-              <select
-                value={currentSaccoId}
-                onChange={(e) => handleSwitchSacco(e.target.value)}
-                aria-label={t('sacco.shell.switchSacco')}
-                className="text-[10px] bg-surface text-on-surface border border-outline-variant/40 rounded px-1 py-0.5 cursor-pointer font-mono"
-              >
-                <option value="sacco_metrolink">MetroLink</option>
-                <option value="sacco_greenline">GreenLine</option>
-              </select>
+          {/* SACCO Active Display */}
+          {currentSaccoName && !isCollapsed && (
+            <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 flex items-center gap-1.5 text-xs overflow-hidden">
+              <span className="material-symbols-outlined text-primary text-base">domain</span>
+              <span className="font-bold text-primary truncate">{currentSaccoName}</span>
             </div>
           )}
 

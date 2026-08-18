@@ -77,35 +77,43 @@ export const SaccoAnalyticsScreen: React.FC = () => {
       </div>
 
       {activeSubTab === 'analytics' ? (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-5 space-y-1">
-              <span className="text-xs font-mono uppercase text-on-surface-variant">Average Speed Score</span>
-              <div className="text-2xl font-black font-mono text-emerald-700">
-                {drivers.length > 0
-                  ? `${Math.round(drivers.reduce((acc, d) => acc + d.safetyScore, 0) / drivers.length)} / 100`
-                  : '-- / 100'}
-              </div>
-            </Card>
-            <Card className="p-5 space-y-1">
-              <span className="text-xs font-mono uppercase text-on-surface-variant font-bold">Active Fleet Count</span>
-              <div className="text-2xl font-black font-mono text-amber-600">{vehicles.length} Vehicles</div>
-            </Card>
-            <Card className="p-5 space-y-1">
-              <span className="text-xs font-mono uppercase text-on-surface-variant">Active Drivers</span>
-              <div className="text-2xl font-black font-mono text-primary">{drivers.length} Drivers</div>
+        drivers.length === 0 && vehicles.length === 0 ? (
+          <EmptyState
+            icon="insights"
+            title="No Operational Data Available Yet"
+            description="No operational data is available yet."
+          />
+        ) : (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-5 space-y-1">
+                <span className="text-xs font-mono uppercase text-on-surface-variant">Average Speed Score</span>
+                <div className="text-2xl font-black font-mono text-emerald-700">
+                  {drivers.length > 0
+                    ? `${Math.round(drivers.reduce((acc, d) => acc + d.safetyScore, 0) / drivers.length)} / 100`
+                    : '-- / 100'}
+                </div>
+              </Card>
+              <Card className="p-5 space-y-1">
+                <span className="text-xs font-mono uppercase text-on-surface-variant font-bold">Active Fleet Count</span>
+                <div className="text-2xl font-black font-mono text-amber-600">{vehicles.length} Vehicles</div>
+              </Card>
+              <Card className="p-5 space-y-1">
+                <span className="text-xs font-mono uppercase text-on-surface-variant">Active Drivers</span>
+                <div className="text-2xl font-black font-mono text-primary">{drivers.length} Drivers</div>
+              </Card>
+            </div>
+
+            <Card className="p-6 space-y-4">
+              <h3 className="font-bold text-sm text-on-surface">Corridor Speed Compliance Breakdown</h3>
+              <p className="text-xs text-on-surface-variant font-mono">
+                {vehicles.length === 0
+                  ? 'No operational data is available yet.'
+                  : 'Safety monitoring active across registered SACCO routes.'}
+              </p>
             </Card>
           </div>
-
-          <Card className="p-6 space-y-4">
-            <h3 className="font-bold text-sm text-on-surface">Corridor Speed Compliance Breakdown</h3>
-            <p className="text-xs text-on-surface-variant font-mono">
-              {vehicles.length === 0
-                ? 'No corridor telemetry recorded yet. Register vehicles to track compliance.'
-                : 'Telemetry monitoring active across registered SACCO routes.'}
-            </p>
-          </Card>
-        </div>
+        )
       ) : (
         /* LEADERBOARDS SUB TAB (§19) */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

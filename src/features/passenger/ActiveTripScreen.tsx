@@ -12,7 +12,6 @@ import { storageService } from '../../services/storageService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
 import { remoteConfigService } from '../../services/remoteConfigService';
-import { SHOW_DEV_TOOLS } from '../../lib/devFlags';
 
 export const ActiveTripScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -418,27 +417,6 @@ export const ActiveTripScreen: React.FC = () => {
             Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span>
           </div>
         </div>
-
-        {/* Simulate Telemetry Speed (Development Only) */}
-        {SHOW_DEV_TOOLS && (
-          <div className="bg-emerald-950/90 border border-emerald-700/50 p-3 rounded-xl max-w-sm mx-auto space-y-2 text-xs font-mono text-left">
-            <div className="flex justify-between items-center text-emerald-300 font-bold">
-              <span>Simulate Telemetry Speed</span>
-              <span>{currentSpeed} km/h</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="120"
-              value={currentSpeed}
-              onChange={(e) => updateTelemetry(Number(e.target.value))}
-              className="w-full accent-emerald-500 cursor-pointer"
-            />
-            <p className="text-[10px] text-emerald-400/70 font-sans">
-              Dev-only simulation slider. In production, speed updates automatically via device GPS location.
-            </p>
-          </div>
-        )}
 
         {/* Alert Cards Feed */}
         <div className="space-y-2 max-w-sm mx-auto text-left">

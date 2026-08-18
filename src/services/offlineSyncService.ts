@@ -47,7 +47,6 @@ class OfflineSyncService {
    */
   async drainQueue(): Promise<DrainResult> {
     if (this.isDraining) {
-      console.debug('[OfflineSyncService] Drain already in progress. Skipping duplicate run.');
       const { tripKeys, reportKeys } = await this.getQueuedKeys();
       return {
         syncedTrips: 0,

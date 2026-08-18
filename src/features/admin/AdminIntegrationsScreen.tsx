@@ -7,49 +7,49 @@ export const AdminIntegrationsScreen: React.FC = () => {
 
   const integrations = [
     {
-      id: 'firebase_db',
-      name: 'Firebase Firestore Database',
-      description: 'Primary real-time document store for users, trips, SACCOs, and blackspot reports.',
+      id: 'core_db',
+      name: 'Primary Database Connector',
+      description: 'Real-time synchronization store for users, trips, SACCOs, and blackspot reports.',
       status: 'Connected',
       type: 'Database',
       icon: 'database',
     },
     {
       id: 'fcm',
-      name: 'Firebase Cloud Messaging (FCM)',
-      description: 'Cross-platform mobile push notification pipeline for emergency alerts.',
+      name: 'Push Notification Dispatcher',
+      description: 'Cross-platform mobile notification pipeline for emergency alerts and broadcast updates.',
       status: 'Connected',
       type: 'Messaging',
       icon: 'notifications_active',
     },
     {
       id: 'storage',
-      name: 'Cloud Storage Bucket',
-      description: 'Persistent file store for inspection certificates and blackspot evidence photos.',
+      name: 'Secure Document & Evidence Vault',
+      description: 'Encrypted storage for inspection certificates and blackspot evidence imagery.',
       status: 'Connected',
       type: 'Storage',
       icon: 'cloud',
     },
     {
-      id: 'bigquery',
-      name: 'Google BigQuery Warehouse',
-      description: 'Long-term raw GPS telemetry sink for machine learning hazard detection.',
-      status: 'Configured',
+      id: 'analytics_engine',
+      name: 'Safety Analytics & Aggregation Engine',
+      description: 'Aggregates long-term speed metrics and hazard clustering data.',
+      status: 'Connected',
       type: 'Analytics',
       icon: 'analytics',
     },
     {
-      id: 'sentry',
-      name: 'Sentry Performance & Error Tracker',
-      description: 'Real-time crash reporting and JavaScript stack trace aggregation.',
+      id: 'audit_monitor',
+      name: 'Audit & Activity Monitor',
+      description: 'Real-time diagnostic auditing, logging, and operational tracking.',
       status: 'Connected',
       type: 'Monitoring',
       icon: 'bug_report',
     },
     {
-      id: 'twilio',
-      name: 'Twilio SMS Gateway',
-      description: 'Fallback SMS channel for non-smartphone emergency SOS dispatch.',
+      id: 'sms_gateway',
+      name: 'National SMS Dispatch Gateway',
+      description: 'Direct SMS channel for non-smartphone emergency SOS dispatch and driver alerts.',
       status: 'Connected',
       type: 'Telephony',
       icon: 'sms',
@@ -61,10 +61,10 @@ export const AdminIntegrationsScreen: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md">
         <div>
           <h2 className="font-headline-lg-mobile text-lg text-on-surface font-bold">
-            External Integrations & API Services
+            External Integrations & System Services
           </h2>
           <p className="font-body-sm text-xs text-on-surface-variant">
-            Connectors and status monitors for GCP, Firebase, Sentry, and Twilio.
+            Connectors and status monitors for national transport safety infrastructure.
           </p>
         </div>
 

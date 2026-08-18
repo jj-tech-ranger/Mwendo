@@ -55,58 +55,6 @@ export const SafetyMapScreen: React.FC = () => {
         longitude: typeof p.longitude === 'number' ? p.longitude : 36.817223 + (idx % 3) * 0.02,
       }));
 
-      if (mapped.length === 0) {
-        return [
-          {
-            id: 'pin_default_1',
-            title: 'Kinungi Blackspot (A104)',
-            type: 'blackspot' as const,
-            severity: 'high' as const,
-            locationName: 'Naivasha - Nakuru Highway',
-            corroborationCount: 14,
-            description: 'High frequency collision area near Kinungi flyover.',
-            distanceKm: 2.5,
-            latitude: -0.8351,
-            longitude: 36.4678,
-          },
-          {
-            id: 'pin_default_2',
-            title: 'Salgaa Deceleration Hill',
-            type: 'blackspot' as const,
-            severity: 'high' as const,
-            locationName: 'Nakuru - Eldoret Highway',
-            corroborationCount: 22,
-            description: 'Steep incline with runaway truck ramp.',
-            distanceKm: 12.0,
-            latitude: -0.2185,
-            longitude: 35.8821,
-          },
-          {
-            id: 'pin_default_3',
-            title: 'A104 Waiyaki Way U-Turn',
-            type: 'danger_zone' as const,
-            severity: 'medium' as const,
-            locationName: 'Waiyaki Way / Westlands',
-            corroborationCount: 8,
-            description: 'Sharp merges and pedestrian crossing hazard.',
-            distanceKm: 4.2,
-            latitude: -1.2612,
-            longitude: 36.7865,
-          },
-          {
-            id: 'pin_default_4',
-            title: 'Mombasa Road City Cabanas Junction',
-            type: 'blackspot' as const,
-            severity: 'high' as const,
-            locationName: 'Mombasa Road (A109)',
-            corroborationCount: 19,
-            description: 'High speed entry zone with heavy freight traffic.',
-            distanceKm: 8.5,
-            latitude: -1.3321,
-            longitude: 36.8794,
-          },
-        ];
-      }
       return mapped;
     },
     staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,

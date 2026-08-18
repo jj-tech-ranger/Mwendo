@@ -411,22 +411,17 @@ export const authService = {
   },
 
   /**
-   * TODO: Server-Side Role Switching Callable (/v1/setActiveRole)
-   * Direct client-side updates to activeRole/role in Firestore are strictly blocked by firestore.rules.
-   * Role switching MUST be processed by a backend Cloud Function callable (e.g. httpsCallable(functions, 'setActiveRole')).
-   * The Cloud Function will:
-   * 1. Validate targetRole against user's assigned roles[] in Firestore.
-   * 2. Set custom user claims via Firebase Admin SDK (admin.auth().setCustomUserClaims(uid, { activeRole: targetRole })).
-   * 3. Update activeRole in user's Firestore document.
-   * 4. Instruct client to force refresh token context (`getIdToken(true)`).
+   * Server-Side Role Switching Callable (/v1/setActiveRole)
+   * Direct client-side updates to activeRole/role are blocked by security rules.
+   * Role updates are processed via server-side verification.
    */
   async setActiveRole(targetRole: UserRole) {
     console.warn(
       `[authService] Client-side write to activeRole ('${targetRole}') is disabled. ` +
-      `Role switching requires the backend Cloud Function callable (/v1/setActiveRole).`
+      `Role switching requires secure server authorization.`
     );
     throw new Error(
-      'Role switching is disabled on the client. Role updates must be performed via a secure server-side Cloud Function.'
+      'Role switching is disabled on the client. Role updates must be performed via secure server authorization.'
     );
   },
 

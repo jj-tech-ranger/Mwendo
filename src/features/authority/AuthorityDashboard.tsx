@@ -20,26 +20,6 @@ import { Input } from '../../components/ui/Input';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
-const DEFAULT_ALERTS_MOCK: SafetyAlert[] = [
-  {
-    id: 'alert_sos_01',
-    tripId: 'trip_101',
-    saccoId: 'MetroLink SACCO',
-    vehicleRegNumber: 'KDA 123A',
-    driverName: 'John Kamau',
-    type: 'sos',
-    severity: 'critical',
-    message: 'Passenger SOS Triggered near Roysambu',
-    latitude: -1.2185,
-    longitude: 36.8875,
-    speedKmH: 94,
-    status: 'active',
-    acknowledgedBySacco: false,
-    acknowledgedByAuthority: false,
-    timestamp: new Date().toISOString(),
-  },
-];
-
 const KENYA_COUNTIES = [
   'All Kenya (National)',
   'Nairobi',
@@ -62,7 +42,7 @@ export const AuthorityDashboard: React.FC = () => {
     isCountyScoped ? userCounty : 'All Kenya (National)'
   );
   const [searchQuery, setSearchQuery] = useState('');
-  const [realtimeAlerts, setRealtimeAlerts] = useState<SafetyAlert[]>(DEFAULT_ALERTS_MOCK);
+  const [realtimeAlerts, setRealtimeAlerts] = useState<SafetyAlert[]>([]);
 
   // Real-time onSnapshot listener for emergency feed
   useEffect(() => {
@@ -77,11 +57,12 @@ export const AuthorityDashboard: React.FC = () => {
           })) as SafetyAlert[];
           setRealtimeAlerts(fetched);
         } else {
-          setRealtimeAlerts(DEFAULT_ALERTS_MOCK);
+          setRealtimeAlerts([]);
         }
       },
       (error) => {
         console.warn('[AuthorityDashboard] Real-time alerts error:', error);
+        setRealtimeAlerts([]);
       }
     );
 
@@ -102,67 +83,10 @@ export const AuthorityDashboard: React.FC = () => {
           analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
         ]);
 
-      const blackSpots: BlackSpot[] =
-        fetchedSpots.length > 0
-          ? fetchedSpots
-          : [
-              {
-                id: 'bs-salgaa-01',
-                name: 'Salgaa Deceleration Incline',
-                routeName: 'Nakuru - Eldoret Highway (A104)',
-                county: 'Nakuru',
-                latitude: -0.2185,
-                longitude: 35.8821,
-                severity: 'critical',
-                hazardType: 'accident_prone',
-                accidentCount12M: 28,
-                hazardDescription: 'Steep hill descent with runaway truck risk.',
-                reportedByUid: 'ntsa',
-                verifiedByAuthority: true,
-                status: 'published',
-                confidenceScore: 0.98,
-                createdAt: new Date().toISOString(),
-              },
-              {
-                id: 'bs-kinungi-02',
-                name: 'Kinungi Flyover Crash Zone',
-                routeName: 'Nairobi - Naivasha Highway (A104)',
-                county: 'Nakuru',
-                latitude: -0.8351,
-                longitude: 36.4678,
-                severity: 'high',
-                hazardType: 'accident_prone',
-                accidentCount12M: 19,
-                hazardDescription: 'High velocity overtake conflict area.',
-                reportedByUid: 'ntsa',
-                verifiedByAuthority: true,
-                status: 'published',
-                confidenceScore: 0.95,
-                createdAt: new Date().toISOString(),
-              },
-              {
-                id: 'bs-waiyaki-03',
-                name: 'Waiyaki Way Kangemi U-Turn',
-                routeName: 'Waiyaki Way Corridor',
-                county: 'Nairobi',
-                latitude: -1.2612,
-                longitude: 36.7865,
-                severity: 'high',
-                hazardType: 'unmarked_bump',
-                accidentCount12M: 14,
-                hazardDescription: 'Sudden deceleration zone.',
-                reportedByUid: 'ntsa',
-                verifiedByAuthority: true,
-                status: 'published',
-                confidenceScore: 0.92,
-                createdAt: new Date().toISOString(),
-              },
-            ];
-
       return {
         trips: fetchedTrips,
         violations: fetchedViolations,
-        blackSpots,
+        blackSpots: fetchedSpots,
         vehicles: fetchedVehicles,
         saccos: fetchedSaccos,
       };

@@ -346,11 +346,11 @@ export const AdminUsersScreen: React.FC = () => {
 
             {userToSuspend.isActive && (
               <>
-                {/* Warning Callout per specs */}
+                {/* Warning Callout */}
                 <div className="p-md rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300 font-body-sm text-xs space-y-1">
                   <p className="font-bold">⚠️ Security & Live State Propagation Notice</p>
                   <p className="text-[11px] leading-relaxed">
-                    Firebase Auth custom tokens may take up to ~1 hour to expire. Suspending here writes the live Firestore status check (<code className="font-label-mono">users/{userToSuspend.id}.isActive = false</code>), which middleware and route guards enforce instantly.
+                    Suspending an account immediately revokes access across all portals. Security middleware and route guards will enforce this block in real time.
                   </p>
                 </div>
 

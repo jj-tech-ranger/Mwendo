@@ -7,7 +7,7 @@ import { MfaEnrollmentScreen } from '../auth/MfaEnrollmentScreen';
 
 export const AdminSettingsScreen: React.FC = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'settings' | 'profile' | 'docs' | 'states'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'profile' | 'docs'>('settings');
   const [showMfaModal, setShowMfaModal] = useState(false);
 
   return (
@@ -18,7 +18,7 @@ export const AdminSettingsScreen: React.FC = () => {
             Platform Configuration, Documentation & Operational Runbooks
           </h2>
           <p className="font-body-sm text-xs text-on-surface-variant">
-            System parameters, in-app documentation, profile settings, and UI component state previews.
+            System parameters, in-app documentation, and profile settings.
           </p>
         </div>
 
@@ -53,16 +53,6 @@ export const AdminSettingsScreen: React.FC = () => {
             }`}
           >
             Runbooks
-          </button>
-          <button
-            onClick={() => setActiveTab('states')}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              activeTab === 'states'
-                ? 'bg-primary text-on-primary font-bold shadow-xs'
-                : 'text-on-surface-variant hover:text-on-surface'
-            }`}
-          >
-            UI States
           </button>
         </div>
       </div>
@@ -166,38 +156,20 @@ export const AdminSettingsScreen: React.FC = () => {
             <div className="p-md rounded-xl bg-surface-container-low space-y-2 border border-outline-variant/20">
               <span className="font-label-mono text-xs font-bold text-primary">RUNBOOK #1: SACCO Suspension Workflow</span>
               <p className="text-on-surface-variant">
-                1. Review violation history under /admin/saccos. 2. Verify formal NTSA legal order attachment. 3. Click Suspend SACCO to revoke claims.
+                1. Review violation history under /admin/saccos. 2. Verify formal NTSA legal order attachment. 3. Suspend SACCO to revoke portal access.
               </p>
             </div>
 
             <div className="p-md rounded-xl bg-surface-container-low space-y-2 border border-outline-variant/20">
-              <span className="font-label-mono text-xs font-bold text-primary">RUNBOOK #2: Telemetry Ingestion Spikes</span>
+              <span className="font-label-mono text-xs font-bold text-primary">RUNBOOK #2: High Ingestion Traffic</span>
               <p className="text-on-surface-variant">
-                1. Inspect p95 latency under /admin/monitoring. 2. Scale Cloud Functions concurrency limit if Pub/Sub queue depth &gt; 10,000.
+                1. Inspect latency under /admin/monitoring. 2. Scale processing server capacity if queue volume exceeds thresholds.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tab 4: UI Component States Preview */}
-      {activeTab === 'states' && (
-        <div className="space-y-md">
-          <div className="p-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 text-center py-xl space-y-2 shadow-xs">
-            <span className="material-symbols-outlined text-4xl text-outline">inbox</span>
-            <p className="font-bold text-on-surface text-sm">Honest Empty State Preview</p>
-            <p className="font-body-sm text-xs text-on-surface-variant">
-              No live telemetry data registered for this parameter range yet.
-            </p>
-          </div>
-
-          <div className="p-md rounded-2xl bg-[#0A0F1D] border border-slate-800 text-slate-400 font-label-mono text-xs space-y-2 animate-pulse">
-            <p className="text-emerald-400 font-bold">Dark Ops Skeleton Loading State...</p>
-            <div className="h-4 bg-slate-800 rounded w-3/4" />
-            <div className="h-4 bg-slate-800 rounded w-1/2" />
-          </div>
-        </div>
-      )}
       {showMfaModal && (
         <MfaEnrollmentScreen isModal onClose={() => setShowMfaModal(false)} />
       )}

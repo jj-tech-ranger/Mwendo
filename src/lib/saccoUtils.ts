@@ -1,5 +1,3 @@
-import { SHOW_DEV_TOOLS } from './devFlags';
-
 /**
  * Single source of truth for mapping SACCO IDs to display names.
  */
@@ -13,11 +11,9 @@ export function getSaccoName(saccoId?: string | null): string {
 }
 
 /**
- * Resolves saccoId for a user, respecting dev mode fallback if SHOW_DEV_TOOLS is active.
- * In production (!SHOW_DEV_TOOLS), returns undefined if user has no saccoId.
+ * Resolves saccoId for a user. Returns undefined if user has no saccoId.
  */
 export function getEffectiveSaccoId(saccoId?: string | null): string | undefined {
-  if (saccoId) return saccoId;
-  if (SHOW_DEV_TOOLS) return 'sacco_metrolink';
-  return undefined;
+  return saccoId || undefined;
 }
+

@@ -339,7 +339,7 @@ export const PassengerProfileScreen: React.FC = () => {
                 <div className="text-[11px] text-on-surface-variant">
                   {analyticsService.hasDpaConsent()
                     ? `Consent Granted ${user?.analyticsConsentAt ? `(${new Date(user.analyticsConsentAt).toLocaleDateString()})` : ''}`
-                    : 'Consent Withheld (Essential Telemetry Only)'}
+                    : 'Consent Withheld (Essential Trip Data Only)'}
                 </div>
               </div>
               <Badge variant={analyticsService.hasDpaConsent() ? 'success' : 'neutral'} className="font-mono text-[10px]">

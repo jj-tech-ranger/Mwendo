@@ -62,7 +62,7 @@ export const ServerUnavailableScreen: React.FC = () => {
 
       <footer className="py-4 text-center">
         <p className="font-label-mono text-xs text-outline opacity-60 uppercase">
-          ERROR CODE: 503_UNAVAILABLE_SA
+          Mwendo Salama Safe Transit Network
         </p>
       </footer>
     </div>

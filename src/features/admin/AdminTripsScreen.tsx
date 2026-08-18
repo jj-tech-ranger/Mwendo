@@ -74,7 +74,7 @@ export const AdminTripsScreen: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md">
         <div>
           <h2 className="font-headline-lg-mobile text-lg text-on-surface font-bold">
-            Platform Trip Explorer & Raw Telemetry
+            Platform Trip Explorer & GPS Logs
           </h2>
           <p className="font-body-sm text-xs text-on-surface-variant">
             Cross-tenant search across all GPS trip logs and raw ingestion data.
@@ -212,7 +212,7 @@ export const AdminTripsScreen: React.FC = () => {
 
               <div className="p-md rounded-2xl border border-outline-variant/20 space-y-2">
                 <span className="font-label-mono text-[10px] text-outline uppercase font-bold">
-                  Telemetry Confidence Breakdown
+                  Verification Confidence Breakdown
                 </span>
                 <div className="grid grid-cols-2 gap-sm text-xs">
                   <div>
@@ -242,7 +242,7 @@ export const AdminTripsScreen: React.FC = () => {
                 onClick={() => setShowRawTelemetryModal(true)}
               >
                 <span className="material-symbols-outlined text-lg">code</span>
-                View Raw GPS Telemetry JSON
+                View GPS Coordinates & Data
               </Button>
             </div>
           </div>
@@ -256,7 +256,7 @@ export const AdminTripsScreen: React.FC = () => {
             <div className="flex items-center justify-between border-b border-emerald-800/40 pb-sm">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-emerald-400">data_object</span>
-                <span className="font-bold text-white">Raw Telemetry Packet ({selectedTrip.id})</span>
+                <span className="font-bold text-white">Trip Coordinates & Log ({selectedTrip.id})</span>
               </div>
               <button
                 onClick={() => setShowRawTelemetryModal(false)}
@@ -302,7 +302,7 @@ export const AdminTripsScreen: React.FC = () => {
                       <span className="material-symbols-outlined text-3xl text-slate-500 block mb-1">
                         location_off
                       </span>
-                      <p className="font-bold text-slate-300">No telemetry sample available</p>
+                      <p className="font-bold text-slate-300">No GPS coordinates sample available</p>
                       <p className="text-[11px] text-slate-500">
                         This trip record has no stored GPS location coordinates.
                       </p>
@@ -317,9 +317,8 @@ export const AdminTripsScreen: React.FC = () => {
                         tripId: selectedTrip.id,
                         vehicleRegNumber: selectedTrip.vehicleRegNumber,
                         saccoId: selectedTrip.saccoId,
-                        traceId: selectedTrip.traceId || `trc-${selectedTrip.id}`,
-                        telemetryStoragePath:
-                          selectedTrip.telemetryStoragePath || `telemetry/${selectedTrip.id}.json`,
+                        traceId: selectedTrip.traceId,
+                        telemetryStoragePath: selectedTrip.telemetryStoragePath,
                         sampleGPS,
                       },
                       null,

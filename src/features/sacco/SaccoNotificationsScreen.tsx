@@ -42,9 +42,11 @@ export const SaccoNotificationsScreen: React.FC = () => {
 
       <div className="space-y-3">
         {notifications.length === 0 ? (
-          <Card className="p-8 text-center text-xs text-on-surface-variant font-mono">
-            No notifications recorded for this SACCO.
-          </Card>
+          <EmptyState
+            icon="notifications"
+            title="No Notifications"
+            description="You don't have any notifications yet."
+          />
         ) : (
           notifications.map((n) => (
             <Card

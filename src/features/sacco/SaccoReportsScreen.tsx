@@ -258,7 +258,7 @@ export const SaccoReportsScreen: React.FC = () => {
 
           {/* Download Action Bar */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <span className="text-xs font-mono text-slate-500">Document ID: {saccoId}_safety_{Date.now()}</span>
+            <span className="text-xs font-mono text-slate-500">Report Reference: {saccoId}_safety_{Date.now()}</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" className="font-bold text-xs" onClick={handleExportCSV}>
                 <span className="material-symbols-outlined text-base mr-1">csv</span> Export CSV Ledger

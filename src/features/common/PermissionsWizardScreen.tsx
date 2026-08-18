@@ -89,7 +89,7 @@ export const PermissionsWizardScreen: React.FC = () => {
       id: 'storage',
       icon: 'folder_zip',
       title: 'Save trips for offline access',
-      body: 'Buffers telemetry, offline trip logs, and black-spot reports locally in IndexedDB so the app functions seamlessly in low-signal areas.',
+      body: 'Saves your journey history and safety reports locally on your device so the app functions seamlessly in low-signal areas.',
       primaryCta: 'Allow Storage Access',
       requestFn: async () => {
         try {

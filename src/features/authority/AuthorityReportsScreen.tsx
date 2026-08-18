@@ -262,7 +262,7 @@ export const AuthorityReportsScreen: React.FC = () => {
 
       lines.push('--- EXECUTIVE SUMMARY METRICS ---');
       lines.push('Metric,Value,Unit/Note');
-      lines.push(`Total Telemetry Trips,${totalTripsCount},GPS Recorded`);
+      lines.push(`Total Monitored Trips,${totalTripsCount},GPS Recorded`);
       lines.push(`Speed Violations,${totalViolationsCount},Infractions`);
       lines.push(`Statutory Fines Assessed,KES ${totalFinesKES.toLocaleString()},Kenya Traffic Act Cap 403`);
       lines.push(`Overall Compliance Rate,${formattedComplianceRate},Clean Trips / Total`);
@@ -337,7 +337,7 @@ export const AuthorityReportsScreen: React.FC = () => {
               NTSA Regulatory Reports & Analytical Intelligence
             </h2>
             <Badge variant="success" className="text-[10px]">
-              Active Telemetry Analytics
+              Active Fleet Safety Analytics
             </Badge>
           </div>
           <p className="font-body-sm text-xs text-on-surface-variant">
@@ -448,7 +448,7 @@ export const AuthorityReportsScreen: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-md">
         <div id="kpi-total-trips" className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-1">
           <span className="font-label-mono text-[11px] text-on-surface-variant uppercase">
-            Total Telemetry Trips
+            Total Monitored Trips
           </span>
           <p className="font-headline-lg-mobile text-2xl text-on-surface font-bold">
             {isLoading ? '...' : totalTripsCount.toLocaleString()}

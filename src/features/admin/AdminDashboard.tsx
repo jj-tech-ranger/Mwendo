@@ -2,7 +2,6 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { AreaChartWrapper } from '../../components/charts/Charts';
 import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
 import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
