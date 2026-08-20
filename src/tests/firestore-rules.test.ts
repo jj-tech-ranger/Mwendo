@@ -353,8 +353,12 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   const auth = uid ? { uid, token: { activeRole: 'passenger', ...tokenClaims } } : null;
 
   if (testEnv && !isOfflineFallback) {
-    return testEnv.authenticatedContext(uid || 'anon', tokenClaims);
+  if (!uid) {
+    return testEnv.unauthenticatedContext();
   }
+
+  return testEnv.authenticatedContext(uid, tokenClaims);
+}
 
   return {
     firestore: () => ({
