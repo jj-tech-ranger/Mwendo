@@ -1,21 +1,39 @@
+```yaml
 name: Deploy
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   deploy-hosting:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions'
+          service_account: 'github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build
         run: npm run build
         env:
@@ -30,31 +48,56 @@ jobs:
           VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
           VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
           VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          projectId: mwendo-salama-ke
-          channelId: ${{ github.event_name == 'pull_request' && 'pr-${{ github.event.number }}' || 'live' }}
+        run: |
+          firebase deploy \
+            --only hosting \
+            --project mwendo-salama-ke \
+            --non-interactive
 
   deploy-backend:
     runs-on: ubuntu-latest
+
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions'
+          service_account: 'github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: |
-          npm ci
-          cd apps/functions && npm ci
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install Functions dependencies
+        working-directory: apps/functions
+        run: npm ci
+
       - name: Build Functions
-        run: cd apps/functions && npm run build
+        working-directory: apps/functions
+        run: npm run build
+
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
+
       - name: Deploy Functions, Storage Rules, and Firestore Rules
-        run: firebase deploy --only functions,storage,firestore --project mwendo-salama-ke --non-interactive
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          firebase deploy \
+            --only functions,storage,firestore \
+            --project mwendo-salama-ke \
+            --non-interactive
+```
