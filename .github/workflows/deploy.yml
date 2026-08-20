@@ -55,7 +55,7 @@ jobs:
         run: |
           firebase deploy \
             --only hosting \
-            --project mwendo-salama-ke \
+            --project mwendosalama-cf777 \
             --non-interactive
 
   deploy-backend:
@@ -97,5 +97,5 @@ jobs:
         run: |
           firebase deploy \
             --only functions,storage,firestore \
-            --project mwendo-salama-ke \
+            --project mwendosalama-cf777 \
             --non-interactive
