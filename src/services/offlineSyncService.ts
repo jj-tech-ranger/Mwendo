@@ -3,6 +3,8 @@ import { tripRepository, blackSpotRepository } from '../repositories';
 import { useOfflineStore } from '../store/useOfflineStore';
 import { Trip, BlackSpot } from '../types';
 
+export const MAX_RETRIES = 5;
+
 export interface DrainResult {
   syncedTrips: number;
   syncedReports: number;
@@ -31,19 +33,41 @@ class OfflineSyncService {
   }
 
   /**
-   * Updates the Zustand offline store with the real pending queued count.
+   * Scans offlineStorage for dead-letter failed items that exceeded MAX_RETRIES.
+   */
+  async getFailedKeys(): Promise<{ failedTripKeys: string[]; failedReportKeys: string[] }> {
+    try {
+      const allKeys = await offlineStorage.keys();
+      const failedKeys = allKeys.filter((k) => k.startsWith('offline_failed_'));
+      const failedTripKeys = failedKeys.filter((k) => k.includes('trip'));
+      const failedReportKeys = failedKeys.filter(
+        (k) => k.includes('report') || k.includes('blackspot') || k.includes('bs_')
+      );
+      return { failedTripKeys, failedReportKeys };
+    } catch (err) {
+      console.error('[OfflineSyncService] Failed to retrieve failed keys:', err);
+      return { failedTripKeys: [], failedReportKeys: [] };
+    }
+  }
+
+  /**
+   * Updates the Zustand offline store with the real pending queued count and failed count.
    */
   async updatePendingCount(): Promise<number> {
     const { tripKeys, reportKeys } = await this.getQueuedKeys();
+    const { failedTripKeys, failedReportKeys } = await this.getFailedKeys();
     const totalCount = tripKeys.length + reportKeys.length;
+    const totalFailed = failedTripKeys.length + failedReportKeys.length;
+
     useOfflineStore.getState().setQueuedActionsCount(totalCount);
+    useOfflineStore.getState().setFailedActionsCount(totalFailed);
     return totalCount;
   }
 
   /**
    * Drains all offline-queued trips and reports, uploading them to Firestore.
    * On success, removes the item from offline storage and decrements the pending count.
-   * On failure, retains the item for subsequent retry cycles.
+   * On failure, increments retry count; if retries >= MAX_RETRIES, moves to dead-letter storage.
    */
   async drainQueue(): Promise<DrainResult> {
     if (this.isDraining) {
@@ -65,13 +89,14 @@ class OfflineSyncService {
 
     try {
       const { tripKeys, reportKeys } = await this.getQueuedKeys();
-      useOfflineStore.getState().setQueuedActionsCount(tripKeys.length + reportKeys.length);
+      await this.updatePendingCount();
 
       // 1. Process queued trips
       for (const key of tripKeys) {
+        let currentTrip: Trip | null = null;
         try {
-          const trip = await offlineStorage.getItem<Trip>(key);
-          if (!trip || !trip.id) {
+          currentTrip = await offlineStorage.getItem<Trip>(key);
+          if (!currentTrip || !currentTrip.id) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);
             this.retryCounts.delete(key);
@@ -79,7 +104,7 @@ class OfflineSyncService {
           }
 
           // Use the SAME client-generated ID already embedded in the stored object
-          await tripRepository.save(trip);
+          await tripRepository.save(currentTrip);
           await offlineStorage.removeItem(key);
           this.retryCounts.delete(key);
           syncedTrips++;
@@ -87,15 +112,24 @@ class OfflineSyncService {
           console.warn(`[OfflineSyncService] Failed to sync offline trip ${key}:`, err);
           failedTrips++;
           const retries = (this.retryCounts.get(key) || 0) + 1;
-          this.retryCounts.set(key, retries);
+          if (retries >= MAX_RETRIES) {
+            if (currentTrip) {
+              await offlineStorage.setItem(`offline_failed_${key}`, currentTrip);
+            }
+            await offlineStorage.removeItem(key);
+            this.retryCounts.delete(key);
+          } else {
+            this.retryCounts.set(key, retries);
+          }
         }
       }
 
       // 2. Process queued black spot reports
       for (const key of reportKeys) {
+        let currentReport: BlackSpot | null = null;
         try {
-          const report = await offlineStorage.getItem<BlackSpot>(key);
-          if (!report || !report.id) {
+          currentReport = await offlineStorage.getItem<BlackSpot>(key);
+          if (!currentReport || !currentReport.id) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);
             this.retryCounts.delete(key);
@@ -103,7 +137,7 @@ class OfflineSyncService {
           }
 
           // Use the SAME client-generated ID already embedded in the stored object
-          await blackSpotRepository.save(report);
+          await blackSpotRepository.save(currentReport);
           await offlineStorage.removeItem(key);
           this.retryCounts.delete(key);
           syncedReports++;
@@ -111,7 +145,15 @@ class OfflineSyncService {
           console.warn(`[OfflineSyncService] Failed to sync offline report ${key}:`, err);
           failedReports++;
           const retries = (this.retryCounts.get(key) || 0) + 1;
-          this.retryCounts.set(key, retries);
+          if (retries >= MAX_RETRIES) {
+            if (currentReport) {
+              await offlineStorage.setItem(`offline_failed_${key}`, currentReport);
+            }
+            await offlineStorage.removeItem(key);
+            this.retryCounts.delete(key);
+          } else {
+            this.retryCounts.set(key, retries);
+          }
         }
       }
 
@@ -130,6 +172,60 @@ class OfflineSyncService {
     } finally {
       this.isDraining = false;
     }
+  }
+
+  /**
+   * Retries all dead-letter failed items by restoring them to the active queue.
+   */
+  async retryAllFailed(): Promise<DrainResult> {
+    const allKeys = await offlineStorage.keys();
+    const failedKeys = allKeys.filter((k) => k.startsWith('offline_failed_'));
+    for (const fKey of failedKeys) {
+      const item = await offlineStorage.getItem(fKey);
+      const originalKey = fKey.replace(/^offline_failed_/, '');
+      if (item) {
+        await offlineStorage.setItem(originalKey, item);
+      }
+      await offlineStorage.removeItem(fKey);
+      this.retryCounts.delete(originalKey);
+    }
+    await this.updatePendingCount();
+    return await this.drainQueue();
+  }
+
+  /**
+   * Retries a single dead-letter failed item.
+   */
+  async retryFailedItem(failedKey: string): Promise<DrainResult> {
+    const item = await offlineStorage.getItem(failedKey);
+    const originalKey = failedKey.replace(/^offline_failed_/, '');
+    if (item) {
+      await offlineStorage.setItem(originalKey, item);
+    }
+    await offlineStorage.removeItem(failedKey);
+    this.retryCounts.delete(originalKey);
+    await this.updatePendingCount();
+    return await this.drainQueue();
+  }
+
+  /**
+   * Permanently discards all dead-letter failed items upon user confirmation.
+   */
+  async discardAllFailed(): Promise<void> {
+    const allKeys = await offlineStorage.keys();
+    const failedKeys = allKeys.filter((k) => k.startsWith('offline_failed_'));
+    for (const fKey of failedKeys) {
+      await offlineStorage.removeItem(fKey);
+    }
+    await this.updatePendingCount();
+  }
+
+  /**
+   * Permanently discards a specific dead-letter failed item.
+   */
+  async discardFailedItem(failedKey: string): Promise<void> {
+    await offlineStorage.removeItem(failedKey);
+    await this.updatePendingCount();
   }
 
   /**

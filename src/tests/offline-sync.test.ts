@@ -148,9 +148,47 @@ describe('VT-004: Offline Storage Queue & Reconnect Drain Synchronization', () =
     expect(drainResult.failedTrips).toBe(1);
     expect(drainResult.remainingCount).toBe(1);
 
-    // Item must still remain in storage
+    // Item must still remain in active storage
     expect(store[`offline_trip_${mockTrip.id}`]).toEqual(mockTrip);
     expect(useOfflineStore.getState().queuedActionsCount).toBe(1);
+  });
+
+  it('moves items to dead-letter queue (offline_failed_*) after exceeding MAX_RETRIES and allows user retry/discard', async () => {
+    vi.spyOn(tripRepository, 'save').mockRejectedValue(new Error('Persistent Firestore Permission Error'));
+
+    const mockTrip = {
+      id: 'trip_offline_deadletter_1',
+      userId: 'user_p1',
+      plateNumber: 'KDA 777Q',
+      status: 'completed',
+    };
+
+    const key = `offline_trip_${mockTrip.id}`;
+    await offlineStorage.setItem(key, mockTrip);
+    await offlineSyncService.updatePendingCount();
+
+    // Drain 5 times (MAX_RETRIES)
+    for (let i = 0; i < 5; i++) {
+      await offlineSyncService.drainQueue();
+    }
+
+    // Active key must be deleted and dead-letter key populated
+    expect(store[key]).toBeUndefined();
+    expect(store[`offline_failed_${key}`]).toEqual(mockTrip);
+
+    // Store state: queued is 0, failed is 1
+    expect(useOfflineStore.getState().queuedActionsCount).toBe(0);
+    expect(useOfflineStore.getState().failedActionsCount).toBe(1);
+
+    // Test retry: restore network and retry all failed
+    vi.spyOn(tripRepository, 'save').mockResolvedValue(undefined as any);
+    const retryResult = await offlineSyncService.retryAllFailed();
+
+    expect(retryResult.syncedTrips).toBe(1);
+    expect(store[`offline_failed_${key}`]).toBeUndefined();
+    expect(store[key]).toBeUndefined(); // Successfully synced and removed
+    expect(useOfflineStore.getState().failedActionsCount).toBe(0);
+    expect(useOfflineStore.getState().queuedActionsCount).toBe(0);
   });
 
   it('triggers drainQueue automatically on window "online" event', async () => {

@@ -298,11 +298,35 @@ export const functionsService = {
   /**
    * Gen 2 Function: updateDailyAnalytics (§8.2 CQRS)
    * Pre-aggregates daily metrics into analytics/daily_{dateStr}
+   * Scoped strictly by date range to prevent unbounded collection scans.
    */
   async updateDailyAnalytics(dateStr: string): Promise<PlatformAnalyticsDaily> {
-    const tripsSnap = await getDocs(collection(db, 'trips'));
-    const violSnap = await getDocs(collection(db, 'violations'));
-    const alertsSnap = await getDocs(collection(db, 'safety_alerts'));
+    const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    const startIso = startOfDay.toISOString();
+    const endIso = endOfDay.toISOString();
+
+    const tripsSnap = await getDocs(
+      query(
+        collection(db, 'trips'),
+        where('startTime', '>=', startIso),
+        where('startTime', '<=', endIso)
+      )
+    );
+    const violSnap = await getDocs(
+      query(
+        collection(db, 'violations'),
+        where('timestamp', '>=', startIso),
+        where('timestamp', '<=', endIso)
+      )
+    );
+    const alertsSnap = await getDocs(
+      query(
+        collection(db, 'safety_alerts'),
+        where('timestamp', '>=', startIso),
+        where('timestamp', '<=', endIso)
+      )
+    );
     const vehiclesSnap = await getDocs(collection(db, 'vehicles'));
 
     const totalTrips = tripsSnap.size;

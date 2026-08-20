@@ -5,49 +5,62 @@ import { updateDailyAnalytics, processUpdateDailyAnalyticsLogic } from '../analy
 describe('Cloud Functions — rebuildSaccoAnalytics & updateDailyAnalytics (CF-004, CF-005 & TEST-002)', () => {
   let mockDbData: Record<string, any>;
 
+  function matchesOp(actual: any, op: string, target: any): boolean {
+    if (op === '==' || op === '===') return actual === target;
+    if (op === '>=') return actual >= target;
+    if (op === '<=') return actual <= target;
+    if (op === '>') return actual > target;
+    if (op === '<') return actual < target;
+    return actual === target;
+  }
+
   function createMockDb() {
     return {
-      collection: (colName: string) => ({
-        doc: (docId: string) => ({
-          get: async () => {
-            const data = mockDbData[`${colName}/${docId}`];
-            return {
-              exists: !!data,
-              data: () => data || {},
-            };
-          },
-          set: async (data: any, options?: { merge: boolean }) => {
-            const key = `${colName}/${docId}`;
-            if (options?.merge && mockDbData[key]) {
-              mockDbData[key] = { ...mockDbData[key], ...data };
-            } else {
-              mockDbData[key] = data;
-            }
-          },
-        }),
-        where: (f1: string, op1: string, v1: any) => ({
-          where: (f2: string, op2: string, v2: any) => ({
-            get: async () => {
-              const docs = Object.entries(mockDbData)
-                .filter(([k, val]) => k.startsWith(`${colName}/`) && val[f1] === v1 && val[f2] === v2)
-                .map(([_, d]) => ({ data: () => d }));
-              return { docs, size: docs.length };
-            },
-          }),
+      collection: (colName: string) => {
+        const createQuery = (filters: Array<{ field: string; op: string; val: any }>) => ({
+          where: (f: string, op: string, val: any) =>
+            createQuery([...filters, { field: f, op, val }]),
           get: async () => {
             const docs = Object.entries(mockDbData)
-              .filter(([k, val]) => k.startsWith(`${colName}/`) && val[f1] === v1)
+              .filter(([k, item]) => {
+                if (!k.startsWith(`${colName}/`)) return false;
+                return filters.every((filter) =>
+                  matchesOp(item[filter.field], filter.op, filter.val)
+                );
+              })
               .map(([_, d]) => ({ data: () => d }));
             return { docs, size: docs.length };
           },
-        }),
-        get: async () => {
-          const docs = Object.entries(mockDbData)
-            .filter(([k]) => k.startsWith(`${colName}/`))
-            .map(([_, d]) => ({ data: () => d }));
-          return { docs, size: docs.length };
-        },
-      }),
+        });
+
+        return {
+          doc: (docId: string) => ({
+            get: async () => {
+              const data = mockDbData[`${colName}/${docId}`];
+              return {
+                exists: !!data,
+                data: () => data || {},
+              };
+            },
+            set: async (data: any, options?: { merge: boolean }) => {
+              const key = `${colName}/${docId}`;
+              if (options?.merge && mockDbData[key]) {
+                mockDbData[key] = { ...mockDbData[key], ...data };
+              } else {
+                mockDbData[key] = data;
+              }
+            },
+          }),
+          where: (f1: string, op1: string, v1: any) =>
+            createQuery([{ field: f1, op: op1, val: v1 }]),
+          get: async () => {
+            const docs = Object.entries(mockDbData)
+              .filter(([k]) => k.startsWith(`${colName}/`))
+              .map(([_, d]) => ({ data: () => d }));
+            return { docs, size: docs.length };
+          },
+        };
+      },
     };
   }
 
@@ -198,24 +211,34 @@ describe('Cloud Functions — rebuildSaccoAnalytics & updateDailyAnalytics (CF-0
       });
     });
 
-    it('computes daily platform totals and risk distribution for authorized admin/authority', async () => {
+    it('computes daily platform totals and risk distribution strictly for the requested date', async () => {
       const mockDb = createMockDb() as any;
 
-      // Seed trips, violations, alerts, vehicles
-      mockDbData['trips/t1'] = { id: 't1' };
-      mockDbData['trips/t2'] = { id: 't2' };
-      mockDbData['violations/v1'] = { id: 'v1' };
-      mockDbData['safety_alerts/a1'] = { id: 'a1', status: 'active' };
-      mockDbData['safety_alerts/a2'] = { id: 'a2', status: 'resolved' };
+      // Target date: 2026-08-16
+      // Seed trips for target date AND other dates
+      mockDbData['trips/t1'] = { id: 't1', startTime: '2026-08-16T08:30:00.000Z' };
+      mockDbData['trips/t2'] = { id: 't2', startTime: '2026-08-16T14:45:00.000Z' };
+      mockDbData['trips/t_other_day'] = { id: 't_other', startTime: '2026-08-15T10:00:00.000Z' };
+
+      // Seed violations
+      mockDbData['violations/v1'] = { id: 'v1', timestamp: '2026-08-16T11:20:00.000Z' };
+      mockDbData['violations/v_other_day'] = { id: 'v_other', timestamp: '2026-08-17T09:00:00.000Z' };
+
+      // Seed safety alerts
+      mockDbData['safety_alerts/a1'] = { id: 'a1', status: 'active', timestamp: '2026-08-16T07:15:00.000Z' };
+      mockDbData['safety_alerts/a2'] = { id: 'a2', status: 'resolved', timestamp: '2026-08-16T16:00:00.000Z' };
+      mockDbData['safety_alerts/a_other_day'] = { id: 'a_other', status: 'active', timestamp: '2026-08-14T12:00:00.000Z' };
+
+      // Fleet vehicles snapshot
       mockDbData['vehicles/veh1'] = { id: 'veh1', riskTier: 'low' };
       mockDbData['vehicles/veh2'] = { id: 'veh2', riskTier: 'critical' };
 
       const result = await processUpdateDailyAnalyticsLogic(mockDb, '2026-08-16');
 
       expect(result.date).toBe('2026-08-16');
-      expect(result.totalTrips).toBe(2);
-      expect(result.totalViolations).toBe(1);
-      expect(result.activeAlerts).toBe(1);
+      expect(result.totalTrips).toBe(2); // Only t1 & t2 counted; t_other_day excluded
+      expect(result.totalViolations).toBe(1); // Only v1 counted; v_other_day excluded
+      expect(result.activeAlerts).toBe(1); // Only a1 counted; a_other_day excluded
       expect(result.riskDistribution).toEqual({
         low: 1,
         medium: 0,

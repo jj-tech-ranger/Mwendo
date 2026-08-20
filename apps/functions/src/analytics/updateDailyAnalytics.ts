@@ -1,14 +1,44 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 
+/**
+ * ANALYTICS-001: Date-scoped Daily Analytics Engine
+ * Aggregates daily platform metrics bounded strictly by the target date's range,
+ * avoiding unbounded full-collection scans while maintaining current vehicle risk snapshots.
+ */
 export async function processUpdateDailyAnalyticsLogic(
   db: Firestore,
   dateStr: string
 ): Promise<any> {
-  const tripsSnap = await db.collection('trips').get();
-  const violSnap = await db.collection('violations').get();
-  const alertsSnap = await db.collection('safety_alerts').get();
+  const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
+  const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+  const startIso = startOfDay.toISOString();
+  const endIso = endOfDay.toISOString();
+
+  // 1. Date-scoped query for trips starting within the target day
+  const tripsSnap = await db
+    .collection('trips')
+    .where('startTime', '>=', startIso)
+    .where('startTime', '<=', endIso)
+    .get();
+
+  // 2. Date-scoped query for violations recorded within the target day
+  const violSnap = await db
+    .collection('violations')
+    .where('timestamp', '>=', startIso)
+    .where('timestamp', '<=', endIso)
+    .get();
+
+  // 3. Date-scoped query for safety alerts triggered within the target day
+  const alertsSnap = await db
+    .collection('safety_alerts')
+    .where('timestamp', '>=', startIso)
+    .where('timestamp', '<=', endIso)
+    .get();
+
+  // 4. Vehicles risk-tier snapshot is current-state read across active fleet
   const vehiclesSnap = await db.collection('vehicles').get();
 
   const totalTrips = tripsSnap.size;
@@ -51,6 +81,9 @@ export async function processUpdateDailyAnalyticsLogic(
   return payload;
 }
 
+/**
+ * On-demand callable variant for administrators and authorities.
+ */
 export const updateDailyAnalytics = onCall(
   { enforceAppCheck: APP_CHECK_ENFORCED },
   async (request) => {
@@ -71,3 +104,18 @@ export const updateDailyAnalytics = onCall(
     return await processUpdateDailyAnalyticsLogic(db, dateStr);
   }
 );
+
+/**
+ * Scheduled cron job running once daily at 01:00 UTC to automatically
+ * aggregate yesterday's finalized metrics and today's rolling metrics.
+ */
+export const dailyAnalyticsScheduled = onSchedule('every day 01:00', async () => {
+  const db = getFirestore();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  await processUpdateDailyAnalyticsLogic(db, yesterdayStr);
+  await processUpdateDailyAnalyticsLogic(db, todayStr);
+  console.log(`[dailyAnalyticsScheduled] Computed daily analytics for ${yesterdayStr} and ${todayStr}`);
+});
+

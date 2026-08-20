@@ -201,7 +201,7 @@ export const AdminModerationScreen: React.FC = () => {
               <div className="flex items-start gap-3">
                 <span className="material-symbols-outlined text-outline text-xl mt-0.5">info</span>
                 <div className="space-y-1">
-                  <p className="font-bold text-on-surface">Community Moderation Status</p>
+                  <p className="font-bold text-on-surface">Community abuse-flagging is not yet implemented</p>
                   <p className="text-on-surface-variant leading-relaxed">
                     No active user flags are pending moderation.
                   </p>
