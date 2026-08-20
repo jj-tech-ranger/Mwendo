@@ -1,5 +1,5 @@
-name: Deploy
-
+name: Deploy suspendUser only
+  run: firebase deploy --only functions:suspendUser
 on:
   push:
     branches: [main]
