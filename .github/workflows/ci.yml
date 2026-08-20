@@ -39,7 +39,7 @@ jobs:
 
       - name: Run Emulator-Backed Tests
         env:
-          VITE_FIREBASE_API_KEY: test-api-key
+          VITE_FIREBASE_API_KEY: AIzaSyDUMMYTESTKEY1234567890123456789
           VITE_FIREBASE_AUTH_DOMAIN: demo-mwendo-salama-audit.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: demo-mwendo-salama-audit
           VITE_FIREBASE_STORAGE_BUCKET: demo-mwendo-salama-audit.appspot.com
