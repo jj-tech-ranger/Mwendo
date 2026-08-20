@@ -1025,23 +1025,23 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     };
 
     // 1. Stale claim user access denied for read and write
-    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
     await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
 
     // 2. Unrelated passenger access denied for read and write
-    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
     await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
 
     // 3. Complainant can upload evidence and read their uploaded evidence
     await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
-    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
 
     // 4. Legitimate manager can read evidence for their SACCO, but CANNOT delete or update it
-    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
     await assertFails((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
 
     // 5. Authority and Admin have full read and delete access
-    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
     await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
   });
 
@@ -1061,7 +1061,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     };
 
     // 1. Any user (including imposter) can read black spot photos (public read)
-    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').get() as Promise<any>);
+    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').getMetadata() as Promise<any>);
 
     // 2. Imposter attempting to upload evidence to spot_100 -> FAILS (ownership mismatch)
     await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
