@@ -16,10 +16,6 @@ env:
   FIREBASE_PROJECT_ID: mwendosalama-cf777
 
 jobs:
-
-  # ============================================================
-  # JOB 1 — TESTS
-  # ============================================================
   test:
     name: Test Application
     runs-on: ubuntu-latest
@@ -28,38 +24,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Firebase Emulator currently requires Java 21+
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
 
-      - name: Verify Java version
-        run: java -version
-
-      - name: Verify Node version
-        run: node --version
-
-      - name: Verify npm version
-        run: npm --version
-
-      - name: Checkout repository dependencies
+      - name: Install root dependencies
         run: npm ci
 
       - name: Install Functions dependencies
         working-directory: apps/functions
         run: npm ci
 
-      # --------------------------------------------------------
-      # Build frontend first
-      # --------------------------------------------------------
       - name: Build frontend
         run: npm run build
         env:
@@ -75,28 +58,11 @@ jobs:
           VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
           VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
 
-      # --------------------------------------------------------
-      # Firebase CLI
-      # --------------------------------------------------------
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Verify Firebase CLI
-        run: firebase --version
-
-      # --------------------------------------------------------
-      # Firebase Emulator tests
-      #
-      # IMPORTANT:
-      # We run BOTH Firestore and Storage because the test suite
-      # contains Storage security-rule tests.
-      #
-      # The tests use a DEMO project so they cannot accidentally
-      # access production Firebase services.
-      # --------------------------------------------------------
-      - name: Run Firebase Emulator test suite
+      - name: Run tests with Firebase emulators
         env:
-          # Frontend Firebase configuration required by tests
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: demo-mwendo-salama-audit
@@ -104,29 +70,18 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
-
-          # Explicit emulator environment
           GCLOUD_PROJECT: demo-mwendo-salama-audit
           FIREBASE_PROJECT: demo-mwendo-salama-audit
-
         run: |
           npx firebase emulators:exec \
             --only firestore,storage \
             --project demo-mwendo-salama-audit \
             "npm test"
 
-  # ============================================================
-  # JOB 2 — HOSTING
-  # ============================================================
   deploy-hosting:
     name: Deploy Firebase Hosting
     runs-on: ubuntu-latest
-
-    needs:
-      - test
-
-    # Only deploy Hosting from main.
-    # Pull requests should test but never deploy.
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -136,7 +91,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
 
       - name: Install dependencies
@@ -157,14 +112,14 @@ jobs:
           VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
           VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
 
-      - name: Install Firebase CLI
-        run: npm install -g firebase-tools
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions'
-          service_account: 'github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com'
+          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
+          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
 
       - name: Deploy Firebase Hosting
         run: |
@@ -173,44 +128,33 @@ jobs:
             --project mwendosalama-cf777 \
             --non-interactive
 
-  # ============================================================
-  # JOB 3 — BACKEND
-  # ============================================================
   deploy-backend:
     name: Deploy Firebase Backend
     runs-on: ubuntu-latest
-
-    needs:
-      - test
-
-    # Backend deployment only happens after tests pass
-    # and only from main.
+    needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
-      - name: Verify Java
-        run: java -version
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: 'projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions'
-          service_account: 'github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com'
+          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
+          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
 
       - name: Install root dependencies
         run: npm ci
@@ -226,31 +170,14 @@ jobs:
       - name: Install Firebase CLI
         run: npm install -g firebase-tools
 
-      - name: Verify Firebase CLI
-        run: firebase --version
-
-      # --------------------------------------------------------
-      # IMPORTANT:
-      # Deploy ONLY suspendUser first.
-      #
-      # This prevents one broken function from causing the entire
-      # Functions deployment to fail while we verify the pipeline.
-      # --------------------------------------------------------
-      - name: Deploy suspendUser only
+      - name: Deploy suspendUser
         run: |
           firebase deploy \
             --only functions:suspendUser \
             --project mwendosalama-cf777 \
             --non-interactive
 
-      # --------------------------------------------------------
-      # After suspendUser succeeds, deploy the remaining backend.
-      #
-      # NOTE:
-      # If you want to continue isolating Functions until every
-      # function is verified, keep this disabled temporarily.
-      # --------------------------------------------------------
-      - name: Deploy remaining Firebase backend
+      - name: Deploy remaining backend
         run: |
           firebase deploy \
             --only functions,storage,firestore \
