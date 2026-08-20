@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -1164,8 +1165,8 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     });
 
     const now = Date.now();
-    const validTime = new Date(now - 60000).toISOString(); // 1 minute ago
-    const futureTime = new Date(now + 3600000).toISOString(); // 1 hour in future
+    const validTime = Timestamp.fromMillis(now - 60000);
+    const futureTime = Timestamp.fromMillis(now + 3600000); // 1 hour in future
 
     // 1. Trip with coordinates outside Kenya (e.g. London / lat 51.5, lon -0.12) -> FAILS
     await assertFails(
