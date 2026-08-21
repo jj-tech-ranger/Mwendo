@@ -3,13 +3,24 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 
+interface AuthContextToken {
+  activeRole?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+interface AuthContext {
+  uid: string;
+  token?: AuthContextToken;
+}
+
 /**
  * Verify caller is an active admin by inspecting Auth token claims.
  * SEC-004 & SEC-009: Auth custom claims (auth.token.activeRole === 'admin') are the sole source
  * of truth for authorization. Firestore document fields (role/activeRole) are display-only and
  * must never grant administrative privileges.
  */
-async function verifyAdminCaller(auth: any): Promise<{ uid: string; displayName: string }> {
+async function verifyAdminCaller(auth: AuthContext | undefined): Promise<{ uid: string; displayName: string }> {
   if (!auth) {
     throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
   }
@@ -22,7 +33,7 @@ async function verifyAdminCaller(auth: any): Promise<{ uid: string; displayName:
     throw new HttpsError('permission-denied', 'Caller does not possess administrative privileges.');
   }
 
-  let displayName = auth.token?.name || 'System Admin';
+  let displayName = typeof auth.token?.name === 'string' ? auth.token.name : 'System Admin';
 
   try {
     // Read Firestore document only for displayName in audit logging if available
@@ -30,7 +41,7 @@ async function verifyAdminCaller(auth: any): Promise<{ uid: string; displayName:
     const userSnap = await db.collection('users').doc(callerUid).get();
     if (userSnap.exists) {
       const userData = userSnap.data() || {};
-      if (userData.displayName) {
+      if (userData.displayName && typeof userData.displayName === 'string') {
         displayName = userData.displayName;
       }
     }
@@ -47,7 +58,7 @@ async function verifyAdminCaller(auth: any): Promise<{ uid: string; displayName:
 export const suspendUser = onCall(
   { enforceAppCheck: APP_CHECK_ENFORCED },
   async (request) => {
-    const caller = await verifyAdminCaller(request.auth);
+    const caller = await verifyAdminCaller(request.auth as AuthContext | undefined);
     const targetUid = request.data?.targetUid;
     const reason = request.data?.reason || 'Administrative action';
 
@@ -90,9 +101,10 @@ export const suspendUser = onCall(
       });
 
       return { success: true, targetUid, isSuspended: true };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`[suspendUser] Error suspending user ${targetUid}:`, err);
-      throw new HttpsError('internal', err.message || 'Failed to complete user suspension sequence.');
+      throw new HttpsError('internal', message || 'Failed to complete user suspension sequence.');
     }
   }
 );
@@ -100,7 +112,7 @@ export const suspendUser = onCall(
 export const reactivateUser = onCall(
   { enforceAppCheck: APP_CHECK_ENFORCED },
   async (request) => {
-    const caller = await verifyAdminCaller(request.auth);
+    const caller = await verifyAdminCaller(request.auth as AuthContext | undefined);
     const targetUid = request.data?.targetUid;
 
     if (!targetUid || typeof targetUid !== 'string') {
@@ -142,9 +154,10 @@ export const reactivateUser = onCall(
       });
 
       return { success: true, targetUid, isSuspended: false };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       console.error(`[reactivateUser] Error reactivating user ${targetUid}:`, err);
-      throw new HttpsError('internal', err.message || 'Failed to complete user reactivation sequence.');
+      throw new HttpsError('internal', message || 'Failed to complete user reactivation sequence.');
     }
   }
 );

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
+exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
 if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
@@ -16,6 +16,7 @@ var rebuildSaccoAnalytics_1 = require("./analytics/rebuildSaccoAnalytics");
 Object.defineProperty(exports, "rebuildSaccoAnalytics", { enumerable: true, get: function () { return rebuildSaccoAnalytics_1.rebuildSaccoAnalytics; } });
 var updateDailyAnalytics_1 = require("./analytics/updateDailyAnalytics");
 Object.defineProperty(exports, "updateDailyAnalytics", { enumerable: true, get: function () { return updateDailyAnalytics_1.updateDailyAnalytics; } });
+Object.defineProperty(exports, "dailyAnalyticsScheduled", { enumerable: true, get: function () { return updateDailyAnalytics_1.dailyAnalyticsScheduled; } });
 var syncPublicPins_1 = require("./pins/syncPublicPins");
 Object.defineProperty(exports, "syncPublicPins", { enumerable: true, get: function () { return syncPublicPins_1.syncPublicPins; } });
 var sendSOS_1 = require("./alerts/sendSOS");

@@ -92,10 +92,8 @@ export const ConfidenceScorer = {
 
     // Accuracy Score: fraction of valid GPS points with accuracy <= 30m, weighted by accuracy value
     let totalAccuracyWeight = 0;
-    let validCount = 0;
     for (const s of samples) {
       if (s.accuracy > 0 && s.accuracy <= 30) {
-        validCount++;
         totalAccuracyWeight += (30 - s.accuracy) / 30;
       }
     }

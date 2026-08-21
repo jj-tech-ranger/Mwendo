@@ -38,7 +38,7 @@ export interface SmsProvider {
 }
 
 export interface MessagingProvider {
-  sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<any>;
+  sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>;
 }
 
 /**
@@ -81,7 +81,7 @@ export class DefaultSmsProvider implements SmsProvider {
           throw new Error(`Twilio API HTTP ${response.status}: ${errBody}`);
         }
 
-        const data: any = await response.json();
+        const data = (await response.json()) as { sid?: string };
         return { messageId: data.sid || `sms_${Date.now()}`, success: true };
       } catch (err) {
         console.warn(`[DefaultSmsProvider] Twilio API call failed for ${to}:`, err);
@@ -102,7 +102,7 @@ export class DefaultSmsProvider implements SmsProvider {
  * Default FCM Messaging Provider
  */
 export class DefaultMessagingProvider implements MessagingProvider {
-  async sendToTopic(topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }): Promise<any> {
+  async sendToTopic(topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }): Promise<unknown> {
     try {
       const messaging = getMessaging();
       return await messaging.send({
@@ -130,8 +130,8 @@ export async function writeToDLQ(
     alertId: string;
     userId?: string;
     targetRecipient?: string;
-    payload?: any;
-    error: any;
+    payload?: unknown;
+    error: unknown;
   }
 ): Promise<void> {
   try {
@@ -183,7 +183,6 @@ export async function processSendSosLogic(
 
   // 1. Fetch user's registered profile and emergency contacts
   let userDisplayName = 'Passenger';
-  let userPhone = '';
   let emergencyContacts: EmergencyContact[] = [];
 
   if (userId && userId !== 'anonymous') {
@@ -192,7 +191,10 @@ export async function processSendSosLogic(
       if (userSnap.exists) {
         const userData = userSnap.data() || {};
         userDisplayName = userData.displayName || 'Passenger';
-        userPhone = userData.phoneNumber || '';
+        const userPhone = userData.phoneNumber || '';
+        if (userPhone) {
+          userDisplayName = `${userDisplayName} (${userPhone})`;
+        }
         if (Array.isArray(userData.emergencyContacts) && userData.emergencyContacts.length > 0) {
           emergencyContacts = userData.emergencyContacts;
         }
@@ -420,11 +422,12 @@ export const sendSOS = onCall(async (request) => {
 
   try {
     return await processSendSosLogic(db, messagingProvider, smsProvider, payload);
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof HttpsError) {
       throw err;
     }
+    const message = err instanceof Error ? err.message : String(err);
     console.error('[sendSOS] Execution failed:', err);
-    throw new HttpsError('internal', err?.message || 'Emergency SOS dispatch failed.');
+    throw new HttpsError('internal', message || 'Emergency SOS dispatch failed.');
   }
 });

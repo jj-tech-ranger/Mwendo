@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { suspendUser, reactivateUser } from '../admin/suspendUser';
 import { syncPublicPins } from '../pins/syncPublicPins';
 import { computeVehicleRisk } from '../risk/computeVehicleRisk';

@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -354,12 +353,28 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   const auth = uid ? { uid, token: { activeRole: 'passenger', ...tokenClaims } } : null;
 
   if (testEnv && !isOfflineFallback) {
-  if (!uid) {
-    return testEnv.unauthenticatedContext();
+    const rawContext = testEnv.authenticatedContext(uid || 'anon', tokenClaims);
+    return {
+      firestore: () => rawContext.firestore(),
+      storage: (bucket?: string) => {
+        const rawStorage = rawContext.storage(bucket);
+        return {
+          ref: (path: string) => {
+            const rawRef = rawStorage.ref(path);
+            const dummyBuffer = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+            return {
+              get: () => rawRef.getMetadata(),
+              getMetadata: () => rawRef.getMetadata(),
+              getDownloadURL: () => rawRef.getDownloadURL(),
+              put: (data?: any, metadata?: any) =>
+                rawRef.put(data || dummyBuffer, metadata || { contentType: 'image/jpeg' }),
+              delete: () => rawRef.delete(),
+            };
+          },
+        };
+      },
+    };
   }
-
-  return testEnv.authenticatedContext(uid, tokenClaims);
-}
 
   return {
     firestore: () => ({
@@ -399,6 +414,16 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
           return true;
         },
+        getMetadata: async () => {
+          const allowed = evaluateStorageRules('read', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
+          return true;
+        },
+        getDownloadURL: async () => {
+          const allowed = evaluateStorageRules('read', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
+          return 'https://download-url';
+        },
         put: async () => {
           const allowed = evaluateStorageRules('write', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
@@ -416,35 +441,45 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
 
 describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   beforeAll(async () => {
-    const rules = readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8');
-    const hostPort = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8085';
-    const [host, portStr] = hostPort.split(':');
-    const port = portStr ? parseInt(portStr, 10) : 8085;
+    const firestoreRules = readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8');
+    const storageRules = readFileSync(resolve(__dirname, '../../storage.rules'), 'utf8');
+    const firestoreHostPort = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8085';
+    const [firestoreHost, firestorePortStr] = firestoreHostPort.split(':');
+    const firestorePort = firestorePortStr ? parseInt(firestorePortStr, 10) : 8085;
+
+    const storageHostPort = process.env.STORAGE_EMULATOR_HOST || '127.0.0.1:9199';
+    const [storageHost, storagePortStr] = storageHostPort.split(':');
+    const storagePort = storagePortStr ? parseInt(storagePortStr, 10) : 9199;
 
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-    const allowOfflineFallback = !isCI || process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true' || true;
+    const allowOfflineFallback = !isCI || process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true';
 
     try {
       testEnv = await initializeTestEnvironment({
         projectId: 'demo-mwendo-salama-audit',
         firestore: {
-          rules,
-          host,
-          port,
+          rules: firestoreRules,
+          host: firestoreHost,
+          port: firestorePort,
+        },
+        storage: {
+          rules: storageRules,
+          host: storageHost,
+          port: storagePort,
         },
       });
       isOfflineFallback = false;
-      console.log(`[firestore-rules.test] Successfully initialized testEnv against Firestore Emulator at ${host}:${port}. isOfflineFallback: false`);
+      console.log(`[firestore-rules.test] Successfully initialized testEnv against Firestore (${firestoreHost}:${firestorePort}) and Storage (${storageHost}:${storagePort}). isOfflineFallback: false`);
     } catch (err: any) {
       if (allowOfflineFallback) {
-        console.warn(`[firestore-rules.test] Warning: Failed to connect to emulator at ${host}:${port}, falling back to offline in-memory mock because ALLOW_RULES_OFFLINE_FALLBACK is enabled for local development.`);
+        console.warn(`[firestore-rules.test] Warning: Failed to connect to emulator at Firestore ${firestoreHost}:${firestorePort} / Storage ${storageHost}:${storagePort}, falling back to offline in-memory mock because ALLOW_RULES_OFFLINE_FALLBACK is enabled for local development.`);
         isOfflineFallback = true;
       } else {
-        console.error(`[firestore-rules.test] CRITICAL ERROR: Unable to connect to Firebase Firestore Emulator at ${host}:${port}.`);
-        console.error(`In CI and standard test runs, firestore-rules.test.ts must run against a real emulator executing firestore.rules.`);
+        console.error(`[firestore-rules.test] CRITICAL ERROR: Unable to connect to Firebase Firestore/Storage Emulators.`);
+        console.error(`In CI and standard test runs, firestore-rules.test.ts must run against a real emulator executing firestore.rules and storage.rules.`);
         throw new Error(
-          `Failed to connect to Firebase Firestore Emulator at ${host}:${port}: ${err.message}. ` +
-          `Ensure the emulator is running with 'npx firebase emulators:exec --only firestore --project demo-mwendo-salama-audit "npm test"' ` +
+          `Failed to connect to Firebase Emulators at ${firestoreHost}:${firestorePort} / ${storageHost}:${storagePort}: ${err.message}. ` +
+          `Ensure the emulators are running with 'npx firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-audit "npm test"' ` +
           `or explicitly set ALLOW_RULES_OFFLINE_FALLBACK=true for offline local development.`
         );
       }
@@ -460,6 +495,13 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   beforeEach(async () => {
     if (testEnv && !isOfflineFallback) {
       await testEnv.clearFirestore();
+      try {
+        if (typeof (testEnv as any).clearStorage === 'function') {
+          await (testEnv as any).clearStorage();
+        }
+      } catch {
+        // Storage clean-up fallback
+      }
     } else {
       Object.keys(offlineStore).forEach((key) => delete offlineStore[key]);
     }
@@ -1016,6 +1058,17 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const authority = getContext('auth_user_1', { activeRole: 'authority' });
 
     // Seed the complaint document in firestore
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('complaints').doc('complaint_1').set({
+          id: 'complaint_1',
+          saccoId: 'sacco_A',
+          reportedByUid: 'complainant_1',
+          reportedByUserId: 'complainant_1',
+          status: 'submitted',
+        });
+      });
+    }
     offlineStore['complaints/complaint_1'] = {
       id: 'complaint_1',
       saccoId: 'sacco_A',
@@ -1025,23 +1078,23 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     };
 
     // 1. Stale claim user access denied for read and write
-    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
+    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
     await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
 
     // 2. Unrelated passenger access denied for read and write
-    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
+    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
     await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
 
     // 3. Complainant can upload evidence and read their uploaded evidence
     await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
-    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
+    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
 
     // 4. Legitimate manager can read evidence for their SACCO, but CANNOT delete or update it
-    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
+    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
     await assertFails((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
 
     // 5. Authority and Admin have full read and delete access
-    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').getMetadata() as Promise<any>);
+    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
     await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
   });
 
@@ -1051,6 +1104,18 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const authority = getContext('auth_user_2', { activeRole: 'authority' });
 
     // Seed the black_spots document in firestore
+    if (testEnv && !isOfflineFallback) {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('black_spots').doc('spot_100').set({
+          id: 'spot_100',
+          title: 'Pothole Cluster',
+          reportedByUid: 'reporter_spot_1',
+          reportedByUserId: 'reporter_spot_1',
+          severity: 'high',
+          status: 'pending',
+        });
+      });
+    }
     offlineStore['black_spots/spot_100'] = {
       id: 'spot_100',
       title: 'Pothole Cluster',
@@ -1061,7 +1126,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     };
 
     // 1. Any user (including imposter) can read black spot photos (public read)
-    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').getMetadata() as Promise<any>);
+    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').get() as Promise<any>);
 
     // 2. Imposter attempting to upload evidence to spot_100 -> FAILS (ownership mismatch)
     await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
@@ -1165,8 +1230,8 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     });
 
     const now = Date.now();
-    const validTime = Timestamp.fromMillis(now - 60000);
-    const futureTime = Timestamp.fromMillis(now + 3600000); // 1 hour in future
+    const validTime = new Date(now - 60000).toISOString(); // 1 minute ago
+    const futureTime = new Date(now + 3600000).toISOString(); // 1 hour in future
 
     // 1. Trip with coordinates outside Kenya (e.g. London / lat 51.5, lon -0.12) -> FAILS
     await assertFails(

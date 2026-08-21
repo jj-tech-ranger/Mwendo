@@ -14,7 +14,20 @@ import { getRemoteConfig, RemoteConfig } from 'firebase/remote-config';
 import { getMessaging, Messaging, isSupported as isMessagingSupported } from 'firebase/messaging';
 import { getAnalytics, Analytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
-const firebaseConfig = {
+const isTestEnv =
+  import.meta.env.MODE === 'test' ||
+  (typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)));
+
+const defaultTestConfig = {
+  apiKey: 'AIzaSyFakeTestApiKeyForVitestSuite0123456789',
+  authDomain: 'demo-mwendo-salama-audit.firebaseapp.com',
+  projectId: 'demo-mwendo-salama-audit',
+  storageBucket: 'demo-mwendo-salama-audit.appspot.com',
+  messagingSenderId: '123456789012',
+  appId: '1:123456789012:web:abcdef1234567890abcdef',
+};
+
+const rawConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -23,7 +36,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+const firebaseConfig = isTestEnv
+  ? {
+      apiKey: rawConfig.apiKey || defaultTestConfig.apiKey,
+      authDomain: rawConfig.authDomain || defaultTestConfig.authDomain,
+      projectId: rawConfig.projectId || defaultTestConfig.projectId,
+      storageBucket: rawConfig.storageBucket || defaultTestConfig.storageBucket,
+      messagingSenderId: rawConfig.messagingSenderId || defaultTestConfig.messagingSenderId,
+      appId: rawConfig.appId || defaultTestConfig.appId,
+    }
+  : rawConfig;
+
+if (!isTestEnv && (!firebaseConfig.apiKey || !firebaseConfig.projectId)) {
   console.error('[Firebase] Missing required Firebase environment variables! Check your .env file.');
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { enforceRateLimit, RATE_LIMIT_CONFIGS } from '../lib/rateLimit';
+import { enforceRateLimit } from '../lib/rateLimit';
 import { processReportBlackSpotLogic } from '../reports/reportBlackSpot';
 
 class MockFirestore {
@@ -91,7 +91,6 @@ describe('SEC-005: Rate Limiting Enforcement', () => {
 
   it('allows up to 10 black spot hazard reports per 24 hours and rejects 11th', async () => {
     const userId = 'user_hazard_test';
-    const now = Date.now();
 
     for (let i = 0; i < 10; i++) {
       const res = await processReportBlackSpotLogic(

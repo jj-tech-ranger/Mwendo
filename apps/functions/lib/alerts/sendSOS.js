@@ -42,7 +42,7 @@ class DefaultSmsProvider {
                     const errBody = await response.text();
                     throw new Error(`Twilio API HTTP ${response.status}: ${errBody}`);
                 }
-                const data = await response.json();
+                const data = (await response.json());
                 return { messageId: data.sid || `sms_${Date.now()}`, success: true };
             }
             catch (err) {
@@ -126,7 +126,6 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
     }
     // 1. Fetch user's registered profile and emergency contacts
     let userDisplayName = 'Passenger';
-    let userPhone = '';
     let emergencyContacts = [];
     if (userId && userId !== 'anonymous') {
         try {
@@ -134,7 +133,10 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
             if (userSnap.exists) {
                 const userData = userSnap.data() || {};
                 userDisplayName = userData.displayName || 'Passenger';
-                userPhone = userData.phoneNumber || '';
+                const userPhone = userData.phoneNumber || '';
+                if (userPhone) {
+                    userDisplayName = `${userDisplayName} (${userPhone})`;
+                }
                 if (Array.isArray(userData.emergencyContacts) && userData.emergencyContacts.length > 0) {
                     emergencyContacts = userData.emergencyContacts;
                 }
@@ -353,8 +355,9 @@ exports.sendSOS = (0, https_1.onCall)(async (request) => {
         if (err instanceof https_1.HttpsError) {
             throw err;
         }
+        const message = err instanceof Error ? err.message : String(err);
         console.error('[sendSOS] Execution failed:', err);
-        throw new https_1.HttpsError('internal', err?.message || 'Emergency SOS dispatch failed.');
+        throw new https_1.HttpsError('internal', message || 'Emergency SOS dispatch failed.');
     }
 });
 //# sourceMappingURL=sendSOS.js.map

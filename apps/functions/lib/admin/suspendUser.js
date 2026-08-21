@@ -21,14 +21,14 @@ async function verifyAdminCaller(auth) {
     if (tokenClaimRole !== 'admin') {
         throw new https_1.HttpsError('permission-denied', 'Caller does not possess administrative privileges.');
     }
-    let displayName = auth.token?.name || 'System Admin';
+    let displayName = typeof auth.token?.name === 'string' ? auth.token.name : 'System Admin';
     try {
         // Read Firestore document only for displayName in audit logging if available
         const db = (0, firestore_1.getFirestore)();
         const userSnap = await db.collection('users').doc(callerUid).get();
         if (userSnap.exists) {
             const userData = userSnap.data() || {};
-            if (userData.displayName) {
+            if (userData.displayName && typeof userData.displayName === 'string') {
                 displayName = userData.displayName;
             }
         }
@@ -77,8 +77,9 @@ exports.suspendUser = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENF
         return { success: true, targetUid, isSuspended: true };
     }
     catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[suspendUser] Error suspending user ${targetUid}:`, err);
-        throw new https_1.HttpsError('internal', err.message || 'Failed to complete user suspension sequence.');
+        throw new https_1.HttpsError('internal', message || 'Failed to complete user suspension sequence.');
     }
 });
 exports.reactivateUser = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_ENFORCED }, async (request) => {
@@ -116,8 +117,9 @@ exports.reactivateUser = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_
         return { success: true, targetUid, isSuspended: false };
     }
     catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[reactivateUser] Error reactivating user ${targetUid}:`, err);
-        throw new https_1.HttpsError('internal', err.message || 'Failed to complete user reactivation sequence.');
+        throw new https_1.HttpsError('internal', message || 'Failed to complete user reactivation sequence.');
     }
 });
 //# sourceMappingURL=suspendUser.js.map
