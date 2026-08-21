@@ -73,15 +73,23 @@ service cloud.firestore {
     function isPlausibleTimestamp(ts) {
       return (
         (ts is timestamp && ts <= request.time + duration.value(5, 'm') && ts >= request.time - duration.value(24, 'h')) ||
-        (ts is string && ts.size() >= 10 && ts.size() <= 40)
+        (ts is string && ts.size() >= 10 && ts.size() <= 35 && ts.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'))
       );
     }
 
     function isValidTripData(data) {
-      return (!('latitude' in data) || !('longitude' in data) || isWithinKenyaBounds(data.latitude, data.longitude)) &&
-             (!('startLocation' in data) || data.startLocation == null || isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude)) &&
-             (!('endLocation' in data) || data.endLocation == null || isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude)) &&
+      return ((!('latitude' in data) && !('longitude' in data)) ||
+              (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
+             (!('startLocation' in data) || data.startLocation == null || (
+               ('latitude' in data.startLocation) && ('longitude' in data.startLocation) &&
+               isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude)
+             )) &&
+             (!('endLocation' in data) || data.endLocation == null || (
+               ('latitude' in data.endLocation) && ('longitude' in data.endLocation) &&
+               isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude)
+             )) &&
              (!('lastGpsUpdate' in data) || data.lastGpsUpdate == null || (
+               ('latitude' in data.lastGpsUpdate) && ('longitude' in data.lastGpsUpdate) &&
                isWithinKenyaBounds(data.lastGpsUpdate.latitude, data.lastGpsUpdate.longitude) &&
                (!('speedKmH' in data.lastGpsUpdate) || isPlausibleSpeed(data.lastGpsUpdate.speedKmH))
              )) &&
@@ -93,7 +101,8 @@ service cloud.firestore {
     }
 
     function isValidViolationData(data) {
-      return (!('latitude' in data) || !('longitude' in data) || isWithinKenyaBounds(data.latitude, data.longitude)) &&
+      return ((!('latitude' in data) && !('longitude' in data)) ||
+              (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
              (!('recordedSpeedKmH' in data) || isPlausibleSpeed(data.recordedSpeedKmH)) &&
              (!('speedLimitKmH' in data) || isPlausibleSpeed(data.speedLimitKmH)) &&
              (!('timestamp' in data) || isPlausibleTimestamp(data.timestamp));
@@ -195,10 +204,10 @@ service cloud.firestore {
 
     // Black Spots Collection
     match /black_spots/{spotId} {
-      allow read: if isSignedIn();
+      allow read: if isRegisteredUser();
       allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
       allow update: if isAuthority() || isAdmin() || (
-        isSignedIn() && resource.data.reportedByUid == request.auth.uid
+        isRegisteredUser() && resource.data.reportedByUid == request.auth.uid
       );
       allow delete: if isAuthority() || isAdmin();
     }

@@ -59,7 +59,7 @@ function evaluateFirestoreRules(
 
       // VT-003: Coordinates bounds check
       const checkCoords = (lat?: any, lon?: any) => {
-        if (lat !== undefined && lon !== undefined) {
+        if (lat !== undefined || lon !== undefined) {
           if (typeof lat !== 'number' || typeof lon !== 'number') return false;
           if (lat < -5.5 || lat > 6.0 || lon < 33.0 || lon > 43.5) return false;
         }
@@ -73,6 +73,7 @@ function evaluateFirestoreRules(
 
       // VT-003: Speed bounds check (0 - 180 km/h)
       if (data?.recordedSpeedKmH !== undefined && (data.recordedSpeedKmH < 0 || data.recordedSpeedKmH > 180)) return false;
+      if (data?.speedLimitKmH !== undefined && (data.speedLimitKmH < 0 || data.speedLimitKmH > 180)) return false;
       if (data?.maxSpeedKmH !== undefined && (data.maxSpeedKmH < 0 || data.maxSpeedKmH > 180)) return false;
       if (data?.currentSpeedKmH !== undefined && (data.currentSpeedKmH < 0 || data.currentSpeedKmH > 180)) return false;
       if (data?.avgSpeedKmH !== undefined && (data.avgSpeedKmH < 0 || data.avgSpeedKmH > 180)) return false;
@@ -121,7 +122,7 @@ function evaluateFirestoreRules(
   }
 
   if (collection === 'black_spots') {
-    if (action === 'read') return auth != null;
+    if (action === 'read') return isRegisteredUser;
     if (action === 'create') {
       return isRegisteredUser && data?.reportedByUid === auth.uid;
     }
@@ -350,10 +351,11 @@ function evaluateStorageRules(
 }
 
 function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
-  const auth = uid ? { uid, token: { activeRole: 'passenger', ...tokenClaims } } : null;
+  const claims = { activeRole: 'passenger', ...tokenClaims };
+  const auth = uid ? { uid, token: claims } : null;
 
   if (testEnv && !isOfflineFallback) {
-    const rawContext = testEnv.authenticatedContext(uid || 'anon', tokenClaims);
+    const rawContext = uid ? testEnv.authenticatedContext(uid, claims) : testEnv.unauthenticatedContext();
     return {
       firestore: () => rawContext.firestore(),
       storage: (bucket?: string) => {
