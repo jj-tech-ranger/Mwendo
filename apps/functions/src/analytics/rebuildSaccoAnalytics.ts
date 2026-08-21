@@ -1,14 +1,28 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore, QueryDocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 import { calculateSaccoSafetyScore } from '../lib/engine';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+
+export interface SaccoAnalyticsPayload {
+  id: string;
+  docId: string;
+  saccoId: string;
+  type: 'sacco';
+  safetyScore: number;
+  fleetCount: number;
+  unresolvedComplaints: number;
+  updatedAt: string;
+}
 
 export async function processRebuildSaccoAnalyticsLogic(
   db: Firestore,
   saccoId: string
-): Promise<any> {
+): Promise<SaccoAnalyticsPayload> {
   const vehiclesSnap = await db.collection('vehicles').where('saccoId', '==', saccoId).get();
-  const scores = vehiclesSnap.docs.map((d: any) => d.data().riskScore ?? 85);
+  const scores = vehiclesSnap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => {
+    const score = d.data().riskScore;
+    return typeof score === 'number' ? score : 85;
+  });
 
   const complaintsSnap = await db
     .collection('complaints')
@@ -34,7 +48,7 @@ export async function processRebuildSaccoAnalyticsLogic(
   }
 
   const docId = `sacco_${saccoId}`;
-  const payload = {
+  const payload: SaccoAnalyticsPayload = {
     id: docId,
     docId,
     saccoId,

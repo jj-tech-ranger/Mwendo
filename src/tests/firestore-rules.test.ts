@@ -439,17 +439,73 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   };
 }
 
+function parseEmulatorHostPort(
+  raw: string | undefined,
+  defaultHost: string,
+  defaultPort: number
+): { host: string; port: number } {
+  if (!raw || typeof raw !== 'string') {
+    return { host: defaultHost, port: defaultPort };
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { host: defaultHost, port: defaultPort };
+  }
+
+  // Robustly handle http:// or https:// URLs
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname || defaultHost;
+      const port = parsed.port ? parseInt(parsed.port, 10) : defaultPort;
+      return {
+        host: host.replace(/^\[(.*)\]$/, '$1'),
+        port: Number.isFinite(port) && port > 0 ? port : defaultPort,
+      };
+    } catch {
+      // Fall through to host:port parsing
+    }
+  }
+
+  // Handle HOST:PORT or clean host
+  const cleanStr = trimmed.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+  const colonIndex = cleanStr.lastIndexOf(':');
+  if (colonIndex !== -1) {
+    const hostPart = cleanStr.slice(0, colonIndex).trim();
+    const portPart = cleanStr.slice(colonIndex + 1).trim();
+    const parsedPort = parseInt(portPart, 10);
+    const host = hostPart || defaultHost;
+    const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : defaultPort;
+    return { host, port };
+  }
+
+  return { host: cleanStr, port: defaultPort };
+}
+
 describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   beforeAll(async () => {
     const firestoreRules = readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8');
     const storageRules = readFileSync(resolve(__dirname, '../../storage.rules'), 'utf8');
-    const firestoreHostPort = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8085';
-    const [firestoreHost, firestorePortStr] = firestoreHostPort.split(':');
-    const firestorePort = firestorePortStr ? parseInt(firestorePortStr, 10) : 8085;
 
-    const storageHostPort = process.env.STORAGE_EMULATOR_HOST || '127.0.0.1:9199';
-    const [storageHost, storagePortStr] = storageHostPort.split(':');
-    const storagePort = storagePortStr ? parseInt(storagePortStr, 10) : 9199;
+    const rawFirestoreHost =
+      process.env.FIRESTORE_EMULATOR_HOST ||
+      process.env.FIREBASE_FIRESTORE_EMULATOR_HOST ||
+      '127.0.0.1:8085';
+    const { host: firestoreHost, port: firestorePort } = parseEmulatorHostPort(
+      rawFirestoreHost,
+      '127.0.0.1',
+      8085
+    );
+
+    const rawStorageHost =
+      process.env.STORAGE_EMULATOR_HOST ||
+      process.env.FIREBASE_STORAGE_EMULATOR_HOST ||
+      '127.0.0.1:9199';
+    const { host: storageHost, port: storagePort } = parseEmulatorHostPort(
+      rawStorageHost,
+      '127.0.0.1',
+      9199
+    );
 
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
     const allowOfflineFallback = !isCI || process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true';
@@ -470,7 +526,8 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       });
       isOfflineFallback = false;
       console.log(`[firestore-rules.test] Successfully initialized testEnv against Firestore (${firestoreHost}:${firestorePort}) and Storage (${storageHost}:${storagePort}). isOfflineFallback: false`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       if (allowOfflineFallback) {
         console.warn(`[firestore-rules.test] Warning: Failed to connect to emulator at Firestore ${firestoreHost}:${firestorePort} / Storage ${storageHost}:${storagePort}, falling back to offline in-memory mock because ALLOW_RULES_OFFLINE_FALLBACK is enabled for local development.`);
         isOfflineFallback = true;
@@ -478,7 +535,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
         console.error(`[firestore-rules.test] CRITICAL ERROR: Unable to connect to Firebase Firestore/Storage Emulators.`);
         console.error(`In CI and standard test runs, firestore-rules.test.ts must run against a real emulator executing firestore.rules and storage.rules.`);
         throw new Error(
-          `Failed to connect to Firebase Emulators at ${firestoreHost}:${firestorePort} / ${storageHost}:${storagePort}: ${err.message}. ` +
+          `Failed to connect to Firebase Emulators at ${firestoreHost}:${firestorePort} / ${storageHost}:${storagePort}: ${errMsg}. ` +
           `Ensure the emulators are running with 'npx firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-audit "npm test"' ` +
           `or explicitly set ALLOW_RULES_OFFLINE_FALLBACK=true for offline local development.`
         );

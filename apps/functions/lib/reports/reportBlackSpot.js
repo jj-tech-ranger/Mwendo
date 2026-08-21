@@ -91,7 +91,8 @@ exports.reportBlackSpot = (0, https_1.onCall)(async (request) => {
             throw err;
         }
         console.error('[reportBlackSpot] Execution failed:', err);
-        throw new https_1.HttpsError('internal', err?.message || 'Black spot submission failed.');
+        const message = err instanceof Error ? err.message : 'Black spot submission failed.';
+        throw new https_1.HttpsError('internal', message);
     }
 });
 //# sourceMappingURL=reportBlackSpot.js.map

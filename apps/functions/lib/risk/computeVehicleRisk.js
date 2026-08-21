@@ -6,6 +6,12 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const engine_1 = require("../lib/engine");
 const env_1 = require("../lib/env");
+function parseSeverity(val) {
+    if (val === 'medium' || val === 'high' || val === 'critical') {
+        return val;
+    }
+    return 'low';
+}
 async function processVehicleRiskLogic(db, event) {
     const ledgerRef = db.collection('processedEvents').doc(event.eventId);
     // Use a Firestore transaction for atomic idempotency check and write
@@ -54,8 +60,8 @@ async function processVehicleRiskLogic(db, event) {
         .map((d) => {
         const data = d.data();
         return {
-            severity: (data.severity || 'low'),
-            timestamp: data.timestamp || new Date().toISOString(),
+            severity: parseSeverity(data.severity),
+            timestamp: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
             confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
             recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
         };
@@ -73,7 +79,7 @@ async function processVehicleRiskLogic(db, event) {
     if (Number.isFinite(incomingTimeMs) &&
         (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))) {
         eventsList.push({
-            severity: event.severity,
+            severity: parseSeverity(event.severity),
             timestamp: event.timestamp,
             confidenceScore: typeof event.confidenceScore === 'number' ? event.confidenceScore : 1.0,
         });

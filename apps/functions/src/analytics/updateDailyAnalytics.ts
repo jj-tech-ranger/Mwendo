@@ -1,7 +1,24 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore, QueryDocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+
+export interface DailyAnalyticsPayload {
+  id: string;
+  docId: string;
+  date: string;
+  type: 'daily';
+  totalTrips: number;
+  totalViolations: number;
+  activeAlerts: number;
+  riskDistribution: {
+    low: number;
+    medium: number;
+    high: number;
+    critical: number;
+  };
+  updatedAt: string;
+}
 
 /**
  * ANALYTICS-001: Date-scoped Daily Analytics Engine
@@ -11,7 +28,7 @@ import { APP_CHECK_ENFORCED } from '../lib/env';
 export async function processUpdateDailyAnalyticsLogic(
   db: Firestore,
   dateStr: string
-): Promise<any> {
+): Promise<DailyAnalyticsPayload> {
   const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
   const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
   const startIso = startOfDay.toISOString();
@@ -43,14 +60,16 @@ export async function processUpdateDailyAnalyticsLogic(
 
   const totalTrips = tripsSnap.size;
   const totalViolations = violSnap.size;
-  const activeAlerts = alertsSnap.docs.filter((d: any) => d.data().status === 'active').length;
+  const activeAlerts = alertsSnap.docs.filter(
+    (d: QueryDocumentSnapshot<DocumentData>) => d.data().status === 'active'
+  ).length;
 
   let lowRiskCount = 0;
   let mediumRiskCount = 0;
   let highRiskCount = 0;
   let criticalRiskCount = 0;
 
-  vehiclesSnap.docs.forEach((d: any) => {
+  vehiclesSnap.docs.forEach((d: QueryDocumentSnapshot<DocumentData>) => {
     const tier = d.data().riskTier;
     if (tier === 'critical') criticalRiskCount++;
     else if (tier === 'high') highRiskCount++;
@@ -59,7 +78,7 @@ export async function processUpdateDailyAnalyticsLogic(
   });
 
   const docId = `daily_${dateStr}`;
-  const payload = {
+  const payload: DailyAnalyticsPayload = {
     id: docId,
     docId,
     date: dateStr,

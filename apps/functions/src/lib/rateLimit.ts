@@ -71,7 +71,11 @@ export async function enforceRateLimit(
 
     validTimestamps.push(nowMs);
 
-    const updatePayload: Record<string, any> = {
+    const updatePayload: {
+      userId: string;
+      updatedAt: string;
+      [key: string]: string | number[] | undefined;
+    } = {
       userId,
       [fieldKey]: validTimestamps,
       updatedAt: new Date(nowMs).toISOString(),

@@ -2,6 +2,18 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 
+interface BlackSpotDocData {
+  status?: string;
+  verifiedByAuthority?: boolean;
+  name?: string;
+  title?: string;
+  routeName?: string;
+  latitude?: number;
+  longitude?: number;
+  severity?: string;
+  [key: string]: unknown;
+}
+
 export async function processSyncPublicPinsLogic(
   db: Firestore
 ): Promise<{ syncedCount: number; deletedCount: number }> {
@@ -10,9 +22,9 @@ export async function processSyncPublicPinsLogic(
     db.collection('public_pins').get(),
   ]);
 
-  const validSpotMap = new Map<string, any>();
+  const validSpotMap = new Map<string, BlackSpotDocData>();
   for (const spotDoc of spotsSnap.docs) {
-    const data = spotDoc.data();
+    const data = spotDoc.data() as BlackSpotDocData;
     if (data.status === 'published' || data.verifiedByAuthority === true) {
       validSpotMap.set(spotDoc.id, data);
     }

@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
+import { getFirestore, Firestore, QueryDocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 
@@ -14,6 +14,17 @@ export interface VehicleRiskEventPayload {
   speedLimitKmH?: number;
   confidenceScore?: number;
   timestamp: string;
+}
+
+function parseSeverity(val: unknown): 'low' | 'medium' | 'high' | 'critical' {
+  if (val === 'medium' || val === 'high' || val === 'critical') {
+    return val;
+  }
+  return 'low';
+}
+
+interface ViolationCandidate extends RiskEvent {
+  recordedSpeedKmH?: number;
 }
 
 export async function processVehicleRiskLogic(
@@ -70,16 +81,16 @@ export async function processVehicleRiskLogic(
 
   const nowMs = Date.now();
   const eventsList: RiskEvent[] = violSnap.docs
-    .map((d: any) => {
+    .map((d: QueryDocumentSnapshot<DocumentData>): ViolationCandidate => {
       const data = d.data();
       return {
-        severity: (data.severity || 'low') as any,
-        timestamp: data.timestamp || new Date().toISOString(),
+        severity: parseSeverity(data.severity),
+        timestamp: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
         confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
         recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
       };
     })
-    .filter((e: any) => {
+    .filter((e: ViolationCandidate) => {
       // VT-003: Plausibility checks - discard physically impossible speeds (>180 km/h) or invalid timestamps
       if (e.recordedSpeedKmH !== undefined && (e.recordedSpeedKmH < 0 || e.recordedSpeedKmH > 180)) {
         return false;
@@ -95,7 +106,7 @@ export async function processVehicleRiskLogic(
     (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))
   ) {
     eventsList.push({
-      severity: event.severity as any,
+      severity: parseSeverity(event.severity),
       timestamp: event.timestamp,
       confidenceScore: typeof event.confidenceScore === 'number' ? event.confidenceScore : 1.0,
     });

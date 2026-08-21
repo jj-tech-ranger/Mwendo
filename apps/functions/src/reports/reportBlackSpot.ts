@@ -121,11 +121,12 @@ export const reportBlackSpot = onCall(async (request) => {
 
   try {
     return await processReportBlackSpotLogic(db, payload, userId);
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (err instanceof HttpsError) {
       throw err;
     }
     console.error('[reportBlackSpot] Execution failed:', err);
-    throw new HttpsError('internal', err?.message || 'Black spot submission failed.');
+    const message = err instanceof Error ? err.message : 'Black spot submission failed.';
+    throw new HttpsError('internal', message);
   }
 });

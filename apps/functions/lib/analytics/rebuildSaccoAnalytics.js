@@ -8,7 +8,10 @@ const engine_1 = require("../lib/engine");
 const env_1 = require("../lib/env");
 async function processRebuildSaccoAnalyticsLogic(db, saccoId) {
     const vehiclesSnap = await db.collection('vehicles').where('saccoId', '==', saccoId).get();
-    const scores = vehiclesSnap.docs.map((d) => d.data().riskScore ?? 85);
+    const scores = vehiclesSnap.docs.map((d) => {
+        const score = d.data().riskScore;
+        return typeof score === 'number' ? score : 85;
+    });
     const complaintsSnap = await db
         .collection('complaints')
         .where('saccoId', '==', saccoId)
