@@ -4,6 +4,7 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
+import { Timestamp } from 'firebase/firestore';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, beforeAll, afterAll, beforeEach, it } from 'vitest';
@@ -359,15 +360,6 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
       firestore: () => rawContext.firestore(),
       storage: (bucket?: string) => {
         const rawStorage = rawContext.storage(bucket);
-        if (typeof (rawStorage as any).setMaxUploadRetryTime === 'function') {
-          (rawStorage as any).setMaxUploadRetryTime(1000);
-        }
-        if (typeof (rawStorage as any).setMaxOperationRetryTime === 'function') {
-          (rawStorage as any).setMaxOperationRetryTime(1000);
-        }
-        if (typeof (rawStorage as any).setMaxDownloadRetryTime === 'function') {
-          (rawStorage as any).setMaxDownloadRetryTime(1000);
-        }
         return {
           ref: (path: string) => {
             const rawRef = rawStorage.ref(path);
@@ -1161,34 +1153,34 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const validJpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
     const validMetadata = { contentType: 'image/jpeg' };
 
-    // SCENARIO 1: Stale passenger with saccoId claim but activeRole passenger
-    // - read denied
-    // - upload denied
-    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-
-    // SCENARIO 2: Unrelated passenger
-    // - read denied
-    // - upload denied
-    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-
-    // SCENARIO 3: Original complainant
+    // SCENARIO 1: Original complainant
     // - upload succeeds
     // - read succeeds
+    // - delete denied (restricted to authority/admin)
     await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
     await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
 
-    // SCENARIO 4: Matching SACCO manager
+    // SCENARIO 2: Stale passenger & unrelated passenger
+    // - read denied
+    // - upload / overwrite denied
+    // - delete denied
+    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
+    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
+    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
+
+    // SCENARIO 3: Matching SACCO manager
     // - read succeeds
-    // - update denied
+    // - update / overwrite denied
     // - delete denied
     await assertSucceeds(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
     await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').update(validJpegBytes, validMetadata));
     await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
     await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
 
-    // SCENARIO 5: Authority
+    // SCENARIO 4: Authority
     // - read succeeds
     // - delete succeeds
     await assertSucceeds(authority.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
@@ -1222,14 +1214,19 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       status: 'pending',
     };
 
-    // 1. Any user (including imposter) can read black spot photos (public read)
+    const evidenceData = new Uint8Array([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00,
+    ]);
+    const metadata = { contentType: 'image/jpeg' };
+
+    // 1. Reporter uploading evidence to spot_100 -> SUCCEEDS (reportedByUid matches auth.uid)
+    await assertSucceeds((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').put(evidenceData, metadata) as Promise<any>);
+
+    // 2. Any user (including imposter) can read existing black spot photos (public read)
     await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').get() as Promise<any>);
 
-    // 2. Imposter attempting to upload evidence to spot_100 -> FAILS (ownership mismatch)
-    await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
-
-    // 3. Reporter uploading evidence to spot_100 -> SUCCEEDS (reportedByUid matches auth.uid)
-    await assertSucceeds((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').put() as Promise<any>);
+    // 3. Imposter attempting to upload / overwrite evidence to spot_100 -> FAILS (ownership mismatch)
+    await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put(evidenceData, metadata) as Promise<any>);
 
     // 4. Reporter attempting to delete or overwrite -> FAILS (update/delete restricted to authority/admin)
     await assertFails((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').delete() as Promise<any>);
@@ -1327,12 +1324,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     });
 
     const now = Date.now();
-    const createTs = (ms: number) => ({
-      seconds: Math.floor(ms / 1000),
-      nanoseconds: (ms % 1000) * 1e6,
-      toDate: () => new Date(ms),
-      toMillis: () => ms,
-    });
+    const createTs = (ms: number) => Timestamp.fromMillis(ms);
 
     const validTime = createTs(now - 60000); // 1 minute ago
     const futureTime = createTs(now + 3600000); // 1 hour in future (>5m)
