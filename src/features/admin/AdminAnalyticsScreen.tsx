@@ -63,7 +63,13 @@ export const AdminAnalyticsScreen: React.FC = () => {
       </div>
 
       {/* Main Grid: User Roles & SACCO Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+      {isLoading ? (
+        <div className="p-12 text-center text-xs text-on-surface-variant font-mono flex items-center justify-center gap-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl">
+          <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin inline-block" />
+          Loading platform analytics & demographics...
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <h3 className="font-headline-lg-mobile text-sm text-on-surface font-bold border-b border-outline-variant/20 pb-sm">
             Registered User Demographics ({users.length} total)
@@ -114,6 +120,7 @@ export const AdminAnalyticsScreen: React.FC = () => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

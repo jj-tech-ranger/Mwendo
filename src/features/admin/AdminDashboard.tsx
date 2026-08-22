@@ -11,7 +11,11 @@ import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
 
-  const { data: dashboardData, isLoading, isError, error, refetch } = useQuery({
+  const { data: dashboardData, isError, error, refetch } = useQuery<{
+    logs: AuditLog[];
+    complaints: Complaint[];
+    stats: { userCount: number; saccoCount: number; tripCount: number };
+  }>({
     queryKey: ['adminDashboardData'],
     queryFn: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
@@ -33,7 +37,7 @@ export const AdminDashboard: React.FC = () => {
 
       return {
         logs: fetchedLogs,
-        complaints: fetchedComplaints.filter((c) => c.status === 'open' || c.status === 'investigating'),
+        complaints: fetchedComplaints.filter((c: Complaint) => c.status === 'open' || c.status === 'investigating'),
         stats: {
           userCount: fetchedUsers.length,
           saccoCount: fetchedSaccos.length,
@@ -44,8 +48,8 @@ export const AdminDashboard: React.FC = () => {
     staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
   });
 
-  const logs = dashboardData?.logs || [];
-  const complaints = dashboardData?.complaints || [];
+  const logs: AuditLog[] = dashboardData?.logs || [];
+  const complaints: Complaint[] = dashboardData?.complaints || [];
   const stats = dashboardData?.stats || { userCount: 0, saccoCount: 0, tripCount: 0 };
 
   if (isError) {
@@ -138,7 +142,7 @@ export const AdminDashboard: React.FC = () => {
 
           <div className="space-y-sm">
             {logs.length > 0 ? (
-              logs.slice(0, 5).map((log) => (
+              logs.slice(0, 5).map((log: AuditLog) => (
                 <div key={log.id} className="p-sm rounded-xl bg-surface-container-low border border-outline-variant/20 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-on-surface">{log.actorName}</span>
@@ -175,7 +179,7 @@ export const AdminDashboard: React.FC = () => {
                   No pending complaints or reports in moderation queue.
                 </p>
               ) : (
-                complaints.slice(0, 3).map((c) => (
+                complaints.slice(0, 3).map((c: Complaint) => (
                   <div key={c.id} className="p-sm rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-label-mono text-xs font-bold text-on-surface">

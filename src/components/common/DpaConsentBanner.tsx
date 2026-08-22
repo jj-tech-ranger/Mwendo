@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { analyticsService } from '../../services/analyticsService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../ui/Button';
@@ -13,7 +12,6 @@ export const DpaConsentBanner: React.FC<DpaConsentBannerProps> = ({
   forceVisible = false,
   onClose,
 }) => {
-  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
   const [isVisible, setIsVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);

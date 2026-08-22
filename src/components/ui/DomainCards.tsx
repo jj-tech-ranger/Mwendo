@@ -235,7 +235,7 @@ export const TripCard: React.FC<TripCardProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-outline-variant/20 font-body-sm text-xs">
+      <div className="grid grid-cols-4 gap-2 pt-2 border-t border-outline-variant/20 font-body-sm text-xs">
         <div>
           <span className="text-on-surface-variant/70 block uppercase font-label-bold text-[10px]">Duration</span>
           <span className="font-label-mono text-on-surface font-medium">{durationMinutes} mins</span>
@@ -249,6 +249,17 @@ export const TripCard: React.FC<TripCardProps> = ({
             )}
           >
             {maxSpeedKmh} km/h
+          </span>
+        </div>
+        <div>
+          <span className="text-on-surface-variant/70 block uppercase font-label-bold text-[10px]">Violations</span>
+          <span
+            className={cn(
+              'font-label-mono font-bold',
+              violationsCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-on-surface'
+            )}
+          >
+            {violationsCount}
           </span>
         </div>
         <div>
@@ -308,7 +319,10 @@ export const HazardCard: React.FC<HazardCardProps> = ({
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <Badge variant="neutral" className="font-label-mono text-[10px] uppercase border border-outline-variant/30">
+              {hazardType.replace('_', ' ')}
+            </Badge>
             <Badge variant={severityBadge[severity]}>{severity} severity</Badge>
             <Badge variant={status === 'published' ? 'success' : status === 'pending' ? 'warning' : 'danger'}>
               {status}

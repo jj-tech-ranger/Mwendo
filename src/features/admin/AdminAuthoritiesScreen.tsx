@@ -135,8 +135,14 @@ export const AdminAuthoritiesScreen: React.FC = () => {
 
       {/* Inspectors Table */}
       <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-body-sm">
+        {isLoading ? (
+          <div className="p-8 text-center text-xs text-on-surface-variant font-mono flex items-center justify-center gap-2">
+            <span className="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin inline-block" />
+            Loading enforcement authority directory...
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-body-sm">
             <thead className="bg-surface-container-low font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/20">
               <tr>
                 <th className="p-md">Inspector Name</th>
@@ -191,6 +197,7 @@ export const AdminAuthoritiesScreen: React.FC = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {/* Provision Account Modal */}
