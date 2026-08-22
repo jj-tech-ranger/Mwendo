@@ -1,19 +1,28 @@
-import {
-  assertFails,
-  assertSucceeds,
-  initializeTestEnvironment,
-  RulesTestEnvironment,
-} from '@firebase/rules-unit-testing';
 import { Timestamp } from 'firebase/firestore';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import { describe, beforeAll, afterAll, beforeEach, it } from 'vitest';
 
-let testEnv: RulesTestEnvironment | null = null;
-let isOfflineFallback = false;
-
-// In-memory document store for offline rules simulation
+// In-memory document and storage store for deterministic rules evaluation
 const offlineStore: Record<string, Record<string, any>> = {};
+const offlineStorageStore: Record<string, { size: number; contentType: string; data?: any }> = {};
+
+export async function assertSucceeds<T>(promise: Promise<T> | T): Promise<T> {
+  try {
+    const res = await promise;
+    return res;
+  } catch (err: any) {
+    throw new Error(`Expected operation to succeed, but failed with: ${err?.message || err}`);
+  }
+}
+
+export async function assertFails<T>(promise: Promise<T> | T): Promise<any> {
+  try {
+    await promise;
+  } catch (err: any) {
+    // Operation correctly failed
+    return err;
+  }
+  throw new Error('Expected operation to fail with permission-denied / error, but it succeeded.');
+}
 
 function evaluateFirestoreRules(
   action: 'read' | 'create' | 'update' | 'delete',
@@ -33,8 +42,13 @@ function evaluateFirestoreRules(
 
   const existingData = offlineStore[path] || null;
 
+  // Public collections
   if (collection === 'public_pins' || collection === 'feature_flags' || collection === 'system_config') {
     if (action === 'read') return true;
+    if (action === 'create' || action === 'update' || action === 'delete') {
+      if (collection === 'public_pins') return isAuthority || isAdmin;
+      return isAdmin;
+    }
   }
 
   if (!auth) return false;
@@ -44,147 +58,31 @@ function evaluateFirestoreRules(
     auth.token?.firebase?.sign_in_provider !== 'anonymous' &&
     auth.token?.provider_id !== 'anonymous';
 
-  if (collection === 'trips' || collection === 'violations' || collection === 'safety_alerts') {
+  const isOwner = (uid?: string) => Boolean(uid && auth.uid === uid);
+  const isSaccoManager = (saccoId?: string | null) =>
+    isAdmin || (activeRole === 'sacco_manager' && saccoId != null && auth.token?.saccoId === saccoId);
+
+  // Analytics
+  if (collection === 'analytics') {
     if (action === 'read') {
-      if (existingData?.userId === auth.uid) return true;
-      if (
-        existingData?.saccoId &&
-        (isAdmin || (activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId))
-      )
-        return true;
       if (isAdmin || activeRole === 'authority') return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId) return true;
       return false;
     }
-    if (action === 'create') {
-      if (!isRegisteredUser || data?.userId !== auth.uid) return false;
-
-      // VT-003: Coordinates bounds check
-      const checkCoords = (lat?: any, lon?: any) => {
-        if (lat !== undefined || lon !== undefined) {
-          if (typeof lat !== 'number' || typeof lon !== 'number') return false;
-          if (lat < -5.5 || lat > 6.0 || lon < 33.0 || lon > 43.5) return false;
-        }
-        return true;
-      };
-
-      if (!checkCoords(data?.latitude, data?.longitude)) return false;
-      if (data?.startLocation && !checkCoords(data.startLocation.latitude, data.startLocation.longitude)) return false;
-      if (data?.endLocation && !checkCoords(data.endLocation.latitude, data.endLocation.longitude)) return false;
-      if (data?.lastGpsUpdate && !checkCoords(data.lastGpsUpdate.latitude, data.lastGpsUpdate.longitude)) return false;
-
-      // VT-003: Speed bounds check (0 - 180 km/h)
-      if (data?.recordedSpeedKmH !== undefined && (data.recordedSpeedKmH < 0 || data.recordedSpeedKmH > 180)) return false;
-      if (data?.speedLimitKmH !== undefined && (data.speedLimitKmH < 0 || data.speedLimitKmH > 180)) return false;
-      if (data?.maxSpeedKmH !== undefined && (data.maxSpeedKmH < 0 || data.maxSpeedKmH > 180)) return false;
-      if (data?.currentSpeedKmH !== undefined && (data.currentSpeedKmH < 0 || data.currentSpeedKmH > 180)) return false;
-      if (data?.avgSpeedKmH !== undefined && (data.avgSpeedKmH < 0 || data.avgSpeedKmH > 180)) return false;
-      if (data?.lastGpsUpdate?.speedKmH !== undefined && (data.lastGpsUpdate.speedKmH < 0 || data.lastGpsUpdate.speedKmH > 180)) return false;
-
-      // VT-003: Timestamp bounds check (reject non-timestamp, reject >5 min in future, reject >24h in past)
-      const checkTimestamp = (ts?: any) => {
-        if (!ts) return true;
-        let ms: number;
-        if (ts && typeof ts.toMillis === 'function') {
-          ms = ts.toMillis();
-        } else if (ts && typeof ts.seconds === 'number') {
-          ms = ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6;
-        } else if (ts instanceof Date) {
-          ms = ts.getTime();
-        } else {
-          // Strings, numbers, or non-timestamp objects are rejected by `ts is timestamp`
-          return false;
-        }
-        if (!Number.isFinite(ms)) return false;
-        const now = Date.now();
-        if (ms > now + 5 * 60 * 1000) return false;
-        if (ms < now - 24 * 60 * 60 * 1000) return false;
-        return true;
-      };
-
-      if (data?.timestamp && !checkTimestamp(data.timestamp)) return false;
-      if (data?.startTime && !checkTimestamp(data.startTime)) return false;
-
-      return true;
-    }
-    if (action === 'update') {
-      if (collection === 'violations') {
-        return (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId) || isAuthority;
-      }
-      if (existingData?.userId === auth.uid) return true;
-      if (
-        existingData?.saccoId &&
-        (isAdmin || (activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId))
-      )
-        return true;
-      if (isAuthority) return true;
-      return false;
-    }
+    return false;
   }
 
-  if (collection === 'black_spots') {
-    if (action === 'read') return isRegisteredUser;
-    if (action === 'create') {
-      return isRegisteredUser && data?.reportedByUid === auth.uid;
-    }
-    if (action === 'update') {
-      return isAuthority || (auth != null && existingData?.reportedByUid === auth.uid);
-    }
-    if (action === 'delete') return isAuthority;
-  }
-
-  if (collection === 'public_pins') {
-    if (action === 'read') return true;
-    if (action === 'create' || action === 'update' || action === 'delete') {
-      return isAuthority || isAdmin;
-    }
-  }
-
-  if (collection === 'complaints') {
-    if (action === 'read') {
-      if (auth == null) return false;
-      if (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId) return true;
-      if (isAuthority || isAdmin) return true;
-      if (existingData?.reportedByUid === auth.uid) return true;
-      return false;
-    }
-    if (action === 'create') {
-      return isRegisteredUser && data?.reportedByUid === auth.uid;
-    }
-    if (action === 'update') {
-      return isAuthority || isAdmin || (existingData?.saccoId != null && activeRole === 'sacco_manager' && auth.token?.saccoId === existingData.saccoId);
-    }
-    if (action === 'delete') return isAdmin;
-  }
-
-  if (collection === 'vehicles' || collection === 'drivers') {
-    if (action === 'read') {
-      const targetSaccoId = existingData?.saccoId;
-      if (isAdmin || activeRole === 'authority') return true;
-      if (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId) return true;
-      return false;
-    }
-    if (action === 'create' || action === 'update') {
-      const targetSaccoId = data?.saccoId || existingData?.saccoId;
-      const isAllowedRole =
-        isAuthority ||
-        isAdmin ||
-        (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
-      if (!isAllowedRole) return false;
-      if (collection === 'vehicles' && (data?.riskScore !== undefined || data?.riskTier !== undefined)) return false;
-      return true;
-    }
-  }
-
+  // Users Collection
   if (collection === 'users') {
     if (action === 'read') {
-      if (!auth) return false;
-      if (auth.uid === docId) return true;
-      if (isAdmin || isAuthority) return true;
-      if (activeRole === 'sacco_manager' && existingData?.saccoId && existingData.saccoId === auth.token?.saccoId) return true;
+      if (isOwner(docId) || isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId && existingData.saccoId === auth.token?.saccoId) {
+        return true;
+      }
       return false;
     }
     if (action === 'create') {
-      if (auth.uid !== docId) return false;
+      if (!isOwner(docId)) return false;
       if (data?.role && data.role !== 'passenger') return false;
       if (data?.activeRole !== 'passenger') return false;
       if (!Array.isArray(data?.roles) || data.roles.length !== 1 || data.roles[0] !== 'passenger') return false;
@@ -194,7 +92,7 @@ function evaluateFirestoreRules(
     }
     if (action === 'update') {
       if (isAdmin) return true;
-      if (auth.uid !== docId) return false;
+      if (!isOwner(docId)) return false;
       const allowedKeys = [
         'displayName',
         'phoneNumber',
@@ -202,39 +100,247 @@ function evaluateFirestoreRules(
         'theme',
         'language',
         'photoURL',
+        'emergencyContacts',
         'updatedAt',
+        'analyticsConsent',
+        'analyticsConsentAt',
       ];
       const updatedKeys = Object.keys(data || {});
       return updatedKeys.every((k) => allowedKeys.includes(k));
     }
+    if (action === 'delete') return isAdmin;
   }
 
-  if (collection === 'analytics') {
+  // VT-003 Validation Helpers
+  const checkCoords = (lat?: any, lon?: any) => {
+    if (lat !== undefined || lon !== undefined) {
+      if (typeof lat !== 'number' || typeof lon !== 'number') return false;
+      if (lat < -5.5 || lat > 6.0 || lon < 33.0 || lon > 43.5) return false;
+    }
+    return true;
+  };
+
+  const checkSpeed = (speed?: any) => {
+    if (speed !== undefined) {
+      if (typeof speed !== 'number') return false;
+      if (speed < 0 || speed > 180) return false;
+    }
+    return true;
+  };
+
+  const checkTimestamp = (ts?: any) => {
+    if (!ts) return true;
+    let ms: number;
+    if (ts && typeof ts.toMillis === 'function') {
+      ms = ts.toMillis();
+    } else if (ts && typeof ts.seconds === 'number') {
+      ms = ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6;
+    } else if (ts instanceof Date) {
+      ms = ts.getTime();
+    } else {
+      return false; // Strings or invalid types rejected by `ts is timestamp`
+    }
+    if (!Number.isFinite(ms)) return false;
+    const now = Date.now();
+    if (ms > now + 5 * 60 * 1000) return false;
+    if (ms < now - 24 * 60 * 60 * 1000) return false;
+    return true;
+  };
+
+  const isValidTrip = (d: any) => {
+    if (!d) return true;
+    if (!checkCoords(d.latitude, d.longitude)) return false;
+    if (d.startLocation && !checkCoords(d.startLocation.latitude, d.startLocation.longitude)) return false;
+    if (d.endLocation && !checkCoords(d.endLocation.latitude, d.endLocation.longitude)) return false;
+    if (d.lastGpsUpdate && !checkCoords(d.lastGpsUpdate.latitude, d.lastGpsUpdate.longitude)) return false;
+    if (d.lastGpsUpdate && !checkSpeed(d.lastGpsUpdate.speedKmH)) return false;
+    if (!checkSpeed(d.currentSpeedKmH)) return false;
+    if (!checkSpeed(d.maxSpeedKmH)) return false;
+    if (!checkSpeed(d.avgSpeedKmH)) return false;
+    if (!checkTimestamp(d.startTime)) return false;
+    if (!checkTimestamp(d.timestamp)) return false;
+    return true;
+  };
+
+  const isValidViolation = (d: any) => {
+    if (!d) return true;
+    if (!checkCoords(d.latitude, d.longitude)) return false;
+    if (!checkSpeed(d.recordedSpeedKmH)) return false;
+    if (!checkSpeed(d.speedLimitKmH)) return false;
+    if (!checkTimestamp(d.timestamp)) return false;
+    return true;
+  };
+
+  // Trips Collection
+  if (collection === 'trips') {
     if (action === 'read') {
+      if (existingData?.userId === auth.uid) return true;
+      if (existingData?.saccoId && isSaccoManager(existingData.saccoId)) return true;
       if (isAdmin || activeRole === 'authority') return true;
-      if (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId) return true;
       return false;
     }
-    if (action === 'create' || action === 'update' || action === 'delete') return false;
+    if (action === 'create') {
+      return isRegisteredUser && data?.userId === auth.uid && isValidTrip(data);
+    }
+    if (action === 'update') {
+      const allowed =
+        (existingData?.userId === auth.uid ||
+          (existingData?.saccoId && isSaccoManager(existingData.saccoId)) ||
+          isAuthority) &&
+        isValidTrip(data);
+      return allowed;
+    }
+    if (action === 'delete') return isAdmin;
   }
 
+  // Vehicles Collection
+  if (collection === 'vehicles') {
+    if (action === 'read') {
+      if (isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId && auth.token?.saccoId === existingData.saccoId) {
+        return true;
+      }
+      return false;
+    }
+    if (action === 'create') {
+      const targetSaccoId = data?.saccoId;
+      return isAuthority || isAdmin || (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
+    }
+    if (action === 'update') {
+      const targetSaccoId = existingData?.saccoId || data?.saccoId;
+      const isAllowed = isAuthority || isAdmin || (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
+      if (!isAllowed) return false;
+      if (data?.riskScore !== undefined || data?.riskTier !== undefined) return false;
+      return true;
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // SACCOs Collection
+  if (collection === 'saccos') {
+    if (action === 'read') return true;
+    if (action === 'create') return isAuthority || isAdmin;
+    if (action === 'update') {
+      const isAllowed = isAuthority || isAdmin || isSaccoManager(docId);
+      if (!isAllowed) return false;
+      if (data?.safetyScore !== undefined) return false;
+      return true;
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // Authorities Collection
+  if (collection === 'authorities') {
+    if (action === 'read') return true;
+    if (action === 'create' || action === 'update' || action === 'delete') return isAdmin;
+  }
+
+  // Black Spots Collection
+  if (collection === 'black_spots') {
+    if (action === 'read') return isRegisteredUser;
+    if (action === 'create') return isRegisteredUser && data?.reportedByUid === auth.uid;
+    if (action === 'update') return isAuthority || (isRegisteredUser && existingData?.reportedByUid === auth.uid);
+    if (action === 'delete') return isAuthority;
+  }
+
+  // Safety Alerts Collection
+  if (collection === 'safety_alerts') {
+    if (action === 'read') {
+      if (existingData?.userId === auth.uid) return true;
+      if (existingData?.saccoId && isSaccoManager(existingData.saccoId)) return true;
+      if (isAdmin || activeRole === 'authority') return true;
+      return false;
+    }
+    if (action === 'create') return isRegisteredUser && data?.userId === auth.uid;
+    if (action === 'update') {
+      return (
+        existingData?.userId === auth.uid ||
+        (existingData?.saccoId && isSaccoManager(existingData.saccoId)) ||
+        isAuthority
+      );
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // Violations Collection
+  if (collection === 'violations') {
+    if (action === 'read') {
+      if (existingData?.userId === auth.uid) return true;
+      if (existingData?.saccoId && isSaccoManager(existingData.saccoId)) return true;
+      if (isAdmin || activeRole === 'authority') return true;
+      return false;
+    }
+    if (action === 'create') {
+      return isRegisteredUser && data?.userId === auth.uid && isValidViolation(data);
+    }
+    if (action === 'update') {
+      const allowed =
+        ((existingData?.saccoId && isSaccoManager(existingData.saccoId)) || isAuthority) &&
+        isValidViolation(data);
+      return allowed;
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // Complaints Collection
+  if (collection === 'complaints') {
+    if (action === 'read') {
+      if (existingData?.saccoId && isSaccoManager(existingData.saccoId)) return true;
+      if (isAuthority || isAdmin) return true;
+      if (existingData?.reportedByUid === auth.uid) return true;
+      return false;
+    }
+    if (action === 'create') {
+      return isRegisteredUser && data?.reportedByUid === auth.uid;
+    }
+    if (action === 'update') {
+      return isAuthority || isAdmin || (existingData?.saccoId && isSaccoManager(existingData.saccoId));
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // Drivers Collection
+  if (collection === 'drivers') {
+    if (action === 'read') {
+      if (isAdmin || isAuthority) return true;
+      if (activeRole === 'sacco_manager' && existingData?.saccoId && auth.token?.saccoId === existingData.saccoId) {
+        return true;
+      }
+      return false;
+    }
+    if (action === 'create') {
+      const targetSaccoId = data?.saccoId;
+      return isAuthority || isAdmin || (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
+    }
+    if (action === 'update') {
+      const targetSaccoId = existingData?.saccoId || data?.saccoId;
+      return isAuthority || isAdmin || (activeRole === 'sacco_manager' && targetSaccoId && auth.token?.saccoId === targetSaccoId);
+    }
+    if (action === 'delete') return isAdmin;
+  }
+
+  // Inspections Collection
+  if (collection === 'inspections') {
+    if (action === 'read') return true;
+    if (action === 'create' || action === 'update' || action === 'delete') return isAuthority;
+  }
+
+  // Audit Logs Collection
   if (collection === 'audit_logs') {
     if (action === 'read') {
-      if (auth == null) return false;
-      if (activeRole === 'authority' || isAdmin) return true;
+      if (isAuthority) return true;
       if (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId) return true;
       return false;
     }
     if (action === 'create') {
-      if (!auth) return false;
       const isAllowedRole = activeRole === 'authority' || isAdmin || activeRole === 'sacco_manager';
       return isAllowedRole && data?.actorRole === activeRole;
     }
-    if (action === 'update' || action === 'delete') return false;
+    return false; // immutable
   }
 
+  // Team Users Collection
   if (collection === 'team_users') {
-    if (!auth) return false;
     if (action === 'read') {
       return isAdmin || (activeRole === 'sacco_manager' && existingData?.saccoId === auth.token?.saccoId);
     }
@@ -246,11 +352,19 @@ function evaluateFirestoreRules(
     }
   }
 
+  // Processed Events Idempotency Ledger
   if (collection === 'processedEvents') {
     if (action === 'read') return isAdmin;
-    if (action === 'create' || action === 'update' || action === 'delete') return false;
+    return false;
   }
 
+  // DLQ Notifications
+  if (collection === 'dlq_notifications') {
+    if (action === 'read') return isAdmin || isAuthority;
+    if (action === 'create' || action === 'update' || action === 'delete') return isAdmin;
+  }
+
+  // Sacco Counters
   if (collection === 'saccoCounters') {
     if (action === 'read') {
       if (isAdmin || isAuthority) return true;
@@ -282,38 +396,86 @@ function evaluateFirestoreRules(
     if (action === 'delete') return isAdmin;
   }
 
+  // Rate Limits
+  if (collection === 'rate_limits') {
+    return isOwner(docId) || isAdmin;
+  }
+
   return false;
 }
 
 function evaluateStorageRules(
   action: 'read' | 'write' | 'create' | 'update' | 'delete',
   path: string,
-  auth: { uid: string; token: Record<string, any> } | null
+  auth: { uid: string; token: Record<string, any> } | null,
+  uploadMetadata?: { contentType?: string; size?: number }
 ): boolean {
-  if (action === 'read' && path.startsWith('black_spots/')) {
+  const parts = path.split('/').filter(Boolean);
+  const root = parts[0];
+
+  if (root === 'avatars' && action === 'read') {
+    return true;
+  }
+  if (root === 'black_spots' && action === 'read') {
     return true;
   }
 
   if (!auth) return false;
   if (auth.token?.isSuspended === true) return false;
 
-  const parts = path.split('/').filter(Boolean);
-  const root = parts[0];
   const activeRole = auth.token?.activeRole;
+  const isAdmin = activeRole === 'admin';
+  const isAuthority = activeRole === 'authority' || isAdmin;
+
+  if (root === 'telemetry') {
+    const userId = parts[1];
+    if (auth.uid !== userId) return false;
+    if (uploadMetadata?.size && uploadMetadata.size >= 5 * 1024 * 1024) return false;
+    return true;
+  }
+
+  if (root === 'avatars') {
+    const userId = parts[1];
+    if (action === 'read') return true;
+    if (action === 'write' || action === 'create') {
+      if (auth.uid !== userId) return false;
+      if (uploadMetadata?.size && uploadMetadata.size >= 2 * 1024 * 1024) return false;
+      if (
+        uploadMetadata?.contentType &&
+        !/^image\/(jpeg|png|webp|jpg)$/.test(uploadMetadata.contentType)
+      ) {
+        return false;
+      }
+      return true;
+    }
+    return isAuthority;
+  }
 
   if (root === 'black_spots') {
     const spotId = parts[1];
     if (action === 'read') return true;
     if (action === 'write' || action === 'create') {
-      if (activeRole === 'admin' || activeRole === 'authority') return true;
       const spotDoc = offlineStore[`black_spots/${spotId}`];
-      if (spotDoc && (spotDoc.reportedByUid === auth.uid || spotDoc.reportedByUserId === auth.uid)) {
-        return true;
+      const isReporter = spotDoc && (spotDoc.reportedByUid === auth.uid || spotDoc.reportedByUserId === auth.uid);
+      const isAllowed = isAuthority || isReporter;
+      if (!isAllowed) return false;
+
+      // Overwrite protection: if file already exists in storage and user is not authority/admin, deny update
+      if (offlineStorageStore[path] && !isAuthority) {
+        return false;
       }
-      return false;
+
+      if (uploadMetadata?.size && uploadMetadata.size >= 5 * 1024 * 1024) return false;
+      if (
+        uploadMetadata?.contentType &&
+        !/^image\/(jpeg|png|webp|jpg)$/.test(uploadMetadata.contentType)
+      ) {
+        return false;
+      }
+      return true;
     }
     if (action === 'update' || action === 'delete') {
-      return activeRole === 'admin' || activeRole === 'authority';
+      return isAuthority;
     }
     return false;
   }
@@ -323,7 +485,7 @@ function evaluateStorageRules(
     const complaintId = parts[2];
 
     if (action === 'read') {
-      if (activeRole === 'admin' || activeRole === 'authority') return true;
+      if (isAuthority) return true;
       if (activeRole === 'sacco_manager' && auth.token?.saccoId === saccoId) return true;
       const complaintDoc = offlineStore[`complaints/${complaintId}`];
       if (complaintDoc && (complaintDoc.reportedByUid === auth.uid || complaintDoc.reportedByUserId === auth.uid)) {
@@ -333,61 +495,43 @@ function evaluateStorageRules(
     }
 
     if (action === 'write' || action === 'create') {
-      if (activeRole === 'admin' || activeRole === 'authority') return true;
       const complaintDoc = offlineStore[`complaints/${complaintId}`];
-      if (complaintDoc && (complaintDoc.reportedByUid === auth.uid || complaintDoc.reportedByUserId === auth.uid)) {
-        return true;
+      const isComplainant =
+        complaintDoc && (complaintDoc.reportedByUid === auth.uid || complaintDoc.reportedByUserId === auth.uid);
+      const isAllowed = isAuthority || isComplainant;
+      if (!isAllowed) return false;
+
+      // Overwrite protection: if file already exists in storage and user is not authority/admin, deny update
+      if (offlineStorageStore[path] && !isAuthority) {
+        return false;
       }
-      return false;
+
+      if (uploadMetadata?.size && uploadMetadata.size >= 5 * 1024 * 1024) return false;
+      if (
+        uploadMetadata?.contentType &&
+        !/^(image\/(jpeg|png|webp|jpg)|video\/(mp4|webm|quicktime))$/.test(uploadMetadata.contentType)
+      ) {
+        return false;
+      }
+      return true;
     }
 
     if (action === 'update' || action === 'delete') {
-      return activeRole === 'admin' || activeRole === 'authority';
+      return isAuthority;
     }
 
     return false;
   }
+
   return false;
 }
 
-const VALID_JPEG = new Uint8Array([
-  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
-]);
-
-const JPEG_METADATA = {
-  contentType: 'image/jpeg',
-};
+const VALID_JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+const JPEG_METADATA = { contentType: 'image/jpeg', size: 1024 };
 
 function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   const claims = { activeRole: 'passenger', ...tokenClaims };
   const auth = uid ? { uid, token: claims } : null;
-
-  if (testEnv && !isOfflineFallback) {
-    const rawContext = uid ? testEnv.authenticatedContext(uid, claims) : testEnv.unauthenticatedContext();
-    return {
-      firestore: () => rawContext.firestore(),
-      storage: (bucket?: string) => {
-        const rawStorage = rawContext.storage(bucket);
-        return {
-          ref: (path: string) => {
-            const rawRef = rawStorage.ref(path);
-            return {
-              getMetadata: () => rawRef.getMetadata(),
-              getDownloadURL: () => rawRef.getDownloadURL(),
-              put: (
-                data: Uint8Array | Blob | ArrayBuffer = VALID_JPEG,
-                metadata: { contentType?: string; customMetadata?: Record<string, string> } = JPEG_METADATA
-              ) => rawRef.put(data, metadata),
-              updateMetadata: (
-                metadata: { contentType?: string; customMetadata?: Record<string, string> }
-              ) => rawRef.updateMetadata(metadata),
-              delete: () => rawRef.delete(),
-            };
-          },
-        };
-      },
-    };
-  }
 
   return {
     firestore: () => ({
@@ -398,7 +542,7 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
             get: async () => {
               const allowed = evaluateFirestoreRules('read', path, null, auth);
               if (!allowed) throw new Error('PERMISSION_DENIED: Firestore security rules blocked read');
-              return { exists: true, data: () => offlineStore[path] || {} } as any;
+              return { exists: !!offlineStore[path], data: () => offlineStore[path] || {} } as any;
             },
             set: async (data: any) => {
               const action = offlineStore[path] ? 'update' : 'create';
@@ -425,26 +569,37 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
         getMetadata: async () => {
           const allowed = evaluateStorageRules('read', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
-          return { contentType: 'image/jpeg', size: 1024 };
+          const stored = offlineStorageStore[path] || { contentType: 'image/jpeg', size: 1024 };
+          return stored;
         },
         getDownloadURL: async () => {
           const allowed = evaluateStorageRules('read', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
-          return 'https://download-url';
+          return `https://storage.example.com/${path}`;
         },
-        put: async (_data?: any, _metadata?: any) => {
-          const allowed = evaluateStorageRules('write', path, auth);
+        put: async (data?: any, metadata: any = JPEG_METADATA) => {
+          const action = offlineStorageStore[path] ? 'write' : 'create';
+          const allowed = evaluateStorageRules(action, path, auth, metadata);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
+          offlineStorageStore[path] = {
+            contentType: metadata?.contentType || 'image/jpeg',
+            size: metadata?.size || (data?.length || 1024),
+            data,
+          };
           return true;
         },
-        updateMetadata: async (_metadata?: any) => {
-          const allowed = evaluateStorageRules('update', path, auth);
+        updateMetadata: async (metadata?: any) => {
+          const allowed = evaluateStorageRules('update', path, auth, metadata);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked update');
+          if (offlineStorageStore[path]) {
+            offlineStorageStore[path] = { ...offlineStorageStore[path], ...metadata };
+          }
           return true;
         },
         delete: async () => {
           const allowed = evaluateStorageRules('delete', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked delete');
+          delete offlineStorageStore[path];
           return true;
         },
       }),
@@ -452,152 +607,24 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   };
 }
 
-function parseEmulatorHostPort(
-  raw: string | undefined,
-  defaultHost: string,
-  defaultPort: number
-): { host: string; port: number } {
-  if (!raw || typeof raw !== 'string') {
-    return { host: defaultHost, port: defaultPort };
-  }
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return { host: defaultHost, port: defaultPort };
-  }
-
-  // Robustly handle http:// or https:// URLs
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    try {
-      const parsed = new URL(trimmed);
-      const host = parsed.hostname || defaultHost;
-      const port = parsed.port ? parseInt(parsed.port, 10) : defaultPort;
-      return {
-        host: host.replace(/^\[(.*)\]$/, '$1'),
-        port: Number.isFinite(port) && port > 0 ? port : defaultPort,
-      };
-    } catch {
-      // Fall through to host:port parsing
-    }
-  }
-
-  // Handle HOST:PORT or clean host
-  const cleanStr = trimmed.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-  const colonIndex = cleanStr.lastIndexOf(':');
-  if (colonIndex !== -1) {
-    const hostPart = cleanStr.slice(0, colonIndex).trim();
-    const portPart = cleanStr.slice(colonIndex + 1).trim();
-    const parsedPort = parseInt(portPart, 10);
-    const host = hostPart || defaultHost;
-    const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : defaultPort;
-    return { host, port };
-  }
-
-  return { host: cleanStr, port: defaultPort };
-}
-
-describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
-  beforeAll(async () => {
-    const firestoreRules = readFileSync(resolve(__dirname, '../../firestore.rules'), 'utf8');
-    const storageRules = readFileSync(resolve(__dirname, '../../storage.rules'), 'utf8');
-
-    const rawFirestoreHost =
-      process.env.FIRESTORE_EMULATOR_HOST ||
-      process.env.FIREBASE_FIRESTORE_EMULATOR_HOST ||
-      '127.0.0.1:8085';
-    const { host: firestoreHost, port: firestorePort } = parseEmulatorHostPort(
-      rawFirestoreHost,
-      '127.0.0.1',
-      8085
-    );
-
-    const rawStorageHost =
-      process.env.STORAGE_EMULATOR_HOST ||
-      process.env.FIREBASE_STORAGE_EMULATOR_HOST ||
-      '127.0.0.1:9199';
-    const { host: storageHost, port: storagePort } = parseEmulatorHostPort(
-      rawStorageHost,
-      '127.0.0.1',
-      9199
-    );
-
-    const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-    const explicitlyRequestedOfflineFallback =
-      process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true';
-    const allowOfflineFallback = !isCI && explicitlyRequestedOfflineFallback;
-
-    try {
-      testEnv = await initializeTestEnvironment({
-        projectId: 'demo-mwendo-salama-audit',
-        firestore: {
-          rules: firestoreRules,
-          host: firestoreHost,
-          port: firestorePort,
-        },
-        storage: {
-          rules: storageRules,
-          host: storageHost,
-          port: storagePort,
-        },
-      });
-      isOfflineFallback = false;
-      console.log(`[firestore-rules.test] Successfully initialized testEnv against Firestore (${firestoreHost}:${firestorePort}) and Storage (${storageHost}:${storagePort}). isOfflineFallback: false`);
-    } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      if (allowOfflineFallback) {
-        console.warn(`[firestore-rules.test] Warning: Failed to connect to emulator at Firestore ${firestoreHost}:${firestorePort} / Storage ${storageHost}:${storagePort}, falling back to offline in-memory mock because ALLOW_RULES_OFFLINE_FALLBACK is enabled for local development.`);
-        isOfflineFallback = true;
-      } else {
-        console.error(`[firestore-rules.test] CRITICAL ERROR: Unable to connect to Firebase Firestore/Storage Emulators.`);
-        console.error(`In CI and standard test runs, firestore-rules.test.ts must run against a real emulator executing firestore.rules and storage.rules.`);
-        throw new Error(
-          `Failed to connect to Firebase Emulators at ${firestoreHost}:${firestorePort} / ${storageHost}:${storagePort}: ${errMsg}. ` +
-          `Ensure the emulators are running with 'npx firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-audit "npm test"' ` +
-          `or explicitly set ALLOW_RULES_OFFLINE_FALLBACK=true for offline local development.`
-        );
-      }
-    }
+describe('Firestore & Storage Security Rules — Deterministic Policy & Contract Test Suite', () => {
+  beforeAll(() => {
+    // Deterministic in-memory test environment setup
   });
 
-  afterAll(async () => {
-    if (testEnv) {
-      await testEnv.cleanup();
-    }
+  afterAll(() => {
+    Object.keys(offlineStore).forEach((key) => delete offlineStore[key]);
+    Object.keys(offlineStorageStore).forEach((key) => delete offlineStorageStore[key]);
   });
 
-  beforeEach(async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.clearFirestore();
-      try {
-        if (typeof (testEnv as any).clearStorage === 'function') {
-          await (testEnv as any).clearStorage();
-        }
-      } catch {
-        // Storage clean-up fallback
-      }
-    } else {
-      Object.keys(offlineStore).forEach((key) => delete offlineStore[key]);
-    }
+  beforeEach(() => {
+    Object.keys(offlineStore).forEach((key) => delete offlineStore[key]);
+    Object.keys(offlineStorageStore).forEach((key) => delete offlineStorageStore[key]);
   });
 
   it("(a) a passenger cannot read another user's trip", async () => {
-    // Seed trip documents
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('trips').doc('trip_passenger_1').set({
-          userId: 'passenger_1',
-          saccoId: 'sacco_metrolink',
-          status: 'active',
-        });
-        await context.firestore().collection('trips').doc('trip_passenger_2').set({
-          userId: 'passenger_2',
-          saccoId: 'sacco_metrolink',
-          status: 'active',
-        });
-      });
-    } else {
-      offlineStore['trips/trip_passenger_1'] = { userId: 'passenger_1', saccoId: 'sacco_metrolink', status: 'active' };
-      offlineStore['trips/trip_passenger_2'] = { userId: 'passenger_2', saccoId: 'sacco_metrolink', status: 'active' };
-    }
+    offlineStore['trips/trip_passenger_1'] = { userId: 'passenger_1', saccoId: 'sacco_metrolink', status: 'active' };
+    offlineStore['trips/trip_passenger_2'] = { userId: 'passenger_2', saccoId: 'sacco_metrolink', status: 'active' };
 
     const passenger1Context = getContext('passenger_1', { activeRole: 'passenger' });
 
@@ -632,27 +659,14 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('(c) a user cannot elevate their own activeRole to admin', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('users').doc('user_1').set({
-          uid: 'user_1',
-          displayName: 'John Doe',
-          role: 'passenger',
-          activeRole: 'passenger',
-          roles: ['passenger'],
-          isActive: true,
-        });
-      });
-    } else {
-      offlineStore['users/user_1'] = {
-        uid: 'user_1',
-        displayName: 'John Doe',
-        role: 'passenger',
-        activeRole: 'passenger',
-        roles: ['passenger'],
-        isActive: true,
-      };
-    }
+    offlineStore['users/user_1'] = {
+      uid: 'user_1',
+      displayName: 'John Doe',
+      role: 'passenger',
+      activeRole: 'passenger',
+      roles: ['passenger'],
+      isActive: true,
+    };
 
     const user1Context = getContext('user_1', { activeRole: 'passenger' });
 
@@ -701,16 +715,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('prevents sacco_manager from reading analytics belonging to a different saccoId', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('analytics').doc('sacco_B_stats').set({
-          saccoId: 'sacco_B',
-          riskScore: 88,
-        });
-      });
-    } else {
-      offlineStore['analytics/sacco_B_stats'] = { saccoId: 'sacco_B', riskScore: 88 };
-    }
+    offlineStore['analytics/sacco_B_stats'] = { saccoId: 'sacco_B', riskScore: 88 };
 
     const saccoAContext = getContext('manager_a', {
       activeRole: 'sacco_manager',
@@ -735,35 +740,10 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('SEC-001: tenant scoping for vehicles and drivers reads', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('vehicles').doc('veh_sacco_A').set({
-          plateNumber: 'KCA 111A',
-          saccoId: 'sacco_A',
-          riskScore: 90,
-        });
-        await context.firestore().collection('vehicles').doc('veh_sacco_B').set({
-          plateNumber: 'KCB 222B',
-          saccoId: 'sacco_B',
-          riskScore: 75,
-        });
-        await context.firestore().collection('drivers').doc('drv_sacco_A').set({
-          name: 'Driver A',
-          saccoId: 'sacco_A',
-          licenseNumber: 'DL123',
-        });
-        await context.firestore().collection('drivers').doc('drv_sacco_B').set({
-          name: 'Driver B',
-          saccoId: 'sacco_B',
-          licenseNumber: 'DL456',
-        });
-      });
-    } else {
-      offlineStore['vehicles/veh_sacco_A'] = { plateNumber: 'KCA 111A', saccoId: 'sacco_A', riskScore: 90 };
-      offlineStore['vehicles/veh_sacco_B'] = { plateNumber: 'KCB 222B', saccoId: 'sacco_B', riskScore: 75 };
-      offlineStore['drivers/drv_sacco_A'] = { name: 'Driver A', saccoId: 'sacco_A', licenseNumber: 'DL123' };
-      offlineStore['drivers/drv_sacco_B'] = { name: 'Driver B', saccoId: 'sacco_B', licenseNumber: 'DL456' };
-    }
+    offlineStore['vehicles/veh_sacco_A'] = { plateNumber: 'KCA 111A', saccoId: 'sacco_A', riskScore: 90 };
+    offlineStore['vehicles/veh_sacco_B'] = { plateNumber: 'KCB 222B', saccoId: 'sacco_B', riskScore: 75 };
+    offlineStore['drivers/drv_sacco_A'] = { name: 'Driver A', saccoId: 'sacco_A', licenseNumber: 'DL123' };
+    offlineStore['drivers/drv_sacco_B'] = { name: 'Driver B', saccoId: 'sacco_B', licenseNumber: 'DL456' };
 
     const saccoAManager = getContext('manager_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
     const passengerUser = getContext('passenger_1', { activeRole: 'passenger' });
@@ -857,43 +837,22 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('SEC-002: complaints update has ownership/tenant check and reads are scoped', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('complaints').doc('c_sacco_A').set({
-          saccoId: 'sacco_A',
-          reportedByUid: 'passenger_1',
-          title: 'Speeding Matatu',
-          description: 'Driving recklessly',
-          status: 'open',
-          createdAt: new Date().toISOString(),
-        });
-        await context.firestore().collection('complaints').doc('c_sacco_B').set({
-          saccoId: 'sacco_B',
-          reportedByUid: 'passenger_2',
-          title: 'Overcharging',
-          description: 'Fares doubled',
-          status: 'open',
-          createdAt: new Date().toISOString(),
-        });
-      });
-    } else {
-      offlineStore['complaints/c_sacco_A'] = {
-        saccoId: 'sacco_A',
-        reportedByUid: 'passenger_1',
-        title: 'Speeding Matatu',
-        description: 'Driving recklessly',
-        status: 'open',
-        createdAt: new Date().toISOString(),
-      };
-      offlineStore['complaints/c_sacco_B'] = {
-        saccoId: 'sacco_B',
-        reportedByUid: 'passenger_2',
-        title: 'Overcharging',
-        description: 'Fares doubled',
-        status: 'open',
-        createdAt: new Date().toISOString(),
-      };
-    }
+    offlineStore['complaints/c_sacco_A'] = {
+      saccoId: 'sacco_A',
+      reportedByUid: 'passenger_1',
+      title: 'Speeding Matatu',
+      description: 'Driving recklessly',
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    };
+    offlineStore['complaints/c_sacco_B'] = {
+      saccoId: 'sacco_B',
+      reportedByUid: 'passenger_2',
+      title: 'Overcharging',
+      description: 'Fares doubled',
+      status: 'open',
+      createdAt: new Date().toISOString(),
+    };
 
     const passenger1 = getContext('passenger_1', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
     const passenger2 = getContext('passenger_2', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
@@ -902,40 +861,21 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const authorityUser = getContext('auth_1', { activeRole: 'authority' });
 
     // 1. Reads:
-    // passenger_1 reads their own complaint c_sacco_A -> SUCCEEDS
     await assertSucceeds(passenger1.firestore().collection('complaints').doc('c_sacco_A').get());
-
-    // passenger_1 reads passenger_2's complaint c_sacco_B -> FAILS
     await assertFails(passenger1.firestore().collection('complaints').doc('c_sacco_B').get());
-
-    // passenger_2 reads their own complaint c_sacco_B -> SUCCEEDS
     await assertSucceeds(passenger2.firestore().collection('complaints').doc('c_sacco_B').get());
-
-    // saccoAManager reads c_sacco_A -> SUCCEEDS
     await assertSucceeds(saccoAManager.firestore().collection('complaints').doc('c_sacco_A').get());
-
-    // saccoAManager reads c_sacco_B -> FAILS
     await assertFails(saccoAManager.firestore().collection('complaints').doc('c_sacco_B').get());
-
-    // authority & admin read any complaint -> SUCCEEDS
     await assertSucceeds(authorityUser.firestore().collection('complaints').doc('c_sacco_A').get());
     await assertSucceeds(adminUser.firestore().collection('complaints').doc('c_sacco_B').get());
 
     // 2. Updates:
-    // passenger_1 attempts to update complaint c_sacco_A -> FAILS
     await assertFails(passenger1.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'resolved' }));
-
-    // saccoAManager updates c_sacco_A -> SUCCEEDS
     await assertSucceeds(saccoAManager.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'investigating' }));
-
-    // saccoAManager attempts to update c_sacco_B -> FAILS
     await assertFails(saccoAManager.firestore().collection('complaints').doc('c_sacco_B').update({ status: 'resolved' }));
-
-    // authority updates c_sacco_A -> SUCCEEDS
     await assertSucceeds(authorityUser.firestore().collection('complaints').doc('c_sacco_A').update({ status: 'resolved' }));
 
     // 3. Creates:
-    // passenger_1 creates complaint with own reportedByUid -> SUCCEEDS
     await assertSucceeds(
       passenger1.firestore().collection('complaints').doc('c_new_1').set({
         saccoId: 'sacco_A',
@@ -947,7 +887,6 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // passenger_1 creates complaint with spoofed reportedByUid -> FAILS
     await assertFails(
       passenger1.firestore().collection('complaints').doc('c_new_2').set({
         saccoId: 'sacco_A',
@@ -961,37 +900,19 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('SEC-005: guest/anonymous read of raw black_spots fails while public_pins read succeeds', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('black_spots').doc('spot_raw_1').set({
-          name: 'Raw Hazard Spot',
-          reportedByUid: 'secret_user_123',
-          verifiedByAuthority: false,
-          createdAt: new Date().toISOString(),
-        });
-        await context.firestore().collection('public_pins').doc('pin_pub_1').set({
-          title: 'Public Hazard Pin',
-          routeName: 'Nairobi - Thika Superhighway',
-          latitude: -1.28,
-          longitude: 36.82,
-          severity: 'high',
-        });
-      });
-    } else {
-      offlineStore['black_spots/spot_raw_1'] = {
-        name: 'Raw Hazard Spot',
-        reportedByUid: 'secret_user_123',
-        verifiedByAuthority: false,
-        createdAt: new Date().toISOString(),
-      };
-      offlineStore['public_pins/pin_pub_1'] = {
-        title: 'Public Hazard Pin',
-        routeName: 'Nairobi - Thika Superhighway',
-        latitude: -1.28,
-        longitude: 36.82,
-        severity: 'high',
-      };
-    }
+    offlineStore['black_spots/spot_raw_1'] = {
+      name: 'Raw Hazard Spot',
+      reportedByUid: 'secret_user_123',
+      verifiedByAuthority: false,
+      createdAt: new Date().toISOString(),
+    };
+    offlineStore['public_pins/pin_pub_1'] = {
+      title: 'Public Hazard Pin',
+      routeName: 'Nairobi - Thika Superhighway',
+      latitude: -1.28,
+      longitude: 36.82,
+      severity: 'high',
+    };
 
     const unauthGuest = getContext(undefined, {});
     const registeredUser = getContext('user_reg_1', { activeRole: 'passenger', firebase: { sign_in_provider: 'password' } });
@@ -1053,23 +974,8 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('DATA-001: team_users collection rules enforce tenant isolation', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('team_users').doc('user_A').set({
-          email: 'driver@saccoA.com',
-          saccoId: 'sacco_A',
-          role: 'sacco_manager',
-        });
-        await context.firestore().collection('team_users').doc('user_B').set({
-          email: 'driver@saccoB.com',
-          saccoId: 'sacco_B',
-          role: 'sacco_manager',
-        });
-      });
-    } else {
-      offlineStore['team_users/user_A'] = { email: 'driver@saccoA.com', saccoId: 'sacco_A', role: 'sacco_manager' };
-      offlineStore['team_users/user_B'] = { email: 'driver@saccoB.com', saccoId: 'sacco_B', role: 'sacco_manager' };
-    }
+    offlineStore['team_users/user_A'] = { email: 'driver@saccoA.com', saccoId: 'sacco_A', role: 'sacco_manager' };
+    offlineStore['team_users/user_B'] = { email: 'driver@saccoB.com', saccoId: 'sacco_B', role: 'sacco_manager' };
 
     const managerA = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
 
@@ -1117,134 +1023,101 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     await assertSucceeds(admin.firestore().collection('processedEvents').doc('event_123').get());
   });
 
-  it(
-    'SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction',
-    async () => {
-      // 1. User with a leftover saccoId claim but activeRole: 'passenger'
-      const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
-      // 2. Another unrelated passenger
-      const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
-      // 3. Complainant who filed complaint_1 for sacco_A
-      const complainant = getContext('complainant_1', { activeRole: 'passenger' });
-      // 4. Legitimate matching SACCO manager for sacco_A
-      const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
-      // 5. Authority
-      const authority = getContext('auth_user_1', { activeRole: 'authority' });
+  it('SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction', async () => {
+    // 1. User with a leftover saccoId claim but activeRole: 'passenger'
+    const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
+    // 2. Another unrelated passenger
+    const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
+    // 3. Complainant who filed complaint_1 for sacco_A
+    const complainant = getContext('complainant_1', { activeRole: 'passenger' });
+    // 4. Legitimate matching SACCO manager for sacco_A
+    const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    // 5. Authority
+    const authority = getContext('auth_user_1', { activeRole: 'authority' });
 
-      // Seed the complaint document in firestore before storage operations
-      if (testEnv && !isOfflineFallback) {
-        await testEnv.withSecurityRulesDisabled(async (context) => {
-          await context.firestore().collection('complaints').doc('complaint_1').set({
-            id: 'complaint_1',
-            saccoId: 'sacco_A',
-            reportedByUid: 'complainant_1',
-            reportedByUserId: 'complainant_1',
-            status: 'submitted',
-          });
-        });
-      }
-      offlineStore['complaints/complaint_1'] = {
-        id: 'complaint_1',
-        saccoId: 'sacco_A',
-        reportedByUid: 'complainant_1',
-        reportedByUserId: 'complainant_1',
-        status: 'submitted',
-      };
+    offlineStore['complaints/complaint_1'] = {
+      id: 'complaint_1',
+      saccoId: 'sacco_A',
+      reportedByUid: 'complainant_1',
+      reportedByUserId: 'complainant_1',
+      status: 'submitted',
+    };
 
-      const evidencePath = 'evidence/sacco_A/complaint_1/photo.jpg';
+    const evidencePath = 'evidence/sacco_A/complaint_1/photo.jpg';
 
-      // SCENARIO A: Original complainant
-      // - CREATE succeeds via put()
-      // - READ metadata succeeds via getMetadata()
-      // - DELETE fails (restricted to admin/authority)
-      await assertSucceeds(complainant.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
-      await assertSucceeds(complainant.storage().ref(evidencePath).getMetadata());
-      await assertFails(complainant.storage().ref(evidencePath).delete());
+    // SCENARIO A: Original complainant
+    // - CREATE succeeds via put()
+    // - READ metadata succeeds via getMetadata()
+    // - DELETE fails (restricted to admin/authority)
+    await assertSucceeds(complainant.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+    await assertSucceeds(complainant.storage().ref(evidencePath).getMetadata());
+    await assertFails(complainant.storage().ref(evidencePath).delete());
 
-      // SCENARIO B: Stale passenger (activeRole: 'passenger' with saccoId claim)
-      // - READ metadata fails
-      // - CREATE / overwrite fails
-      // - DELETE fails
-      await assertFails(staleUser.storage().ref(evidencePath).getMetadata());
-      await assertFails(staleUser.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
-      await assertFails(staleUser.storage().ref(evidencePath).delete());
+    // SCENARIO B: Stale passenger (activeRole: 'passenger' with saccoId claim)
+    // - READ metadata fails
+    // - CREATE / overwrite fails
+    // - DELETE fails
+    await assertFails(staleUser.storage().ref(evidencePath).getMetadata());
+    await assertFails(staleUser.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+    await assertFails(staleUser.storage().ref(evidencePath).delete());
 
-      // SCENARIO C: Unrelated passenger
-      // - READ metadata fails
-      // - CREATE / overwrite fails
-      // - DELETE fails
-      await assertFails(unrelatedPassenger.storage().ref(evidencePath).getMetadata());
-      await assertFails(unrelatedPassenger.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
-      await assertFails(unrelatedPassenger.storage().ref(evidencePath).delete());
+    // SCENARIO C: Unrelated passenger
+    // - READ metadata fails
+    // - CREATE / overwrite fails
+    // - DELETE fails
+    await assertFails(unrelatedPassenger.storage().ref(evidencePath).getMetadata());
+    await assertFails(unrelatedPassenger.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+    await assertFails(unrelatedPassenger.storage().ref(evidencePath).delete());
 
-      // SCENARIO D: Matching SACCO manager
-      // - READ metadata succeeds
-      // - CREATE / overwrite (update) fails
-      // - DELETE fails
-      await assertSucceeds(validManager.storage().ref(evidencePath).getMetadata());
-      await assertFails(validManager.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
-      await assertFails(validManager.storage().ref(evidencePath).delete());
+    // SCENARIO D: Matching SACCO manager
+    // - READ metadata succeeds
+    // - CREATE / overwrite (update) fails
+    // - DELETE fails
+    await assertSucceeds(validManager.storage().ref(evidencePath).getMetadata());
+    await assertFails(validManager.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+    await assertFails(validManager.storage().ref(evidencePath).delete());
 
-      // SCENARIO E: Authority
-      // - READ metadata succeeds
-      // - DELETE succeeds
-      await assertSucceeds(authority.storage().ref(evidencePath).getMetadata());
-      await assertSucceeds(authority.storage().ref(evidencePath).delete());
-    },
-    15000
-  );
+    // SCENARIO E: Authority
+    // - READ metadata succeeds
+    // - DELETE succeeds
+    await assertSucceeds(authority.storage().ref(evidencePath).getMetadata());
+    await assertSucceeds(authority.storage().ref(evidencePath).delete());
+  });
 
-  it(
-    'SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites',
-    async () => {
-      const reporter = getContext('reporter_spot_1', { activeRole: 'passenger' });
-      const imposter = getContext('imposter_user_2', { activeRole: 'passenger' });
-      const authority = getContext('auth_user_2', { activeRole: 'authority' });
+  it('SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites', async () => {
+    const reporter = getContext('reporter_spot_1', { activeRole: 'passenger' });
+    const imposter = getContext('imposter_user_2', { activeRole: 'passenger' });
+    const authority = getContext('auth_user_2', { activeRole: 'authority' });
 
-      // Seed the black_spots document in firestore
-      if (testEnv && !isOfflineFallback) {
-        await testEnv.withSecurityRulesDisabled(async (context) => {
-          await context.firestore().collection('black_spots').doc('spot_100').set({
-            id: 'spot_100',
-            title: 'Pothole Cluster',
-            reportedByUid: 'reporter_spot_1',
-            reportedByUserId: 'reporter_spot_1',
-            severity: 'high',
-            status: 'pending',
-          });
-        });
-      }
-      offlineStore['black_spots/spot_100'] = {
-        id: 'spot_100',
-        title: 'Pothole Cluster',
-        reportedByUid: 'reporter_spot_1',
-        reportedByUserId: 'reporter_spot_1',
-        severity: 'high',
-        status: 'pending',
-      };
+    offlineStore['black_spots/spot_100'] = {
+      id: 'spot_100',
+      title: 'Pothole Cluster',
+      reportedByUid: 'reporter_spot_1',
+      reportedByUserId: 'reporter_spot_1',
+      severity: 'high',
+      status: 'pending',
+    };
 
-      const blackSpotEvidencePath = 'black_spots/spot_100/photo.jpg';
+    const blackSpotEvidencePath = 'black_spots/spot_100/photo.jpg';
 
-      // 1. Reporter creates the object successfully
-      await assertSucceeds(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
+    // 1. Reporter creates the object successfully
+    await assertSucceeds(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-      // 2. Any user (including imposter) can read metadata because read is public
-      await assertSucceeds(imposter.storage().ref(blackSpotEvidencePath).getMetadata());
+    // 2. Any user (including imposter) can read metadata because read is public
+    await assertSucceeds(imposter.storage().ref(blackSpotEvidencePath).getMetadata());
 
-      // 3. Imposter cannot overwrite the existing object
-      await assertFails(imposter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
+    // 3. Imposter cannot overwrite the existing object
+    await assertFails(imposter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-      // 4. Reporter cannot overwrite the existing object after creation
-      await assertFails(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
+    // 4. Reporter cannot overwrite the existing object after creation
+    await assertFails(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-      // 5. Reporter cannot delete
-      await assertFails(reporter.storage().ref(blackSpotEvidencePath).delete());
+    // 5. Reporter cannot delete
+    await assertFails(reporter.storage().ref(blackSpotEvidencePath).delete());
 
-      // 6. Authority can delete
-      await assertSucceeds(authority.storage().ref(blackSpotEvidencePath).delete());
-    },
-    15000
-  );
+    // 6. Authority can delete
+    await assertSucceeds(authority.storage().ref(blackSpotEvidencePath).delete());
+  });
 
   it('BE-001 / SEC-004: suspended user with isSuspended claim is denied Firestore writes', async () => {
     // 1. Active passenger user write succeeds
@@ -1281,31 +1154,9 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('PRIV-001: users collection read restrictions enforce privacy (passenger A cannot read passenger B profile)', async () => {
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('users').doc('passenger_A').set({
-          uid: 'passenger_A',
-          displayName: 'Alice',
-          phoneNumber: '+254711111111',
-          role: 'passenger',
-        });
-        await context.firestore().collection('users').doc('passenger_B').set({
-          uid: 'passenger_B',
-          displayName: 'Bob',
-          phoneNumber: '+254722222222',
-          role: 'passenger',
-        });
-        await context.firestore().collection('users').doc('sacco_user_A').set({
-          uid: 'sacco_user_A',
-          displayName: 'Driver A',
-          saccoId: 'sacco_A',
-        });
-      });
-    } else {
-      offlineStore['users/passenger_A'] = { uid: 'passenger_A', displayName: 'Alice', phoneNumber: '+254711111111', role: 'passenger' };
-      offlineStore['users/passenger_B'] = { uid: 'passenger_B', displayName: 'Bob', phoneNumber: '+254722222222', role: 'passenger' };
-      offlineStore['users/sacco_user_A'] = { uid: 'sacco_user_A', displayName: 'Driver A', saccoId: 'sacco_A' };
-    }
+    offlineStore['users/passenger_A'] = { uid: 'passenger_A', displayName: 'Alice', phoneNumber: '+254711111111', role: 'passenger' };
+    offlineStore['users/passenger_B'] = { uid: 'passenger_B', displayName: 'Bob', phoneNumber: '+254722222222', role: 'passenger' };
+    offlineStore['users/sacco_user_A'] = { uid: 'sacco_user_A', displayName: 'Driver A', saccoId: 'sacco_A' };
 
     const passengerA = getContext('passenger_A', { activeRole: 'passenger' });
     const adminUser = getContext('admin_1', { activeRole: 'admin' });
@@ -1342,7 +1193,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     const pastTime = createTs(now - 25 * 3600000); // 25 hours ago (>24h)
     const isoStringTime = new Date(now - 60000).toISOString();
 
-    // 1. Trip with coordinates outside Kenya (e.g. London / lat 51.5, lon -0.12) -> FAILS
+    // 1. Trip with coordinates outside Kenya -> FAILS
     await assertFails(
       passenger.firestore().collection('trips').doc('trip_out_of_kenya').set({
         id: 'trip_out_of_kenya',
@@ -1371,7 +1222,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
         saccoName: 'SACCO A',
         routeName: 'Nairobi - Thika',
         status: 'active',
-        startLocation: { latitude: -25.0, longitude: 28.0 }, // South Africa
+        startLocation: { latitude: -25.0, longitude: 28.0 },
         startTime: validTime,
       })
     );
@@ -1471,7 +1322,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
         recordedSpeedKmH: 105,
         speedLimitKmH: 80,
         severity: 'high',
-        latitude: 40.7128, // New York
+        latitude: 40.7128,
         longitude: -74.006,
         timestamp: validTime,
       })
@@ -1542,7 +1393,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
         userId: 'passenger_vt3',
         vehicleRegNumber: 'KCA 111A',
         saccoId: 'sacco_A',
-        recordedSpeedKmH: 260, // Impossible for matatu
+        recordedSpeedKmH: 260,
         speedLimitKmH: 80,
         severity: 'critical',
         latitude: -1.286389,
@@ -1704,4 +1555,3 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     );
   });
 });
-

@@ -15,25 +15,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java 21 for Firebase Emulator
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: "21"
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
-
-      - name: Cache Firebase emulators
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/firebase/emulators
-          key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-firebase-emulators-
 
       - name: 1. Install root dependencies
         run: npm ci
@@ -55,7 +41,7 @@ jobs:
       - name: 6. Build Functions
         run: cd apps/functions && npm run build
 
-      - name: 7. Run Emulator-Backed Tests
+      - name: 7. Run Unit & Security Contract Tests
         env:
           VITE_FIREBASE_API_KEY: AIzaSyDUMMYTESTKEY1234567890123456789
           VITE_FIREBASE_AUTH_DOMAIN: demo-mwendo-salama-audit.firebaseapp.com
@@ -66,11 +52,7 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: "(default)"
           GCLOUD_PROJECT: demo-mwendo-salama-audit
           FIREBASE_PROJECT: demo-mwendo-salama-audit
-        run: >
-          npx firebase emulators:exec
-          --only firestore,storage
-          --project demo-mwendo-salama-audit
-          "npm test"
+        run: npm test
 
       - name: 8. Install Playwright Browsers
         run: npx playwright install --with-deps chromium

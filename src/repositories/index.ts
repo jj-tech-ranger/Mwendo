@@ -1,5 +1,5 @@
 import { BaseRepository } from './baseRepository';
-import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, PlatformAnalyticsDaily, SaccoAnalyticsDaily, AnalyticsDocument } from '../types';
+import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, AnalyticsDocument } from '../types';
 
 export class UserRepository extends BaseRepository<UserProfile> {
   constructor() {

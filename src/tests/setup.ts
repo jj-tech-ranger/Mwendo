@@ -29,6 +29,6 @@ if (typeof HTMLCanvasElement !== 'undefined') {
       rect: () => {},
       clip: () => {},
     };
-  } as any;
+  } as unknown as typeof HTMLCanvasElement.prototype.getContext;
 }
 

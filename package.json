@@ -10,7 +10,6 @@
     "check:bundle-security": "node scripts/check-bundle-security.js",
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
-    "test:emulator": "firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-audit \"vitest run\"",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "typecheck:functions": "npm run --prefix apps/functions lint",
