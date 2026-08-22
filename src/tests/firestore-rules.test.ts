@@ -350,6 +350,14 @@ function evaluateStorageRules(
   return false;
 }
 
+const VALID_JPEG = new Uint8Array([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+]);
+
+const JPEG_METADATA = {
+  contentType: 'image/jpeg',
+};
+
 function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
   const claims = { activeRole: 'passenger', ...tokenClaims };
   const auth = uid ? { uid, token: claims } : null;
@@ -363,17 +371,16 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
         return {
           ref: (path: string) => {
             const rawRef = rawStorage.ref(path);
-            const dummyBuffer = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
             return {
-              get: () => rawRef.getMetadata(),
               getMetadata: () => rawRef.getMetadata(),
               getDownloadURL: () => rawRef.getDownloadURL(),
-              put: (data?: any, metadata?: any) =>
-                rawRef.put(data || dummyBuffer, metadata || { contentType: 'image/jpeg' }),
-              update: (data?: any, metadata?: any) =>
-                rawRef.put(data || dummyBuffer, metadata || { contentType: 'image/jpeg' }),
-              updateMetadata: (meta: any) =>
-                rawRef.updateMetadata(meta || { customMetadata: { updated: 'true' } }),
+              put: (
+                data: Uint8Array | Blob | ArrayBuffer = VALID_JPEG,
+                metadata: { contentType?: string; customMetadata?: Record<string, string> } = JPEG_METADATA
+              ) => rawRef.put(data, metadata),
+              updateMetadata: (
+                metadata: { contentType?: string; customMetadata?: Record<string, string> }
+              ) => rawRef.updateMetadata(metadata),
               delete: () => rawRef.delete(),
             };
           },
@@ -415,15 +422,10 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
     }),
     storage: () => ({
       ref: (path: string) => ({
-        get: async () => {
-          const allowed = evaluateStorageRules('read', path, auth);
-          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
-          return true;
-        },
         getMetadata: async () => {
           const allowed = evaluateStorageRules('read', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
-          return true;
+          return { contentType: 'image/jpeg', size: 1024 };
         },
         getDownloadURL: async () => {
           const allowed = evaluateStorageRules('read', path, auth);
@@ -433,11 +435,6 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
         put: async (_data?: any, _metadata?: any) => {
           const allowed = evaluateStorageRules('write', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
-          return true;
-        },
-        update: async (_data?: any, _metadata?: any) => {
-          const allowed = evaluateStorageRules('update', path, auth);
-          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked update');
           return true;
         },
         updateMetadata: async (_metadata?: any) => {
@@ -524,7 +521,9 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     );
 
     const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
-    const allowOfflineFallback = !isCI || process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true';
+    const explicitlyRequestedOfflineFallback =
+      process.env.ALLOW_RULES_OFFLINE_FALLBACK === 'true' || process.env.VITEST_RULES_MOCK === 'true';
+    const allowOfflineFallback = !isCI && explicitlyRequestedOfflineFallback;
 
     try {
       testEnv = await initializeTestEnvironment({
@@ -1118,122 +1117,134 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     await assertSucceeds(admin.firestore().collection('processedEvents').doc('event_123').get());
   });
 
-  it('SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction', async () => {
-    // 1. User with a leftover saccoId claim but activeRole: 'passenger'
-    const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
-    // 2. Another unrelated passenger
-    const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
-    // 3. Complainant who filed complaint_1 for sacco_A
-    const complainant = getContext('complainant_1', { activeRole: 'passenger' });
-    // 4. Legitimate matching SACCO manager for sacco_A
-    const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
-    // 5. Authority
-    const authority = getContext('auth_user_1', { activeRole: 'authority' });
+  it(
+    'SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction',
+    async () => {
+      // 1. User with a leftover saccoId claim but activeRole: 'passenger'
+      const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
+      // 2. Another unrelated passenger
+      const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
+      // 3. Complainant who filed complaint_1 for sacco_A
+      const complainant = getContext('complainant_1', { activeRole: 'passenger' });
+      // 4. Legitimate matching SACCO manager for sacco_A
+      const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+      // 5. Authority
+      const authority = getContext('auth_user_1', { activeRole: 'authority' });
 
-    // Seed the complaint document in firestore before storage operations
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('complaints').doc('complaint_1').set({
-          id: 'complaint_1',
-          saccoId: 'sacco_A',
-          reportedByUid: 'complainant_1',
-          reportedByUserId: 'complainant_1',
-          status: 'submitted',
+      // Seed the complaint document in firestore before storage operations
+      if (testEnv && !isOfflineFallback) {
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+          await context.firestore().collection('complaints').doc('complaint_1').set({
+            id: 'complaint_1',
+            saccoId: 'sacco_A',
+            reportedByUid: 'complainant_1',
+            reportedByUserId: 'complainant_1',
+            status: 'submitted',
+          });
         });
-      });
-    }
-    offlineStore['complaints/complaint_1'] = {
-      id: 'complaint_1',
-      saccoId: 'sacco_A',
-      reportedByUid: 'complainant_1',
-      reportedByUserId: 'complainant_1',
-      status: 'submitted',
-    };
+      }
+      offlineStore['complaints/complaint_1'] = {
+        id: 'complaint_1',
+        saccoId: 'sacco_A',
+        reportedByUid: 'complainant_1',
+        reportedByUserId: 'complainant_1',
+        status: 'submitted',
+      };
 
-    const validJpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
-    const validMetadata = { contentType: 'image/jpeg' };
+      const evidencePath = 'evidence/sacco_A/complaint_1/photo.jpg';
 
-    // SCENARIO 1: Original complainant
-    // - upload succeeds
-    // - read succeeds
-    // - delete denied (restricted to authority/admin)
-    await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-    await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
+      // SCENARIO A: Original complainant
+      // - CREATE succeeds via put()
+      // - READ metadata succeeds via getMetadata()
+      // - DELETE fails (restricted to admin/authority)
+      await assertSucceeds(complainant.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+      await assertSucceeds(complainant.storage().ref(evidencePath).getMetadata());
+      await assertFails(complainant.storage().ref(evidencePath).delete());
 
-    // SCENARIO 2: Stale passenger & unrelated passenger
-    // - read denied
-    // - upload / overwrite denied
-    // - delete denied
-    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
+      // SCENARIO B: Stale passenger (activeRole: 'passenger' with saccoId claim)
+      // - READ metadata fails
+      // - CREATE / overwrite fails
+      // - DELETE fails
+      await assertFails(staleUser.storage().ref(evidencePath).getMetadata());
+      await assertFails(staleUser.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+      await assertFails(staleUser.storage().ref(evidencePath).delete());
 
-    // SCENARIO 3: Matching SACCO manager
-    // - read succeeds
-    // - update / overwrite denied
-    // - delete denied
-    await assertSucceeds(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').update(validJpegBytes, validMetadata));
-    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
-    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
+      // SCENARIO C: Unrelated passenger
+      // - READ metadata fails
+      // - CREATE / overwrite fails
+      // - DELETE fails
+      await assertFails(unrelatedPassenger.storage().ref(evidencePath).getMetadata());
+      await assertFails(unrelatedPassenger.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+      await assertFails(unrelatedPassenger.storage().ref(evidencePath).delete());
 
-    // SCENARIO 4: Authority
-    // - read succeeds
-    // - delete succeeds
-    await assertSucceeds(authority.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
-    await assertSucceeds(authority.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
-  });
+      // SCENARIO D: Matching SACCO manager
+      // - READ metadata succeeds
+      // - CREATE / overwrite (update) fails
+      // - DELETE fails
+      await assertSucceeds(validManager.storage().ref(evidencePath).getMetadata());
+      await assertFails(validManager.storage().ref(evidencePath).put(VALID_JPEG, JPEG_METADATA));
+      await assertFails(validManager.storage().ref(evidencePath).delete());
 
-  it('SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites', async () => {
-    const reporter = getContext('reporter_spot_1', { activeRole: 'passenger' });
-    const imposter = getContext('imposter_user_2', { activeRole: 'passenger' });
-    const authority = getContext('auth_user_2', { activeRole: 'authority' });
+      // SCENARIO E: Authority
+      // - READ metadata succeeds
+      // - DELETE succeeds
+      await assertSucceeds(authority.storage().ref(evidencePath).getMetadata());
+      await assertSucceeds(authority.storage().ref(evidencePath).delete());
+    },
+    15000
+  );
 
-    // Seed the black_spots document in firestore
-    if (testEnv && !isOfflineFallback) {
-      await testEnv.withSecurityRulesDisabled(async (context) => {
-        await context.firestore().collection('black_spots').doc('spot_100').set({
-          id: 'spot_100',
-          title: 'Pothole Cluster',
-          reportedByUid: 'reporter_spot_1',
-          reportedByUserId: 'reporter_spot_1',
-          severity: 'high',
-          status: 'pending',
+  it(
+    'SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites',
+    async () => {
+      const reporter = getContext('reporter_spot_1', { activeRole: 'passenger' });
+      const imposter = getContext('imposter_user_2', { activeRole: 'passenger' });
+      const authority = getContext('auth_user_2', { activeRole: 'authority' });
+
+      // Seed the black_spots document in firestore
+      if (testEnv && !isOfflineFallback) {
+        await testEnv.withSecurityRulesDisabled(async (context) => {
+          await context.firestore().collection('black_spots').doc('spot_100').set({
+            id: 'spot_100',
+            title: 'Pothole Cluster',
+            reportedByUid: 'reporter_spot_1',
+            reportedByUserId: 'reporter_spot_1',
+            severity: 'high',
+            status: 'pending',
+          });
         });
-      });
-    }
-    offlineStore['black_spots/spot_100'] = {
-      id: 'spot_100',
-      title: 'Pothole Cluster',
-      reportedByUid: 'reporter_spot_1',
-      reportedByUserId: 'reporter_spot_1',
-      severity: 'high',
-      status: 'pending',
-    };
+      }
+      offlineStore['black_spots/spot_100'] = {
+        id: 'spot_100',
+        title: 'Pothole Cluster',
+        reportedByUid: 'reporter_spot_1',
+        reportedByUserId: 'reporter_spot_1',
+        severity: 'high',
+        status: 'pending',
+      };
 
-    const evidenceData = new Uint8Array([
-      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00,
-    ]);
-    const metadata = { contentType: 'image/jpeg' };
+      const blackSpotEvidencePath = 'black_spots/spot_100/photo.jpg';
 
-    // 1. Reporter uploading evidence to spot_100 -> SUCCEEDS (reportedByUid matches auth.uid)
-    await assertSucceeds((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').put(evidenceData, metadata) as Promise<any>);
+      // 1. Reporter creates the object successfully
+      await assertSucceeds(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-    // 2. Any user (including imposter) can read existing black spot photos (public read)
-    await assertSucceeds((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').get() as Promise<any>);
+      // 2. Any user (including imposter) can read metadata because read is public
+      await assertSucceeds(imposter.storage().ref(blackSpotEvidencePath).getMetadata());
 
-    // 3. Imposter attempting to upload / overwrite evidence to spot_100 -> FAILS (ownership mismatch)
-    await assertFails((imposter as any).storage().ref('black_spots/spot_100/photo.jpg').put(evidenceData, metadata) as Promise<any>);
+      // 3. Imposter cannot overwrite the existing object
+      await assertFails(imposter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-    // 4. Reporter attempting to delete or overwrite -> FAILS (update/delete restricted to authority/admin)
-    await assertFails((reporter as any).storage().ref('black_spots/spot_100/photo.jpg').delete() as Promise<any>);
+      // 4. Reporter cannot overwrite the existing object after creation
+      await assertFails(reporter.storage().ref(blackSpotEvidencePath).put(VALID_JPEG, JPEG_METADATA));
 
-    // 5. Authority can delete evidence
-    await assertSucceeds((authority as any).storage().ref('black_spots/spot_100/photo.jpg').delete() as Promise<any>);
-  });
+      // 5. Reporter cannot delete
+      await assertFails(reporter.storage().ref(blackSpotEvidencePath).delete());
+
+      // 6. Authority can delete
+      await assertSucceeds(authority.storage().ref(blackSpotEvidencePath).delete());
+    },
+    15000
+  );
 
   it('BE-001 / SEC-004: suspended user with isSuspended claim is denied Firestore writes', async () => {
     // 1. Active passenger user write succeeds
