@@ -2,13 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { en } from '../locales/en';
 import { sw } from '../locales/sw';
 
-function getDeepKeys(obj: Record<string, any>, prefix = ''): string[] {
+function getDeepKeys(obj: Record<string, unknown>, prefix = ''): string[] {
   let keys: string[] = [];
   for (const key of Object.keys(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     const value = obj[key];
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      keys = keys.concat(getDeepKeys(value, fullKey));
+      keys = keys.concat(getDeepKeys(value as Record<string, unknown>, fullKey));
     } else {
       keys.push(fullKey);
     }
@@ -37,12 +37,12 @@ describe('I18N-001: Locale Key Parity (en vs sw)', () => {
   });
 
   it('all translation values in en.ts and sw.ts are non-empty strings', () => {
-    function assertNoEmptyValues(obj: Record<string, any>, prefix = '', localeName: string) {
+    function assertNoEmptyValues(obj: Record<string, unknown>, prefix = '', localeName: string) {
       for (const key of Object.keys(obj)) {
         const fullKey = prefix ? `${prefix}.${key}` : key;
         const val = obj[key];
         if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
-          assertNoEmptyValues(val, fullKey, localeName);
+          assertNoEmptyValues(val as Record<string, unknown>, fullKey, localeName);
         } else {
           expect(typeof val).toBe('string');
           expect((val as string).trim().length, `Empty string at ${localeName}:${fullKey}`).toBeGreaterThan(0);

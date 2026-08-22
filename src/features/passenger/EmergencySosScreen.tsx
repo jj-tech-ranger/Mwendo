@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../services/authService';
 import { functionsService } from '../../services/functionsService';
 import { messagingService } from '../../services/messagingService';
+import { UserProfile } from '../../types';
 
 interface ContactItem {
   id: string;
@@ -91,10 +92,11 @@ export const EmergencySosScreen: React.FC = () => {
         fcmTargets: ['SACCO Operations Dispatch', 'NTSA Safety Control Center'],
         alertId,
       });
-    } catch (fnErr: any) {
-      if (fnErr.message?.includes('RATE_LIMIT_EXCEEDED') || fnErr.code === 'RATE_LIMIT_EXCEEDED') {
+    } catch (fnErr: unknown) {
+      const errObj = fnErr as { message?: string; code?: string };
+      if (errObj.message?.includes('RATE_LIMIT_EXCEEDED') || errObj.code === 'RATE_LIMIT_EXCEEDED') {
         setIsDispatching(false);
-        setRateLimitError(fnErr.message || 'Rate limit exceeded: Maximum 3 SOS triggers per hour allowed.');
+        setRateLimitError(errObj.message || 'Rate limit exceeded: Maximum 3 SOS triggers per hour allowed.');
         return;
       }
       console.warn('[EmergencySosScreen] sendSOS function error, local fallback active:', fnErr);
@@ -195,7 +197,7 @@ export const EmergencySosScreen: React.FC = () => {
           await userRepository.update(userId, {
             emergencyContacts: formattedForProfile,
             updatedAt: new Date().toISOString(),
-          } as Partial<any>);
+          } as Partial<UserProfile>);
         } catch (repoErr) {
           console.warn('[EmergencySosScreen] Error updating userRepository fallback:', repoErr);
         }
@@ -238,7 +240,7 @@ export const EmergencySosScreen: React.FC = () => {
           await userRepository.update(userId, {
             emergencyContacts: formattedForProfile,
             updatedAt: new Date().toISOString(),
-          } as Partial<any>);
+          } as Partial<UserProfile>);
         } catch (repoErr) {
           console.warn('[EmergencySosScreen] Error updating userRepository fallback:', repoErr);
         }

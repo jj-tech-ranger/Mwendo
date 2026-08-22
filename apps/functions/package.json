@@ -2,6 +2,7 @@
   "name": "functions",
   "scripts": {
     "build": "tsc",
+    "lint": "tsc --noEmit && eslint .",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
@@ -19,7 +20,9 @@
     "firebase-functions": "^5.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "eslint": "^9.0.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
   },
   "private": true
 }

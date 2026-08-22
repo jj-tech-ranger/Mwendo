@@ -1,12 +1,19 @@
 import { test, expect } from '@playwright/test';
 
+interface TestWindow extends Window {
+  __TEST_AUTH_OVERRIDE__?: boolean;
+  __INITIAL_TEST_ROLE__?: string;
+  __INITIAL_TEST_SACCO__?: string;
+}
+
 test.describe('Navigation & Shell Route Audit', () => {
   test('SACCO shell sidebar links resolve without 404s', async ({ page }) => {
     // 1. Initialize authenticated SACCO user session before navigation
     await page.addInitScript(() => {
-      (window as any).__TEST_AUTH_OVERRIDE__ = true;
-      (window as any).__INITIAL_TEST_ROLE__ = 'sacco_manager';
-      (window as any).__INITIAL_TEST_SACCO__ = 'sacco_metrolink';
+      const w = window as unknown as TestWindow;
+      w.__TEST_AUTH_OVERRIDE__ = true;
+      w.__INITIAL_TEST_ROLE__ = 'sacco_manager';
+      w.__INITIAL_TEST_SACCO__ = 'sacco_metrolink';
     });
 
     await page.goto('/sacco');
@@ -38,8 +45,9 @@ test.describe('Navigation & Shell Route Audit', () => {
   test('Authority shell sidebar links resolve without 404s', async ({ page }) => {
     // 1. Initialize authenticated Authority user session before navigation
     await page.addInitScript(() => {
-      (window as any).__TEST_AUTH_OVERRIDE__ = true;
-      (window as any).__INITIAL_TEST_ROLE__ = 'authority';
+      const w = window as unknown as TestWindow;
+      w.__TEST_AUTH_OVERRIDE__ = true;
+      w.__INITIAL_TEST_ROLE__ = 'authority';
     });
 
     await page.goto('/authority');
@@ -67,8 +75,9 @@ test.describe('Navigation & Shell Route Audit', () => {
   test('Admin shell sidebar links resolve without 404s', async ({ page }) => {
     // 1. Initialize authenticated Admin user session before navigation
     await page.addInitScript(() => {
-      (window as any).__TEST_AUTH_OVERRIDE__ = true;
-      (window as any).__INITIAL_TEST_ROLE__ = 'admin';
+      const w = window as unknown as TestWindow;
+      w.__TEST_AUTH_OVERRIDE__ = true;
+      w.__INITIAL_TEST_ROLE__ = 'admin';
     });
 
     await page.goto('/admin');

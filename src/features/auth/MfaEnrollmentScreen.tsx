@@ -43,7 +43,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
       }
       const data = await mfaService.getEnrollmentSecret(currentUser);
       setSetupData(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to generate TOTP secret:', err);
       setErrorMsg('Failed to initialize TOTP MFA setup. Please try again.');
     } finally {
@@ -77,9 +77,10 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
         else if (role === 'authority') navigate('/authority');
         else navigate('/passenger');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('MFA Enrollment error:', err);
-      setErrorMsg(err.message || t('auth.mfa.invalidCode'));
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(errMsg || t('auth.mfa.invalidCode'));
     } finally {
       setIsSubmitting(false);
     }

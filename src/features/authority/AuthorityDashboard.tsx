@@ -19,6 +19,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+import { toStandardDate } from '../../lib/utils';
 
 const KENYA_COUNTIES = [
   'All Kenya (National)',
@@ -173,7 +174,7 @@ export const AuthorityDashboard: React.FC = () => {
   const speedTrendData = useMemo(() => {
     const hours: Record<string, { time: string; avgSpeed: number; violations: number }> = {};
     for (const v of violations) {
-      const date = new Date(v.timestamp);
+      const date = toStandardDate(v.timestamp);
       const hourStr = `${String(date.getHours()).padStart(2, '0')}:00`;
       if (!hours[hourStr]) {
         hours[hourStr] = { time: hourStr, avgSpeed: 0, violations: 0 };

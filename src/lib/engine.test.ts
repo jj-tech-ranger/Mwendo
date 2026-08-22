@@ -209,8 +209,8 @@ describe('4. Risk Calculations', () => {
     const events = [
       { severity: 'high' as const, timestamp: now, confidenceScore: 1.0 },
       { severity: 'critical' as const, timestamp: 'invalid-date-format' },
-      { severity: 'critical' as const, timestamp: NaN as any },
-      { severity: 'critical' as const, timestamp: undefined as any },
+      { severity: 'critical' as const, timestamp: NaN },
+      { severity: 'critical' as const, timestamp: undefined as unknown as string },
     ];
 
     const result = calculateVehicleRiskScore(events, 100, now);

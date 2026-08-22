@@ -18,14 +18,29 @@ export function formatSpeed(speed: number): string {
   return `${Math.round(speed)} KM/H`;
 }
 
-export function formatTimestamp(isoString: string): string {
-  if (!isoString) return '';
-  const date = new Date(isoString);
+export function toStandardDate(input?: string | Date | { toDate?: () => Date; seconds?: number } | number | null): Date {
+  if (!input) return new Date();
+  if (typeof input === 'object' && input !== null && 'toDate' in input && typeof input.toDate === 'function') {
+    return input.toDate();
+  }
+  if (typeof input === 'object' && input !== null && 'seconds' in input && typeof input.seconds === 'number') {
+    return new Date(input.seconds * 1000);
+  }
+  if (input instanceof Date) {
+    return input;
+  }
+  const d = new Date(input as string | number);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+export function formatTimestamp(input?: string | Date | { toDate?: () => Date; seconds?: number } | number | null): string {
+  if (!input) return '';
+  const date = toStandardDate(input);
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function formatDate(isoString: string): string {
-  if (!isoString) return '';
-  const date = new Date(isoString);
+export function formatDate(input?: string | Date | { toDate?: () => Date; seconds?: number } | number | null): string {
+  if (!input) return '';
+  const date = toStandardDate(input);
   return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 }

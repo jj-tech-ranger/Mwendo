@@ -28,12 +28,13 @@ export const AdminSystemHealthScreen: React.FC = () => {
       const latency = Math.round(end - start);
       setFirestoreLatency(latency);
       setFirestoreStatus('healthy');
-    } catch (err: any) {
+    } catch (err: unknown) {
       const end = performance.now();
       const latency = Math.round(end - start);
       setFirestoreLatency(latency);
       // If error is permission or not-found, the connection itself is alive
-      if (err?.code === 'permission-denied' || err?.code === 'not-found') {
+      const errCode = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
+      if (errCode === 'permission-denied' || errCode === 'not-found') {
         setFirestoreStatus('healthy');
       } else {
         setFirestoreStatus('error');

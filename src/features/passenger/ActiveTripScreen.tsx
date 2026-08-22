@@ -12,6 +12,7 @@ import { storageService } from '../../services/storageService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
 import { remoteConfigService } from '../../services/remoteConfigService';
+import { Trip } from '../../types';
 
 export const ActiveTripScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export const ActiveTripScreen: React.FC = () => {
   const [setupSacco, setSetupSacco] = useState('');
   const [setupRoute, setSetupRoute] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
-  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<Trip | null>(null);
 
   // Ref to hold SpeedSmoother instance per active trip
   const speedSmootherRef = useRef<SpeedSmoother>(new SpeedSmoother(0.35, 30));
@@ -128,16 +129,25 @@ export const ActiveTripScreen: React.FC = () => {
 
     const completed = endTrip();
     const userId = currentUser?.uid || currentUser?.id;
-    const result: any = completed
-      ? { ...completed, userId: completed.userId || userId, overspeedEventsCount: calculatedOverspeedCount, violationsCount: calculatedOverspeedCount }
+    const result: Trip = completed
+      ? {
+          ...completed,
+          userId: completed.userId || userId,
+          overspeedEventsCount: calculatedOverspeedCount,
+          violationsCount: calculatedOverspeedCount,
+        }
       : {
           id: `trip_${Date.now()}`,
           tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
           userId,
+          vehicleRegNumber: activeTrip?.plateNumber || setupPlate,
           plateNumber: activeTrip?.plateNumber || setupPlate,
+          saccoId: activeTrip?.saccoId || 'sacco_default',
           saccoName: activeTrip?.saccoName || setupSacco,
           routeName: activeTrip?.routeName || setupRoute,
           maxSpeedKmH: maxSpeed,
+          currentSpeedKmH: 0,
+          avgSpeedKmH: Math.round(maxSpeed * 0.7),
           durationSeconds,
           overspeedEventsCount: calculatedOverspeedCount,
           violationsCount: calculatedOverspeedCount,
@@ -166,7 +176,7 @@ export const ActiveTripScreen: React.FC = () => {
     // Save trip document to Firestore / offline storage
     try {
       if (navigator.onLine) {
-        await tripRepository.save(result as any);
+        await tripRepository.save(result);
       } else {
         await offlineStorage.setItem(`offline_trip_${result.id}`, result);
         await offlineSyncService.updatePendingCount();
@@ -180,7 +190,7 @@ export const ActiveTripScreen: React.FC = () => {
 
   // IF TRIP FINISHED - SHOW SUMMARY SCREEN
   if (summaryData) {
-    const isHighRisk = summaryData.maxSpeedKmH > 90 || summaryData.overspeedEventsCount > 0;
+    const isHighRisk = summaryData.maxSpeedKmH > 90 || (summaryData.overspeedEventsCount ?? 0) > 0;
 
     return (
       <div className="min-h-screen bg-background text-on-background p-4 sm:p-6 max-w-lg mx-auto space-y-6 animate-in fade-in">
@@ -273,10 +283,10 @@ export const ActiveTripScreen: React.FC = () => {
             <span className="text-xs text-on-surface-variant">Overspeed Events</span>
             <div
               className={`text-xl font-black font-mono ${
-                summaryData.overspeedEventsCount > 0 ? 'text-amber-600' : 'text-emerald-700'
+                (summaryData.overspeedEventsCount ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-700'
               }`}
             >
-              {summaryData.overspeedEventsCount || 0}
+              {summaryData.overspeedEventsCount ?? 0}
             </div>
           </Card>
         </div>

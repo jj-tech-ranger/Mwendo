@@ -49,13 +49,14 @@ export const LoginScreen: React.FC = () => {
       } else {
         navigate('/passenger');
       }
-    } catch (err: any) {
-      if (err.code === 'auth/multi-factor-auth-required') {
-        navigate('/auth/mfa-challenge', { state: { resolver: err.resolver } });
+    } catch (err: unknown) {
+      const authErr = err as { code?: string; message?: string; resolver?: unknown };
+      if (authErr.code === 'auth/multi-factor-auth-required') {
+        navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } });
         return;
       }
       console.error('Sign in error:', err);
-      setErrorMsg(err.message || t('auth.login.invalidCredentials'));
+      setErrorMsg(authErr.message || t('auth.login.invalidCredentials'));
     }
   };
 
@@ -76,9 +77,10 @@ export const LoginScreen: React.FC = () => {
       } else {
         navigate('/passenger');
       }
-    } catch (err: any) {
-      if (err.code === 'auth/multi-factor-auth-required') {
-        navigate('/auth/mfa-challenge', { state: { resolver: err.resolver } });
+    } catch (err: unknown) {
+      const authErr = err as { code?: string; resolver?: unknown };
+      if (authErr.code === 'auth/multi-factor-auth-required') {
+        navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } });
         return;
       }
       console.error('Google sign in error:', err);
@@ -94,7 +96,7 @@ export const LoginScreen: React.FC = () => {
     try {
       await authService.signInGuest();
       navigate('/passenger');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Guest sign in error:', err);
       setErrorMsg('Failed to sign in as guest');
     } finally {
@@ -112,7 +114,7 @@ export const LoginScreen: React.FC = () => {
     try {
       await authService.sendMagicLink(email);
       setMagicLinkSent(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Magic link error:', err);
       setErrorMsg('Failed to send magic link');
     }

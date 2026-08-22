@@ -33,10 +33,11 @@ export const AuthoritySettingsScreen: React.FC = () => {
     try {
       const fetchedLogs = await auditLogRepository.getAll();
       setLogs(fetchedLogs);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load audit logs:', err);
       setIsErrorLogs(true);
-      setErrorMessage(err?.message || 'Failed to retrieve inspector audit trail.');
+      const errMsg = err instanceof Error ? err.message : typeof err === 'object' && err !== null && 'message' in err ? String((err as { message?: unknown }).message) : 'Failed to retrieve inspector audit trail.';
+      setErrorMessage(errMsg);
     } finally {
       setIsLoadingLogs(false);
     }
@@ -146,7 +147,7 @@ export const AuthoritySettingsScreen: React.FC = () => {
                 <label className="font-label-bold text-on-surface">Authority Scope</label>
                 <select
                   value={authorityScope}
-                  onChange={(e) => setAuthorityScope(e.target.value as any)}
+                  onChange={(e) => setAuthorityScope(e.target.value as 'national' | 'county')}
                   className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface font-label-mono focus:outline-none"
                 >
                   <option value="national">National (All Kenya)</option>

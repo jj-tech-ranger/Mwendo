@@ -11,6 +11,7 @@ import {
   updateDoc,
   QueryConstraint,
   DocumentData,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -19,7 +20,25 @@ export function createConverter<T extends { id: string }>(): FirestoreDataConver
     toFirestore(data: T): DocumentData {
       // Remove id before saving to Firestore document
       const { id: _id, ...rest } = data as unknown as Record<string, unknown>;
-      return rest;
+      const converted: Record<string, unknown> = { ...rest };
+      if (typeof converted.startTime === 'string') {
+        converted.startTime = Timestamp.fromDate(new Date(converted.startTime));
+      } else if (converted.startTime instanceof Date) {
+        converted.startTime = Timestamp.fromDate(converted.startTime);
+      }
+
+      if (typeof converted.endTime === 'string') {
+        converted.endTime = Timestamp.fromDate(new Date(converted.endTime));
+      } else if (converted.endTime instanceof Date) {
+        converted.endTime = Timestamp.fromDate(converted.endTime);
+      }
+
+      if (typeof converted.timestamp === 'string') {
+        converted.timestamp = Timestamp.fromDate(new Date(converted.timestamp));
+      } else if (converted.timestamp instanceof Date) {
+        converted.timestamp = Timestamp.fromDate(converted.timestamp);
+      }
+      return converted;
     },
     fromFirestore(snapshot: QueryDocumentSnapshot, options: SnapshotOptions): T {
       const data = snapshot.data(options);

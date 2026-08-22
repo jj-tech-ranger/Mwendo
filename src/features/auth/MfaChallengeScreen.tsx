@@ -5,6 +5,7 @@ import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/useAuthStore';
 import { mfaService } from '../../services/mfaService';
+import { MultiFactorResolver } from 'firebase/auth';
 
 export const MfaChallengeScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -15,7 +16,7 @@ export const MfaChallengeScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const resolver = (location.state as any)?.resolver || null;
+  const resolver = (location.state as { resolver?: MultiFactorResolver } | null)?.resolver;
 
   async function handleVerifyChallenge(e: React.FormEvent) {
     e.preventDefault();
@@ -35,9 +36,10 @@ export const MfaChallengeScreen: React.FC = () => {
       else if (role === 'authority') navigate('/authority');
       else if (role === 'sacco_manager') navigate('/sacco');
       else navigate('/passenger');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('MFA Verification failed:', err);
-      setErrorMsg(err.message || t('auth.mfa.invalidCode'));
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(errMsg || t('auth.mfa.invalidCode'));
     } finally {
       setIsSubmitting(false);
     }

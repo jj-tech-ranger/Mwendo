@@ -3,7 +3,7 @@ import React, { lazy } from 'react';
 /**
  * Robust lazy import with automatic retry on network or chunk loading failure
  */
-export function lazyWithRetry<T extends React.ComponentType<any>>(
+export function lazyWithRetry<T extends React.ComponentType<Record<string, unknown>>>(
   factory: () => Promise<{ default: T }>
 ) {
   return lazy(async () => {

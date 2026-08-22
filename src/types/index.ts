@@ -63,45 +63,48 @@ export interface UserProfile {
 
 export type TripStatus = 'active' | 'completed' | 'auto_completed' | 'incomplete_signal_lost' | 'discarded';
 
+import type { Timestamp } from 'firebase/firestore';
+
 export interface GPSPoint {
   latitude: number;
   longitude: number;
   speedKmH: number;
   accuracy?: number;
-  timestamp: string;
+  timestamp: Timestamp | string;
   heading?: number;
 }
 
 export interface Trip {
   id: string;
-  tripId?: string;
+  tripId?: string | undefined;
   vehicleRegNumber: string;
-  plateNumber?: string;
+  plateNumber?: string | undefined;
   saccoId: string;
   saccoName: string;
   routeName: string;
-  origin?: string;
-  destination?: string;
+  origin?: string | undefined;
+  destination?: string | undefined;
   status: TripStatus;
   currentSpeedKmH: number;
   maxSpeedKmH: number;
   avgSpeedKmH: number;
-  driverName?: string;
-  passengerCount?: number;
-  startTime: string;
-  endTime?: string;
-  durationSeconds?: number;
-  distanceMeters?: number;
-  overspeedEventsCount?: number;
-  violationsCount?: number;
-  userId?: string;
-  startLocation?: { latitude: number; longitude: number; geohash?: string };
-  endLocation?: { latitude: number; longitude: number; geohash?: string };
-  lastGpsUpdate?: GPSPoint;
-  telemetryStoragePath?: string;
-  traceId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+  driverName?: string | undefined;
+  passengerCount?: number | undefined;
+  startTime: Timestamp | string;
+  endTime?: Timestamp | string | undefined;
+  durationSeconds?: number | undefined;
+  distanceMeters?: number | undefined;
+  overspeedEventsCount?: number | undefined;
+  violationsCount?: number | undefined;
+  userId?: string | undefined;
+  startLocation?: { latitude: number; longitude: number; geohash?: string } | undefined;
+  endLocation?: { latitude: number; longitude: number; geohash?: string } | undefined;
+  lastGpsUpdate?: GPSPoint | undefined;
+  telemetryStoragePath?: string | undefined;
+  traceId?: string | undefined;
+  timestamp?: Timestamp | string | undefined;
+  createdAt?: Timestamp | string | undefined;
+  updatedAt?: Timestamp | string | undefined;
 }
 
 export interface Vehicle {
@@ -226,6 +229,7 @@ export interface Violation {
   id: string;
   violationId?: string;
   saccoId: string;
+  userId?: string;
   vehicleRegNumber: string;
   driverName?: string;
   routeName?: string;
@@ -234,11 +238,13 @@ export interface Violation {
   severity: SeverityLevel;
   confidenceScore: number;
   isCorroborated: boolean;
-  timestamp: string;
+  timestamp: Timestamp | string;
   status: 'pending' | 'reviewed' | 'disputed' | 'dismissed';
   locationName?: string;
   latitude?: number;
   longitude?: number;
+  createdAt?: Timestamp | string;
+  updatedAt?: Timestamp | string;
 }
 
 export interface Complaint {

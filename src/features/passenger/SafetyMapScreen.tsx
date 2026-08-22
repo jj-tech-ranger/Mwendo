@@ -37,23 +37,27 @@ export const SafetyMapScreen: React.FC = () => {
     queryKey: ['publicPinHazards'],
     queryFn: async () => {
       const pins = await publicPinRepository.getAll();
-      const mapped: HazardPin[] = pins.map((p: any, idx: number) => ({
-        id: p.id,
-        title: p.title || p.name || 'Hazardous Location',
-        type:
-          p.type === 'hospital' || p.type === 'police' || p.type === 'hotspot' || p.type === 'danger_zone'
-            ? p.type
-            : p.hazardType === 'accident_prone'
-            ? 'blackspot'
-            : 'blackspot',
-        severity: p.severity === 'critical' ? 'high' : p.severity || 'high',
-        locationName: p.routeName || p.locationName || 'Corridor',
-        corroborationCount: p.corroborationCount || p.corroborationsCount || 0,
-        description: p.description || 'Verified public safety hazard location.',
-        distanceKm: 1.0 + idx * 0.8,
-        latitude: typeof p.latitude === 'number' ? p.latitude : -1.286389 + (idx % 3) * 0.02,
-        longitude: typeof p.longitude === 'number' ? p.longitude : 36.817223 + (idx % 3) * 0.02,
-      }));
+      const mapped: HazardPin[] = pins.map((pinRecord, idx: number) => {
+        const p = pinRecord as Record<string, unknown>;
+        const title = (p.title as string) || (p.name as string) || 'Hazardous Location';
+        const rawType = p.type as string | undefined;
+        const rawSeverity = (p.severity as string) || 'high';
+        return {
+          id: String(p.id || `pin_${idx}`),
+          title,
+          type:
+            rawType === 'hospital' || rawType === 'police' || rawType === 'hotspot' || rawType === 'danger_zone'
+              ? rawType
+              : 'blackspot',
+          severity: rawSeverity === 'critical' ? 'high' : (rawSeverity as 'low' | 'medium' | 'high'),
+          locationName: (p.routeName as string) || (p.locationName as string) || 'Corridor',
+          corroborationCount: Number(p.corroborationCount || p.corroborationsCount || 0),
+          description: (p.description as string) || 'Verified public safety hazard location.',
+          distanceKm: 1.0 + idx * 0.8,
+          latitude: typeof p.latitude === 'number' ? p.latitude : -1.286389 + (idx % 3) * 0.02,
+          longitude: typeof p.longitude === 'number' ? p.longitude : 36.817223 + (idx % 3) * 0.02,
+        };
+      });
 
       return mapped;
     },

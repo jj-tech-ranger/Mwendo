@@ -69,12 +69,11 @@ service cloud.firestore {
       return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180;
     }
 
-    // VT-003: Temporal plausibility bounds (reject >5m future timestamps, or >24h past for live events)
+    // VT-003: Temporal plausibility bounds (reject non-timestamp, >5m future timestamps, or >24h past for live events)
     function isPlausibleTimestamp(ts) {
-      return (
-        (ts is timestamp && ts <= request.time + duration.value(5, 'm') && ts >= request.time - duration.value(24, 'h')) ||
-        (ts is string && ts.size() >= 10 && ts.size() <= 35 && ts.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$'))
-      );
+      return ts is timestamp &&
+             ts <= request.time + duration.value(5, 'm') &&
+             ts >= request.time - duration.value(24, 'h');
     }
 
     function isValidTripData(data) {

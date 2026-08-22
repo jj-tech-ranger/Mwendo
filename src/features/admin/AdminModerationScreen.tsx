@@ -7,6 +7,7 @@ import { auditLogRepository, userRepository, violationRepository } from '../../r
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
 import { Violation } from '../../types';
+import { toStandardDate } from '../../lib/utils';
 
 export const AdminModerationScreen: React.FC = () => {
   const { showToast } = useToast();
@@ -283,7 +284,7 @@ export const AdminModerationScreen: React.FC = () => {
                     </p>
 
                     <div className="flex items-center justify-between pt-2 border-t border-outline-variant/10 text-[11px] text-on-surface-variant font-label-mono">
-                      <span>{new Date(violation.timestamp).toLocaleString()}</span>
+                      <span>{toStandardDate(violation.timestamp).toLocaleString()}</span>
                       <Button
                         size="sm"
                         variant="primary"
@@ -370,7 +371,7 @@ export const AdminModerationScreen: React.FC = () => {
                     </div>
                     <div>
                       <span className="text-[10px] text-outline block">Timestamp</span>
-                      <span className="text-on-surface">{new Date(selectedViolation.timestamp).toLocaleString()}</span>
+                      <span className="text-on-surface">{toStandardDate(selectedViolation.timestamp).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

@@ -13,6 +13,15 @@ import { Vehicle } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
+interface ProvisionalVehicle {
+  id: string;
+  plate: string;
+  route: string;
+  firstSeen: string;
+  trips: number;
+  reportsCount: number;
+}
+
 export const SaccoFleetScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
@@ -28,7 +37,7 @@ export const SaccoFleetScreen: React.FC = () => {
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
 
   // Claim Vehicle workflow state
-  const [claimingVehicle, setClaimingVehicle] = useState<any | null>(null);
+  const [claimingVehicle, setClaimingVehicle] = useState<ProvisionalVehicle | null>(null);
   const [claimStep, setClaimStep] = useState<1 | 2>(1); // 1: confirm, 2: success
   const [isClaiming, setIsClaiming] = useState(false);
 
@@ -39,7 +48,7 @@ export const SaccoFleetScreen: React.FC = () => {
   const [formDriver, setFormDriver] = useState('Driver #12');
 
   // Provisional vehicles state (unclaimed vehicles for this sacco)
-  const [provisionalVehicles, setProvisionalVehicles] = useState<any[]>([]);
+  const [provisionalVehicles, setProvisionalVehicles] = useState<ProvisionalVehicle[]>([]);
 
   const { data: vehicles = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoVehicles', saccoId],

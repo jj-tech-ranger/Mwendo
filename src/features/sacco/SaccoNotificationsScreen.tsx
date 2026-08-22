@@ -1,15 +1,23 @@
 import React, { useState } from 'react';
 import { Card } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+
+interface SaccoNotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  desc: string;
+  time: string;
+  read: boolean;
+}
 
 export const SaccoNotificationsScreen: React.FC = () => {
   const { user } = useAuthStore();
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<SaccoNotificationItem[]>([]);
 
   const handleMarkAllRead = () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));

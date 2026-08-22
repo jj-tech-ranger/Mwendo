@@ -12,6 +12,7 @@ import { tripRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { Trip } from '../../types';
+import { toStandardDate } from '../../lib/utils';
 
 export const TripHistoryScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -93,7 +94,7 @@ export const TripHistoryScreen: React.FC = () => {
                       <span>{trip.routeName || 'Corridor Route'}</span>
                     </div>
                     <p className="text-xs text-on-surface-variant">
-                      {trip.saccoName || 'SACCO'} · {trip.startTime ? new Date(trip.startTime).toLocaleDateString() : 'Recent'}
+                      {trip.saccoName || 'SACCO'} · {trip.startTime ? toStandardDate(trip.startTime).toLocaleDateString() : 'Recent'}
                     </p>
                   </div>
 
@@ -137,7 +138,7 @@ export const TripHistoryScreen: React.FC = () => {
                 {selectedTrip.vehicleRegNumber} ({selectedTrip.saccoName || 'SACCO'})
               </div>
               <div className="text-on-surface-variant">
-                {selectedTrip.startTime ? new Date(selectedTrip.startTime).toLocaleString() : 'N/A'}
+                {selectedTrip.startTime ? toStandardDate(selectedTrip.startTime).toLocaleString() : 'N/A'}
               </div>
             </div>
 

@@ -79,19 +79,18 @@ function evaluateFirestoreRules(
       if (data?.avgSpeedKmH !== undefined && (data.avgSpeedKmH < 0 || data.avgSpeedKmH > 180)) return false;
       if (data?.lastGpsUpdate?.speedKmH !== undefined && (data.lastGpsUpdate.speedKmH < 0 || data.lastGpsUpdate.speedKmH > 180)) return false;
 
-      // VT-003: Timestamp bounds check (reject >5 min in future, reject >24h in past)
+      // VT-003: Timestamp bounds check (reject non-timestamp, reject >5 min in future, reject >24h in past)
       const checkTimestamp = (ts?: any) => {
         if (!ts) return true;
         let ms: number;
-        if (typeof ts === 'string') {
-          ms = new Date(ts).getTime();
-        } else if (ts && typeof ts.toMillis === 'function') {
+        if (ts && typeof ts.toMillis === 'function') {
           ms = ts.toMillis();
+        } else if (ts && typeof ts.seconds === 'number') {
+          ms = ts.seconds * 1000 + (ts.nanoseconds || 0) / 1e6;
         } else if (ts instanceof Date) {
           ms = ts.getTime();
-        } else if (typeof ts === 'number') {
-          ms = ts;
         } else {
+          // Strings, numbers, or non-timestamp objects are rejected by `ts is timestamp`
           return false;
         }
         if (!Number.isFinite(ms)) return false;
@@ -360,6 +359,15 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
       firestore: () => rawContext.firestore(),
       storage: (bucket?: string) => {
         const rawStorage = rawContext.storage(bucket);
+        if (typeof (rawStorage as any).setMaxUploadRetryTime === 'function') {
+          (rawStorage as any).setMaxUploadRetryTime(1000);
+        }
+        if (typeof (rawStorage as any).setMaxOperationRetryTime === 'function') {
+          (rawStorage as any).setMaxOperationRetryTime(1000);
+        }
+        if (typeof (rawStorage as any).setMaxDownloadRetryTime === 'function') {
+          (rawStorage as any).setMaxDownloadRetryTime(1000);
+        }
         return {
           ref: (path: string) => {
             const rawRef = rawStorage.ref(path);
@@ -370,6 +378,10 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
               getDownloadURL: () => rawRef.getDownloadURL(),
               put: (data?: any, metadata?: any) =>
                 rawRef.put(data || dummyBuffer, metadata || { contentType: 'image/jpeg' }),
+              update: (data?: any, metadata?: any) =>
+                rawRef.put(data || dummyBuffer, metadata || { contentType: 'image/jpeg' }),
+              updateMetadata: (meta: any) =>
+                rawRef.updateMetadata(meta || { customMetadata: { updated: 'true' } }),
               delete: () => rawRef.delete(),
             };
           },
@@ -426,9 +438,19 @@ function getContext(uid?: string, tokenClaims: Record<string, any> = {}): any {
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked read');
           return 'https://download-url';
         },
-        put: async () => {
+        put: async (_data?: any, _metadata?: any) => {
           const allowed = evaluateStorageRules('write', path, auth);
           if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked write');
+          return true;
+        },
+        update: async (_data?: any, _metadata?: any) => {
+          const allowed = evaluateStorageRules('update', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked update');
+          return true;
+        },
+        updateMetadata: async (_metadata?: any) => {
+          const allowed = evaluateStorageRules('update', path, auth);
+          if (!allowed) throw new Error('PERMISSION_DENIED: Storage security rules blocked update');
           return true;
         },
         delete: async () => {
@@ -1105,18 +1127,18 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
   });
 
   it('SEC-006 & FUNC-001: complaint evidence storage access control and manager delete restriction', async () => {
-    // User with a leftover saccoId claim but activeRole: 'passenger'
+    // 1. User with a leftover saccoId claim but activeRole: 'passenger'
     const staleUser = getContext('stale_user_1', { activeRole: 'passenger', saccoId: 'sacco_A' });
-    // Legitimate SACCO manager for sacco_A
-    const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
-    // Complainant who filed complaint_1 for sacco_A
-    const complainant = getContext('complainant_1', { activeRole: 'passenger' });
-    // Another unrelated passenger
+    // 2. Another unrelated passenger
     const unrelatedPassenger = getContext('passenger_2', { activeRole: 'passenger' });
-    // Authority
+    // 3. Complainant who filed complaint_1 for sacco_A
+    const complainant = getContext('complainant_1', { activeRole: 'passenger' });
+    // 4. Legitimate matching SACCO manager for sacco_A
+    const validManager = getContext('mgr_a', { activeRole: 'sacco_manager', saccoId: 'sacco_A' });
+    // 5. Authority
     const authority = getContext('auth_user_1', { activeRole: 'authority' });
 
-    // Seed the complaint document in firestore
+    // Seed the complaint document in firestore before storage operations
     if (testEnv && !isOfflineFallback) {
       await testEnv.withSecurityRulesDisabled(async (context) => {
         await context.firestore().collection('complaints').doc('complaint_1').set({
@@ -1136,25 +1158,41 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       status: 'submitted',
     };
 
-    // 1. Stale claim user access denied for read and write
-    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
-    await assertFails((staleUser as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+    const validJpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+    const validMetadata = { contentType: 'image/jpeg' };
 
-    // 2. Unrelated passenger access denied for read and write
-    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
-    await assertFails((unrelatedPassenger as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
+    // SCENARIO 1: Stale passenger with saccoId claim but activeRole passenger
+    // - read denied
+    // - upload denied
+    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(staleUser.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
 
-    // 3. Complainant can upload evidence and read their uploaded evidence
-    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put() as Promise<any>);
-    await assertSucceeds((complainant as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
+    // SCENARIO 2: Unrelated passenger
+    // - read denied
+    // - upload denied
+    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(unrelatedPassenger.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
 
-    // 4. Legitimate manager can read evidence for their SACCO, but CANNOT delete or update it
-    await assertSucceeds((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
-    await assertFails((validManager as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
+    // SCENARIO 3: Original complainant
+    // - upload succeeds
+    // - read succeeds
+    await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
+    await assertSucceeds(complainant.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
 
-    // 5. Authority and Admin have full read and delete access
-    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get() as Promise<any>);
-    await assertSucceeds((authority as any).storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete() as Promise<any>);
+    // SCENARIO 4: Matching SACCO manager
+    // - read succeeds
+    // - update denied
+    // - delete denied
+    await assertSucceeds(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').update(validJpegBytes, validMetadata));
+    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').put(validJpegBytes, validMetadata));
+    await assertFails(validManager.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
+
+    // SCENARIO 5: Authority
+    // - read succeeds
+    // - delete succeeds
+    await assertSucceeds(authority.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').get());
+    await assertSucceeds(authority.storage().ref('evidence/sacco_A/complaint_1/photo.jpg').delete());
   });
 
   it('SEC-005: black spot evidence storage restricts uploads to original reporter and protects against overwrites', async () => {
@@ -1289,8 +1327,17 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
     });
 
     const now = Date.now();
-    const validTime = new Date(now - 60000).toISOString(); // 1 minute ago
-    const futureTime = new Date(now + 3600000).toISOString(); // 1 hour in future
+    const createTs = (ms: number) => ({
+      seconds: Math.floor(ms / 1000),
+      nanoseconds: (ms % 1000) * 1e6,
+      toDate: () => new Date(ms),
+      toMillis: () => ms,
+    });
+
+    const validTime = createTs(now - 60000); // 1 minute ago
+    const futureTime = createTs(now + 3600000); // 1 hour in future (>5m)
+    const pastTime = createTs(now - 25 * 3600000); // 25 hours ago (>24h)
+    const isoStringTime = new Date(now - 60000).toISOString();
 
     // 1. Trip with coordinates outside Kenya (e.g. London / lat 51.5, lon -0.12) -> FAILS
     await assertFails(
@@ -1326,7 +1373,20 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 3. Trip with timestamp 1 hour in the future -> FAILS
+    // 3. Trip with malformed coordinates -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_malformed_coords').set({
+        id: 'trip_malformed_coords',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        latitude: 'not-a-number' as any,
+        longitude: 36.817223,
+        startTime: validTime,
+      })
+    );
+
+    // 4. Trip with timestamp 1 hour in the future (> 5 min) -> FAILS
     await assertFails(
       passenger.firestore().collection('trips').doc('trip_future_time').set({
         id: 'trip_future_time',
@@ -1342,7 +1402,63 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 4. Violation with coordinates outside Kenya -> FAILS
+    // 5. Trip with timestamp older than 24 hours -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_too_old_time').set({
+        id: 'trip_too_old_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Thika',
+        status: 'active',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        startTime: pastTime,
+      })
+    );
+
+    // 6. Trip with raw ISO string instead of Timestamp -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_iso_string_time').set({
+        id: 'trip_iso_string_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        saccoName: 'SACCO A',
+        routeName: 'Nairobi - Thika',
+        status: 'active',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        startTime: isoStringTime,
+      })
+    );
+
+    // 7. Trip with negative speed -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_negative_speed').set({
+        id: 'trip_negative_speed',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        currentSpeedKmH: -10,
+        startTime: validTime,
+      })
+    );
+
+    // 8. Trip with speed > 180 km/h -> FAILS
+    await assertFails(
+      passenger.firestore().collection('trips').doc('trip_excessive_speed').set({
+        id: 'trip_excessive_speed',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        maxSpeedKmH: 220,
+        startTime: validTime,
+      })
+    );
+
+    // 9. Violation with coordinates outside Kenya -> FAILS
     await assertFails(
       passenger.firestore().collection('violations').doc('viol_out_of_kenya').set({
         id: 'viol_out_of_kenya',
@@ -1358,7 +1474,20 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 5. Violation with timestamp 1 hour in the future -> FAILS
+    // 10. Violation with malformed coordinates -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_malformed_coords').set({
+        id: 'viol_malformed_coords',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        latitude: 'bad_lat' as any,
+        longitude: 36.817223,
+        timestamp: validTime,
+      })
+    );
+
+    // 11. Violation with timestamp 1 hour in the future -> FAILS
     await assertFails(
       passenger.firestore().collection('violations').doc('viol_future_time').set({
         id: 'viol_future_time',
@@ -1374,7 +1503,36 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 6. Violation with physically impossible speed (> 180 km/h) -> FAILS
+    // 12. Violation with timestamp older than 24 hours -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_too_old_time').set({
+        id: 'viol_too_old_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 105,
+        speedLimitKmH: 80,
+        severity: 'high',
+        latitude: -1.286389,
+        longitude: 36.817223,
+        timestamp: pastTime,
+      })
+    );
+
+    // 13. Violation with raw ISO string instead of Timestamp -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_iso_string_time').set({
+        id: 'viol_iso_string_time',
+        userId: 'passenger_vt3',
+        vehicleRegNumber: 'KCA 111A',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: 95,
+        speedLimitKmH: 80,
+        timestamp: isoStringTime,
+      })
+    );
+
+    // 14. Violation with physically impossible speed (> 180 km/h) -> FAILS
     await assertFails(
       passenger.firestore().collection('violations').doc('viol_impossible_speed').set({
         id: 'viol_impossible_speed',
@@ -1390,7 +1548,19 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 7. Legitimate Trip within Kenya bounds and valid time -> SUCCEEDS
+    // 15. Violation with negative speed -> FAILS
+    await assertFails(
+      passenger.firestore().collection('violations').doc('viol_negative_speed').set({
+        id: 'viol_negative_speed',
+        userId: 'passenger_vt3',
+        saccoId: 'sacco_A',
+        recordedSpeedKmH: -20,
+        speedLimitKmH: 80,
+        timestamp: validTime,
+      })
+    );
+
+    // 16. Legitimate Trip within Kenya bounds and valid Timestamp -> SUCCEEDS
     await assertSucceeds(
       passenger.firestore().collection('trips').doc('trip_valid_kenya').set({
         id: 'trip_valid_kenya',
@@ -1409,7 +1579,7 @@ describe('Firestore Rules - Security & Tenant Isolation Audit', () => {
       })
     );
 
-    // 8. Legitimate Violation within Kenya bounds and valid time -> SUCCEEDS
+    // 17. Legitimate Violation within Kenya bounds and valid Timestamp -> SUCCEEDS
     await assertSucceeds(
       passenger.firestore().collection('violations').doc('viol_valid_kenya').set({
         id: 'viol_valid_kenya',

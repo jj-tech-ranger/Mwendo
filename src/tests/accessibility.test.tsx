@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { axe, toHaveNoViolations } from 'jest-axe';
+import axeCore from 'axe-core';
 import '../services/i18n';
 import { PassengerDashboard } from '../features/passenger/PassengerDashboard';
 import { PassengerShell } from '../components/shells/PassengerShell';
@@ -12,7 +12,10 @@ import { Input } from '../components/ui/Input';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useAuthStore } from '../store/useAuthStore';
 
-expect.extend(toHaveNoViolations);
+async function checkA11y(container: Element) {
+  const results = await axeCore.run(container);
+  expect(results.violations).toEqual([]);
+}
 
 describe('Accessibility Audit (axe-core)', () => {
   beforeEach(() => {
@@ -46,8 +49,7 @@ describe('Accessibility Audit (axe-core)', () => {
       </MemoryRouter>
     );
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('PassengerShell dashboard shell should have no accessibility violations', async () => {
@@ -61,8 +63,7 @@ describe('Accessibility Audit (axe-core)', () => {
       </MemoryRouter>
     );
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('SaccoShell dashboard shell should have no accessibility violations', async () => {
@@ -76,8 +77,7 @@ describe('Accessibility Audit (axe-core)', () => {
       </MemoryRouter>
     );
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('Input component with label should automatically associate label and input via useId and have no violations', async () => {
@@ -98,8 +98,7 @@ describe('Accessibility Audit (axe-core)', () => {
     expect(phoneInput).toBeDefined();
     expect(phoneInput.getAttribute('id')).toBeTruthy();
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('SearchInput component should have accessible label and no violations', async () => {
@@ -114,8 +113,7 @@ describe('Accessibility Audit (axe-core)', () => {
     const searchInput = getByLabelText('Search SACCOs or vehicles...');
     expect(searchInput).toBeDefined();
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('Input with error sets aria-invalid, role="alert", and links error id via aria-describedby (A11Y-005)', async () => {
@@ -141,8 +139,7 @@ describe('Accessibility Audit (axe-core)', () => {
     expect(alertElement.getAttribute('id')).toBe('driver-license-error');
     expect(alertElement.textContent).toBe('License number must be 8 characters long');
 
-    const results = await axe(container);
-    expect(results).toHaveNoViolations();
+    await checkA11y(container);
   });
 
   it('Input without error sets aria-invalid="false" and does not render alert', () => {

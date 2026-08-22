@@ -392,7 +392,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                   <select
                     id="inspect-governor-select"
                     value={speedGovernor}
-                    onChange={(e) => setSpeedGovernor(e.target.value as any)}
+                    onChange={(e) => setSpeedGovernor(e.target.value as 'valid' | 'tampered' | 'expired' | 'missing')}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none focus:ring-2 focus:ring-primary font-label-mono"
                   >
                     <option value="valid">Valid & Sealed</option>
@@ -409,7 +409,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                   <select
                     id="inspect-brake-select"
                     value={brakeStatus}
-                    onChange={(e) => setBrakeStatus(e.target.value as any)}
+                    onChange={(e) => setBrakeStatus(e.target.value as 'pass' | 'fail')}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none font-label-mono"
                   >
                     <option value="pass">Pass (Certified)</option>
@@ -422,7 +422,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                   <select
                     id="inspect-tire-select"
                     value={tireStatus}
-                    onChange={(e) => setTireStatus(e.target.value as any)}
+                    onChange={(e) => setTireStatus(e.target.value as 'pass' | 'fail')}
                     className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface focus:outline-none font-label-mono"
                   >
                     <option value="pass">Pass (&gt;1.6mm)</option>
@@ -436,7 +436,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 <select
                   id="inspect-overall-select"
                   value={overallResult}
-                  onChange={(e) => setOverallResult(e.target.value as any)}
+                  onChange={(e) => setOverallResult(e.target.value as 'passed' | 'failed' | 'impounded' | 'suspended')}
                   className="w-full mt-1 bg-surface-container border border-outline-variant/30 rounded-xl px-3 py-2 text-on-surface font-label-bold focus:outline-none"
                 >
                   <option value="passed">PASSED (Issue Certificate)</option>

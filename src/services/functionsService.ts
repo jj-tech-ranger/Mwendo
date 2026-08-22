@@ -1,6 +1,6 @@
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../lib/firebase';
+import { db, functions, auth } from '../lib/firebase';
 import { SeverityLevel, PlatformAnalyticsDaily, SaccoAnalyticsDaily } from '../types';
 import {
   calculateVehicleRiskScore,
@@ -485,8 +485,12 @@ export const functionsService = {
 
     for (const v of violations) {
       const eventId = `viol_${tripId}_${Date.now()}_${createdCount}`;
+      const ts = v.startTime ? Timestamp.fromDate(new Date(v.startTime)) : Timestamp.now();
+      const currentAuthUser = auth?.currentUser;
+
       await setDoc(doc(db, 'violations', eventId), {
         id: eventId,
+        ...(currentAuthUser?.uid ? { userId: currentAuthUser.uid } : {}),
         tripId,
         saccoId,
         vehicleRegNumber,
@@ -495,8 +499,8 @@ export const functionsService = {
         durationSec: v.durationSec,
         severity: v.maxSpeedKmH > 110 ? 'critical' : v.maxSpeedKmH > 95 ? 'high' : 'medium',
         status: 'pending',
-        timestamp: v.startTime,
-        createdAt: new Date().toISOString(),
+        timestamp: ts,
+        createdAt: Timestamp.now(),
       });
 
       // Trigger idempotent vehicle risk re-computation
@@ -604,7 +608,7 @@ export const functionsService = {
 
       if (validTimestamps.length >= config.maxAllowed) {
         const err = new Error(config.errorMessage);
-        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        (err as Error & { code?: string }).code = 'RATE_LIMIT_EXCEEDED';
         throw err;
       }
 
@@ -618,8 +622,9 @@ export const functionsService = {
         },
         { merge: true }
       );
-    } catch (e: any) {
-      if (e.message?.includes('RATE_LIMIT_EXCEEDED') || e.code === 'RATE_LIMIT_EXCEEDED') {
+    } catch (e: unknown) {
+      const errObj = e as { message?: string; code?: string };
+      if (errObj.message?.includes('RATE_LIMIT_EXCEEDED') || errObj.code === 'RATE_LIMIT_EXCEEDED') {
         throw e;
       }
       console.warn('[functionsService] Client rate limit check warning:', e);
@@ -631,31 +636,37 @@ export const functionsService = {
    * Dispatches black-spot hazard report with server-enforced rate limiting (Max 10 per 24h).
    */
   async reportBlackSpot(payload: {
-    id?: string;
-    title?: string;
-    description?: string;
-    hazardType?: string;
-    severity?: string;
-    locationName?: string;
-    routeName?: string;
-    county?: string;
-    location?: { lat: number; lng: number };
-    photoUrl?: string;
-    reportedByUid?: string;
-    reportedByDisplayName?: string;
+    id?: string | undefined;
+    title?: string | undefined;
+    description?: string | undefined;
+    hazardType?: string | undefined;
+    severity?: string | undefined;
+    locationName?: string | undefined;
+    routeName?: string | undefined;
+    county?: string | undefined;
+    location?: { lat: number; lng: number } | undefined;
+    photoUrl?: string | undefined;
+    reportedByUid?: string | undefined;
+    reportedByUserId?: string | undefined;
+    reportedByDisplayName?: string | undefined;
+    status?: string | undefined;
+    corroborationsCount?: number | undefined;
+    createdAt?: string | undefined;
+    updatedAt?: string | undefined;
   }): Promise<{ success: boolean; spotId: string }> {
     try {
       const callable = httpsCallable<typeof payload, { success: boolean; spotId: string }>(functions, 'reportBlackSpot');
       const res = await callable(payload);
       return res.data;
-    } catch (remoteErr: any) {
+    } catch (remoteErr: unknown) {
+      const errObj = remoteErr as { message?: string; code?: string; details?: { code?: string } };
       if (
-        remoteErr?.message?.includes('RATE_LIMIT_EXCEEDED') ||
-        remoteErr?.code === 'resource-exhausted' ||
-        remoteErr?.details?.code === 'RATE_LIMIT_EXCEEDED'
+        errObj?.message?.includes('RATE_LIMIT_EXCEEDED') ||
+        errObj?.code === 'resource-exhausted' ||
+        errObj?.details?.code === 'RATE_LIMIT_EXCEEDED'
       ) {
-        const err = new Error(remoteErr.message || 'RATE_LIMIT_EXCEEDED: Maximum 10 hazard reports permitted per 24 hours.');
-        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        const err = new Error(errObj.message || 'RATE_LIMIT_EXCEEDED: Maximum 10 hazard reports permitted per 24 hours.');
+        (err as Error & { code?: string }).code = 'RATE_LIMIT_EXCEEDED';
         throw err;
       }
       console.warn('[functionsService] Remote reportBlackSpot failed, executing client fallback:', remoteErr);
@@ -737,14 +748,15 @@ export const functionsService = {
       }>(functions, 'sendSOS');
       const res = await callable(payload);
       return res.data;
-    } catch (remoteErr: any) {
+    } catch (remoteErr: unknown) {
+      const errObj = remoteErr as { message?: string; code?: string; details?: { code?: string } };
       if (
-        remoteErr?.message?.includes('RATE_LIMIT_EXCEEDED') ||
-        remoteErr?.code === 'resource-exhausted' ||
-        remoteErr?.details?.code === 'RATE_LIMIT_EXCEEDED'
+        errObj?.message?.includes('RATE_LIMIT_EXCEEDED') ||
+        errObj?.code === 'resource-exhausted' ||
+        errObj?.details?.code === 'RATE_LIMIT_EXCEEDED'
       ) {
-        const err = new Error(remoteErr.message || 'RATE_LIMIT_EXCEEDED: Maximum 3 SOS alerts permitted per hour.');
-        (err as any).code = 'RATE_LIMIT_EXCEEDED';
+        const err = new Error(errObj.message || 'RATE_LIMIT_EXCEEDED: Maximum 3 SOS alerts permitted per hour.');
+        (err as Error & { code?: string }).code = 'RATE_LIMIT_EXCEEDED';
         throw err;
       }
       console.warn('[functionsService] Remote sendSOS failed or offline, executing client fallback:', remoteErr);

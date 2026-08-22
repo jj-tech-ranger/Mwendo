@@ -9,14 +9,39 @@ import { db } from '../../lib/firebase';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 
+interface LiveTripItem {
+  id: string;
+  plateNumber: string;
+  driverName: string;
+  routeName: string;
+  currentSpeedKmH: number;
+  status: string;
+  passengers: number;
+  isOverspeeding: boolean;
+  latitude: number;
+  longitude: number;
+  heading: number;
+}
+
+interface IncidentItem {
+  id: string;
+  type: string;
+  severity: 'low' | 'medium' | 'high';
+  plate: string;
+  time: string;
+  speed: string;
+  location: string;
+  acknowledged?: boolean;
+}
+
 export const SaccoLiveTripsScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
   const [activeTab, setActiveTab] = useState<'map' | 'incidents'>('map');
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
-  const [incidents, setIncidents] = useState<any[]>([]);
-  const [trips, setTrips] = useState<any[]>([]);
+  const [incidents, setIncidents] = useState<IncidentItem[]>([]);
+  const [trips, setTrips] = useState<LiveTripItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

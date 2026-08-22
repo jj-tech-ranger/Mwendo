@@ -30,15 +30,17 @@ service firebase.storage {
         request.auth.token.activeRole == 'admin' ||
         request.auth.token.activeRole == 'authority' ||
         (request.auth.token.activeRole == 'sacco_manager' && request.auth.token.saccoId == saccoId) ||
-        firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid
+        (firestore.exists(/databases/(default)/documents/complaints/$(complaintId)) &&
+         firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid)
       );
       allow create: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('(image/(jpeg|png|webp|jpg)|video/(mp4|webm|quicktime))')
                    && (
-                     firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid ||
                      request.auth.token.activeRole == 'admin' ||
-                     request.auth.token.activeRole == 'authority'
+                     request.auth.token.activeRole == 'authority' ||
+                     (firestore.exists(/databases/(default)/documents/complaints/$(complaintId)) &&
+                      firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid)
                    );
       allow update, delete: if request.auth != null && (
         request.auth.token.activeRole == 'admin' ||
@@ -52,7 +54,12 @@ service firebase.storage {
       allow create: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)')
-                   && firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid;
+                   && (
+                     request.auth.token.activeRole == 'admin' ||
+                     request.auth.token.activeRole == 'authority' ||
+                     (firestore.exists(/databases/(default)/documents/black_spots/$(spotId)) &&
+                      firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid)
+                   );
       allow update, delete: if request.auth != null && (
         request.auth.token.activeRole == 'admin' ||
         request.auth.token.activeRole == 'authority'

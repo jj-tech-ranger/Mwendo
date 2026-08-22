@@ -65,9 +65,10 @@ export const RegisterScreen: React.FC = () => {
     try {
       await authService.registerWithEmail(data.email, data.password, data.fullName, 'passenger');
       navigate('/passenger');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Registration error:', err);
-      setErrorMsg(err.message || 'Registration failed. Please try again.');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setErrorMsg(errMsg || 'Registration failed. Please try again.');
     }
   };
 
@@ -77,7 +78,7 @@ export const RegisterScreen: React.FC = () => {
     try {
       await authService.signInWithGoogle();
       navigate('/passenger');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Google register error:', err);
       setErrorMsg('Failed to register with Google');
     } finally {

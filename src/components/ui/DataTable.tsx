@@ -52,10 +52,15 @@ export function DataTable<T extends { id: string }>({
   const sortedData = useMemo(() => {
     if (!sortKey) return filteredData;
     return [...filteredData].sort((a, b) => {
-      const aVal = (a as any)[sortKey];
-      const bVal = (b as any)[sortKey];
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      const aVal = (a as unknown as Record<string, unknown>)[sortKey];
+      const bVal = (b as unknown as Record<string, unknown>)[sortKey];
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      const strA = String(aVal ?? '');
+      const strB = String(bVal ?? '');
+      if (strA < strB) return sortDirection === 'asc' ? -1 : 1;
+      if (strA > strB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
   }, [filteredData, sortKey, sortDirection]);
@@ -151,7 +156,7 @@ export function DataTable<T extends { id: string }>({
                 >
                   {columns.map((col) => (
                     <td key={col.key} className="px-md py-3.5">
-                      {col.render ? col.render(row) : String((row as any)[col.key] ?? '—')}
+                      {col.render ? col.render(row) : String((row as unknown as Record<string, unknown>)[col.key] ?? '—')}
                     </td>
                   ))}
                 </tr>

@@ -12,6 +12,7 @@ import {
   vehicleRepository,
 } from '../../repositories';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+import { toStandardDate } from '../../lib/utils';
 
 export const AuthorityReportsScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -86,7 +87,7 @@ export const AuthorityReportsScreen: React.FC = () => {
   // Filtered dataset for active window and jurisdiction
   const filteredTrips = useMemo(() => {
     return allTrips.filter((t) => {
-      const tripTime = new Date(t.startTime || t.createdAt || 0).getTime();
+      const tripTime = toStandardDate(t.startTime || t.createdAt || 0).getTime();
       if (tripTime < periodStartMs) return false;
       if (selectedScope !== 'All Kenya (National)') {
         return matchesScope(t.origin || t.destination, t.routeName);
@@ -97,7 +98,7 @@ export const AuthorityReportsScreen: React.FC = () => {
 
   const filteredViolations = useMemo(() => {
     return allViolations.filter((v) => {
-      const vTime = new Date(v.timestamp).getTime();
+      const vTime = toStandardDate(v.timestamp).getTime();
       if (vTime < periodStartMs) return false;
       if (selectedScope !== 'All Kenya (National)') {
         return matchesScope(v.locationName, v.routeName);
@@ -108,7 +109,7 @@ export const AuthorityReportsScreen: React.FC = () => {
 
   const prevMetrics = useMemo(() => {
     const prevViolations = allViolations.filter((v) => {
-      const vTime = new Date(v.timestamp).getTime();
+      const vTime = toStandardDate(v.timestamp).getTime();
       if (vTime < prevPeriodStartMs || vTime >= prevPeriodEndMs) return false;
       if (selectedScope !== 'All Kenya (National)') {
         return matchesScope(v.locationName, v.routeName);
@@ -214,7 +215,7 @@ export const AuthorityReportsScreen: React.FC = () => {
   const speedTrendData = useMemo(() => {
     if (filteredViolations.length === 0) return [];
     const grouped = filteredViolations.reduce((acc, v) => {
-      const dateKey = new Date(v.timestamp).toLocaleDateString('en-US', {
+      const dateKey = toStandardDate(v.timestamp).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       });

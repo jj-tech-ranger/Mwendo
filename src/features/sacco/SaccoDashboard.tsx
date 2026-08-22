@@ -9,13 +9,30 @@ import { calculateSaccoSafetyScore } from '../../lib/engine';
 import { where } from 'firebase/firestore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+import { toStandardDate } from '../../lib/utils';
+import { Trip } from '../../types';
+
+interface RecentReportItem {
+  id: string;
+  title: string;
+  route: string;
+  severity: 'low' | 'medium' | 'high';
+  time: string;
+}
+
+interface RouteRankingItem {
+  name: string;
+  violations: number;
+  riskScore: number;
+  status: 'low' | 'medium' | 'high';
+}
 
 export const SaccoDashboard: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
 
-  const [recentReports] = useState<any[]>([]);
-  const [routeRankings] = useState<any[]>([]);
+  const [recentReports] = useState<RecentReportItem[]>([]);
+  const [routeRankings] = useState<RouteRankingItem[]>([]);
 
   const { data: stats = {
     totalTrips: 0,
@@ -23,7 +40,7 @@ export const SaccoDashboard: React.FC = () => {
     highRiskVehicles: 0,
     activePilots: 0,
     safetyScore: null,
-    trips: [],
+    trips: [] as Trip[],
   }, isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoDashboardStats', saccoId],
     queryFn: async () => {
@@ -63,7 +80,7 @@ export const SaccoDashboard: React.FC = () => {
       // Group trips by day for trend
       const dailyTripsMap: { [key: string]: { count: number; totalSpeed: number } } = {};
       trips.forEach((t) => {
-        const dateKey = (t.startTime || t.createdAt || '').split('T')[0] || 'today';
+        const dateKey = toStandardDate(t.startTime || t.createdAt).toISOString().split('T')[0] || 'today';
         if (!dailyTripsMap[dateKey]) {
           dailyTripsMap[dateKey] = { count: 0, totalSpeed: 0 };
         }
@@ -200,8 +217,8 @@ export const SaccoDashboard: React.FC = () => {
               </div>
 
               <div className="flex items-end justify-between h-32 gap-1 pt-4">
-                {stats.trips.slice(-20).map((t: any, i: number) => {
-                  const speed = t.currentSpeedKmH || t.averageSpeedKmH || 40;
+                {stats.trips.slice(-20).map((t: Trip, i: number) => {
+                  const speed = t.currentSpeedKmH || t.avgSpeedKmH || 40;
                   return (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                       <div

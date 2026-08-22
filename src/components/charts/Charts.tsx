@@ -51,7 +51,7 @@ const CHART_TOOLTIP_STYLE: React.CSSProperties = {
  * 1. LineChartWrapper
  * ========================================== */
 export interface LineChartProps extends CommonChartProps {
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   xKey: string;
   lines: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }
@@ -109,7 +109,7 @@ export const LineChartWrapper: React.FC<LineChartProps> = ({
  * 2. AreaChartWrapper
  * ========================================== */
 export interface AreaChartProps extends CommonChartProps {
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   xKey: string;
   areas: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }
@@ -178,7 +178,7 @@ export const AreaChartWrapper: React.FC<AreaChartProps> = ({
  * 3. BarChartWrapper
  * ========================================== */
 export interface BarChartProps extends CommonChartProps {
-  data: Array<Record<string, any>>;
+  data: Array<Record<string, unknown>>;
   xKey: string;
   bars: Array<{ key: string; name?: string | undefined; color?: string | undefined }>;
 }

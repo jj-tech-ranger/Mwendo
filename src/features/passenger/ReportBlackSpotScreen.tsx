@@ -65,7 +65,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
     try {
       if (navigator.onLine) {
         // SEC-005: Create black spot doc first, then upload evidence file under spotId
-        await functionsService.reportBlackSpot(newReport as any);
+        await functionsService.reportBlackSpot(newReport);
 
         if (photoFile) {
           try {
@@ -81,9 +81,10 @@ export const ReportBlackSpotScreen: React.FC = () => {
         await offlineSyncService.updatePendingCount();
         setStep(4);
       }
-    } catch (err: any) {
-      if (err.message?.includes('RATE_LIMIT_EXCEEDED') || err.code === 'RATE_LIMIT_EXCEEDED') {
-        setRateLimitError(err.message || 'Rate limit exceeded: Maximum 10 hazard reports per 24 hours allowed.');
+    } catch (err: unknown) {
+      const errObj = err as { message?: string; code?: string };
+      if (errObj.message?.includes('RATE_LIMIT_EXCEEDED') || errObj.code === 'RATE_LIMIT_EXCEEDED') {
+        setRateLimitError(errObj.message || 'Rate limit exceeded: Maximum 10 hazard reports per 24 hours allowed.');
         return;
       }
       console.warn('Network write failed, saving to offline buffer:', err);
@@ -151,7 +152,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs font-mono">
           <button
-            onClick={() => (step > 1 ? setStep((step - 1) as any) : navigate('/passenger'))}
+            onClick={() => (step > 1 ? setStep((step - 1) as 1 | 2 | 3 | 4) : navigate('/passenger'))}
             className="flex items-center text-on-surface-variant hover:text-on-surface"
           >
             <span className="material-symbols-outlined text-base">arrow_back</span>
@@ -221,15 +222,15 @@ export const ReportBlackSpotScreen: React.FC = () => {
             <label className="text-xs font-bold text-on-surface block">Hazard Type</label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
-                { id: 'accident_prone', label: 'Accident Prone' },
-                { id: 'pothole', label: 'Deep Pothole' },
-                { id: 'carjacking_risk', label: 'Carjacking Risk' },
-                { id: 'poor_lighting', label: 'Poor Lighting' },
-                { id: 'unmarked_bump', label: 'Unmarked Bump' },
+                { id: 'accident_prone' as const, label: 'Accident Prone' },
+                { id: 'pothole' as const, label: 'Deep Pothole' },
+                { id: 'carjacking_risk' as const, label: 'Carjacking Risk' },
+                { id: 'poor_lighting' as const, label: 'Poor Lighting' },
+                { id: 'unmarked_bump' as const, label: 'Unmarked Bump' },
               ].map((type) => (
                 <button
                   key={type.id}
-                  onClick={() => setHazardType(type.id as any)}
+                  onClick={() => setHazardType(type.id)}
                   className={`p-2.5 rounded-xl text-xs font-semibold border text-center transition-all ${
                     hazardType === type.id
                       ? 'bg-primary text-on-primary border-primary shadow-sm'
@@ -307,13 +308,13 @@ export const ReportBlackSpotScreen: React.FC = () => {
 
           <div className="space-y-3">
             {[
-              { id: 'low', label: 'Low Severity', desc: 'Minor inconvenience; slow down', color: 'border-amber-400 text-amber-800' },
-              { id: 'medium', label: 'Medium Severity', desc: 'Moderate accident risk or vehicle damage', color: 'border-amber-600 text-amber-900' },
-              { id: 'high', label: 'High Severity', desc: 'Immediate crash threat; urgent warning', color: 'border-error text-error' },
+              { id: 'low' as const, label: 'Low Severity', desc: 'Minor inconvenience; slow down', color: 'border-amber-400 text-amber-800' },
+              { id: 'medium' as const, label: 'Medium Severity', desc: 'Moderate accident risk or vehicle damage', color: 'border-amber-600 text-amber-900' },
+              { id: 'high' as const, label: 'High Severity', desc: 'Immediate crash threat; urgent warning', color: 'border-error text-error' },
             ].map((sev) => (
               <div
                 key={sev.id}
-                onClick={() => setSeverity(sev.id as any)}
+                onClick={() => setSeverity(sev.id)}
                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   severity === sev.id
                     ? `${sev.color} bg-surface-container-high shadow-md font-bold`
