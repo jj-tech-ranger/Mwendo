@@ -7,9 +7,12 @@ import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { userRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useTripStore } from '../../store/useTripStore';
 import { authService } from '../../services/authService';
 import { functionsService } from '../../services/functionsService';
 import { messagingService } from '../../services/messagingService';
+import { offlineStorage } from '../../services/offlineStorage';
+import { offlineSyncService } from '../../services/offlineSyncService';
 import { UserProfile } from '../../types';
 
 interface ContactItem {
@@ -18,6 +21,74 @@ interface ContactItem {
   relationship: string;
   phone: string;
 }
+
+/**
+ * Resolves current GPS fix with a 3-second timeout, falling back to cached position
+ * from active trip tracking or local offline storage.
+ * Returns null if no GPS position is available (never fabricates fixed coordinates).
+ */
+export const getCurrentPositionWithFallback = async (): Promise<{ lat: number; lng: number } | null> => {
+  // 1. Try real GPS via navigator.geolocation with 3s timeout
+  if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 3000,
+          maximumAge: 10000,
+        });
+      });
+      if (
+        position &&
+        position.coords &&
+        typeof position.coords.latitude === 'number' &&
+        typeof position.coords.longitude === 'number'
+      ) {
+        offlineStorage.setItem('last_known_gps_position', {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          timestamp: Date.now(),
+        }).catch(() => {});
+        return {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+      }
+    } catch (geoErr) {
+      console.warn('[EmergencySosScreen] Live geolocation timed out or denied, falling back to cache:', geoErr);
+    }
+  }
+
+  // 2. Fallback: Check useTripStore routeCoordinates or telemetry
+  const tripState = useTripStore.getState();
+  if (tripState.routeCoordinates && tripState.routeCoordinates.length > 0) {
+    const lastCoord = tripState.routeCoordinates[tripState.routeCoordinates.length - 1];
+    if (lastCoord) {
+      const lat = typeof lastCoord.latitude === 'number' ? lastCoord.latitude : (lastCoord as unknown as { lat: number }).lat;
+      const lng = typeof lastCoord.longitude === 'number' ? lastCoord.longitude : (lastCoord as unknown as { lng: number }).lng;
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        return { lat, lng };
+      }
+    }
+  }
+
+  // 3. Fallback: Check offlineStorage cached GPS
+  try {
+    const cachedGps = await offlineStorage.getItem<{ lat?: number; lng?: number; latitude?: number; longitude?: number }>('last_known_gps_position');
+    if (cachedGps) {
+      const lat = typeof cachedGps.lat === 'number' ? cachedGps.lat : cachedGps.latitude;
+      const lng = typeof cachedGps.lng === 'number' ? cachedGps.lng : cachedGps.longitude;
+      if (typeof lat === 'number' && typeof lng === 'number') {
+        return { lat, lng };
+      }
+    }
+  } catch (cacheErr) {
+    console.warn('[EmergencySosScreen] Error reading cached GPS from offline storage:', cacheErr);
+  }
+
+  // 4. No position fix available (do not fabricate)
+  return null;
+};
 
 export const EmergencySosScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -29,9 +100,12 @@ export const EmergencySosScreen: React.FC = () => {
   const [isDispatching, setIsDispatching] = useState(false);
   const [activeTab, setActiveTab] = useState<'sos' | 'contacts' | 'tips'>('sos');
   const [dispatchedSummary, setDispatchedSummary] = useState<{
-    contacts: Array<{ name: string; relationship: string; status: string }>;
+    contacts: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' | 'queued' | string }>;
     fcmTargets: string[];
     alertId?: string;
+    location?: { lat: number; lng: number } | null;
+    isBackupActive?: boolean;
+    errorMessage?: string;
   } | null>(null);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
 
@@ -72,26 +146,45 @@ export const EmergencySosScreen: React.FC = () => {
     setRateLimitError(null);
     const alertId = `sos_${Date.now()}`;
     const userId = user?.uid || user?.id || 'passenger_me';
-    const location = { lat: -1.286389, lng: 36.817223 };
 
-    // 1. Primary Backend Dispatch: Trigger sendSOS Cloud Function
-    // Notifies saved emergency contacts via SMS and SACCO Manager / Authority via FCM push notification
+    // 0. Resolve real GPS fix with 3s timeout or cached position
+    const location = await getCurrentPositionWithFallback();
+
+    // 1. Resolve real active trip & telemetry from useTripStore
+    const tripState = useTripStore.getState();
+    const activeTrip = tripState.activeTrip;
+    const vehicleRegNumber = activeTrip?.vehicleRegNumber || activeTrip?.plateNumber || (tripState.plateNumber ? tripState.plateNumber : undefined);
+    const saccoId = activeTrip?.saccoId || user?.saccoId || undefined;
+    const speedKmH = tripState.isTracking ? Math.round(tripState.currentSpeed) : undefined;
+    const tripId = activeTrip?.id || activeTrip?.tripId || undefined;
+
+    const tripContext = vehicleRegNumber ? `on vehicle ${vehicleRegNumber}` : '(no active trip)';
+    const sosMessage = `EMERGENCY SOS: Passenger ${user?.displayName || 'Commuter'} triggered urgent safety broadcast ${tripContext}`;
+
+    // 2. Primary Backend Dispatch: Trigger sendSOS Cloud Function
     try {
       const result = await functionsService.sendSOS({
         alertId,
+        tripId,
         userId,
-        vehicleRegNumber: 'KCE 450Z',
-        saccoId: user?.saccoId || 'sacco_super_metro',
-        location,
-        speedKmH: 82,
-        message: `EMERGENCY SOS: Passenger ${user?.displayName || 'Commuter'} triggered urgent safety broadcast`,
+        vehicleRegNumber,
+        saccoId,
+        location: location ?? undefined,
+        speedKmH,
+        message: sosMessage,
       });
 
-      setDispatchedSummary({
-        contacts: result.contactsSummary || contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
-        fcmTargets: ['SACCO Operations Dispatch', 'NTSA Safety Control Center'],
-        alertId,
-      });
+      if (result && result.success) {
+        setDispatchedSummary({
+          contacts: result.contactsSummary || contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
+          fcmTargets: ['SACCO Operations Dispatch', 'NTSA Safety Control Center'],
+          alertId,
+          location,
+          isBackupActive: false,
+        });
+      } else {
+        throw new Error('SOS dispatch failed — using backup channels');
+      }
     } catch (fnErr: unknown) {
       const errObj = fnErr as { message?: string; code?: string };
       if (errObj.message?.includes('RATE_LIMIT_EXCEEDED') || errObj.code === 'RATE_LIMIT_EXCEEDED') {
@@ -99,28 +192,52 @@ export const EmergencySosScreen: React.FC = () => {
         setRateLimitError(errObj.message || 'Rate limit exceeded: Maximum 3 SOS triggers per hour allowed.');
         return;
       }
+
       console.warn('[EmergencySosScreen] sendSOS function error, local fallback active:', fnErr);
+
+      // Queue alert for background retry
+      try {
+        await offlineStorage.setItem(`offline_report_sos_${alertId}`, {
+          alertId,
+          tripId,
+          userId,
+          vehicleRegNumber,
+          saccoId,
+          location: location ?? undefined,
+          speedKmH,
+          timestamp: new Date().toISOString(),
+          type: 'sos',
+          status: 'queued',
+        });
+        await offlineSyncService.updatePendingCount();
+      } catch (queueErr) {
+        console.warn('[EmergencySosScreen] Error queueing offline SOS alert:', queueErr);
+      }
+
       setDispatchedSummary({
-        contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
-        fcmTargets: ['SACCO Operations Dispatch (Local)', 'NTSA Emergency Portal'],
+        contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
+        fcmTargets: [],
         alertId,
+        location,
+        isBackupActive: true,
+        errorMessage: 'SOS dispatch failed — using backup channels',
       });
     }
 
-    // 2. Trigger browser native notification if permitted
+    // 3. Trigger browser native notification if permitted
     try {
       await messagingService.dispatchSOSAlertPush({
         id: alertId,
-        tripId: `trip_${alertId}`,
+        tripId: tripId || `trip_${alertId}`,
         userId,
-        vehicleRegNumber: 'KCE 450Z',
-        saccoId: user?.saccoId || 'sacco_super_metro',
+        vehicleRegNumber: vehicleRegNumber || 'Vehicle In Transit',
+        saccoId: saccoId || 'unassigned',
         type: 'sos',
         severity: 'critical',
-        message: 'Emergency SOS activated by passenger',
-        latitude: location.lat,
-        longitude: location.lng,
-        speedKmH: 82,
+        message: sosMessage,
+        latitude: location?.lat ?? 0,
+        longitude: location?.lng ?? 0,
+        speedKmH: speedKmH ?? 0,
         timestamp: new Date().toISOString(),
         status: 'active',
       });
@@ -128,10 +245,14 @@ export const EmergencySosScreen: React.FC = () => {
       console.warn('[EmergencySosScreen] Local notification trigger error:', msgErr);
     }
 
-    // 3. Trigger supplementary local SMS deep-link fallback per architecture §12
-    const sosMessage = encodeURIComponent('EMERGENCY SOS: I need immediate assistance on my PSV journey! Live GPS location active: https://maps.google.com/?q=-1.286389,36.817223');
+    // 4. Trigger supplementary local SMS deep-link fallback per architecture §12
+    const mapsLink = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : 'Location unavailable';
+    const vehicleNotice = vehicleRegNumber ? ` on PSV ${vehicleRegNumber}` : '';
+    const smsFallbackBody = encodeURIComponent(
+      `EMERGENCY SOS: I need immediate assistance${vehicleNotice}! Live GPS: ${mapsLink}`
+    );
     try {
-      window.location.href = `sms:999?body=${sosMessage}`;
+      window.location.href = `sms:999?body=${smsFallbackBody}`;
     } catch (smsDeepLinkErr) {
       console.warn('[EmergencySosScreen] SMS deep-link fallback trigger:', smsDeepLinkErr);
     }
@@ -329,57 +450,128 @@ export const EmergencySosScreen: React.FC = () => {
             </Card>
           ) : sosSent ? (
             /* SOS Sent Confirmation */
-            <Card className="p-6 bg-emerald-500/10 border border-emerald-500/30 space-y-4 text-left">
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-emerald-600 text-3xl">verified</span>
-                <div>
-                  <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-200">
-                    Emergency Alert Dispatched
-                  </h2>
-                  <p className="text-xs text-emerald-800 dark:text-emerald-300">
-                    Live GPS location & telemetry broadcast active.
+            dispatchedSummary?.isBackupActive ? (
+              /* Failure / Backup Channels Active Card */
+              <Card className="p-6 bg-amber-500/10 border border-amber-500/30 space-y-4 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-amber-600 text-3xl">warning</span>
+                  <div>
+                    <h2 className="text-base font-bold text-amber-900 dark:text-amber-200">
+                      SOS dispatch failed — using backup channels
+                    </h2>
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      {dispatchedSummary?.location
+                        ? `Live GPS fix (${dispatchedSummary.location.lat.toFixed(4)}, ${dispatchedSummary.location.lng.toFixed(4)}) recorded.`
+                        : 'Location unavailable (No GPS fix acquired).'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl">
+                  <div className="text-xs font-bold text-on-surface uppercase mb-1">Backup Dispatch Channels:</div>
+                  <div className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-xs">sync</span>
+                    SOS alert queued for retry (offline sync active)
+                  </div>
+                  {dispatchedSummary?.contacts.map((c, idx) => (
+                    <div key={idx} className="text-on-surface-variant font-medium flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-xs text-amber-600">schedule</span>
+                      SMS to {c.name} ({c.relationship}): <span className="text-amber-700 dark:text-amber-300 font-bold">Queued — will retry</span>
+                    </div>
+                  ))}
+                  <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-xs">sms</span>
+                    Direct SMS (sms:999) composer triggered on device
+                  </div>
+                </div>
+
+                {/* Hotlines Banner */}
+                <div className="p-3 bg-surface-container rounded-xl text-xs space-y-2">
+                  <div className="font-bold text-on-surface flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm text-error">phone_in_talk</span>
+                    Immediate Direct Emergency Hotlines
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <a
+                      href="tel:999"
+                      className="p-2.5 rounded-lg bg-error text-white font-bold flex items-center justify-between text-xs hover:bg-error/90"
+                    >
+                      <span>Call Police (999)</span>
+                      <span className="material-symbols-outlined text-sm">call</span>
+                    </a>
+                    <a
+                      href="tel:0800720822"
+                      className="p-2.5 rounded-lg bg-surface border border-outline-variant font-bold flex items-center justify-between text-xs hover:bg-surface-container-high"
+                    >
+                      <span>Call NTSA (0800720822)</span>
+                      <span className="material-symbols-outlined text-sm">call</span>
+                    </a>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full text-xs font-bold bg-surface-container-highest text-on-surface"
+                  onClick={() => setSosSent(false)}
+                >
+                  Dismiss / Back to SOS
+                </Button>
+              </Card>
+            ) : (
+              /* Success Card */
+              <Card className="p-6 bg-emerald-500/10 border border-emerald-500/30 space-y-4 text-left">
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-emerald-600 text-3xl">verified</span>
+                  <div>
+                    <h2 className="text-base font-bold text-emerald-900 dark:text-emerald-200">
+                      Emergency Alert Dispatched
+                    </h2>
+                    <p className="text-xs text-emerald-800 dark:text-emerald-300">
+                      {dispatchedSummary?.location
+                        ? `Live GPS location (${dispatchedSummary.location.lat.toFixed(4)}, ${dispatchedSummary.location.lng.toFixed(4)}) & telemetry broadcast active.`
+                        : 'Alert dispatched (location unavailable).'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl">
+                  <div className="text-xs font-bold text-on-surface uppercase mb-1">Dispatched Channels:</div>
+                  {dispatchedSummary?.contacts.map((c, idx) => (
+                    <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-xs">sms</span>
+                      Sent SMS to {c.name} ({c.relationship})
+                    </div>
+                  ))}
+                  {dispatchedSummary?.fcmTargets.map((tgt, idx) => (
+                    <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-xs">notifications_active</span>
+                      FCM Push alert to {tgt}
+                    </div>
+                  ))}
+                  <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-xs">shield</span>
+                    Logged to NTSA Safety Incident Portal
+                  </div>
+                </div>
+
+                {/* Supplementary SMS deep-link notice */}
+                <div className="p-3 bg-surface-container rounded-xl text-xs space-y-1 text-on-surface-variant">
+                  <div className="font-bold text-on-surface flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">signal_cellular_alt</span>
+                    Supplementary Local Fallback
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Your device SMS composer was also prepared for 999 as a secondary network-independent emergency backup.
                   </p>
                 </div>
-              </div>
 
-              <div className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl">
-                <div className="text-xs font-bold text-on-surface uppercase mb-1">Dispatched Channels:</div>
-                {dispatchedSummary?.contacts.map((c, idx) => (
-                  <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">sms</span>
-                    Sent SMS to {c.name} ({c.relationship})
-                  </div>
-                ))}
-                {dispatchedSummary?.fcmTargets.map((tgt, idx) => (
-                  <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">notifications_active</span>
-                    FCM Push alert to {tgt}
-                  </div>
-                ))}
-                <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-xs">shield</span>
-                  Logged to NTSA Safety Incident Portal
-                </div>
-              </div>
-
-              {/* Supplementary SMS deep-link notice */}
-              <div className="p-3 bg-surface-container rounded-xl text-xs space-y-1 text-on-surface-variant">
-                <div className="font-bold text-on-surface flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">signal_cellular_alt</span>
-                  Supplementary Local Fallback
-                </div>
-                <p className="text-[11px] leading-relaxed">
-                  Your device SMS composer was also prepared for 999 as a secondary network-independent emergency backup.
-                </p>
-              </div>
-
-              <Button
-                className="w-full text-xs font-bold bg-emerald-700 text-white"
-                onClick={() => setSosSent(false)}
-              >
-                I'm Safe Now — Cancel Broadcast
-              </Button>
-            </Card>
+                <Button
+                  className="w-full text-xs font-bold bg-emerald-700 text-white"
+                  onClick={() => setSosSent(false)}
+                >
+                  I'm Safe Now — Cancel Broadcast
+                </Button>
+              </Card>
+            )
           ) : (
             /* Normal Hold-to-Alert Button */
             <div className="space-y-6">

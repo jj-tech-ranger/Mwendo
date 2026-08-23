@@ -680,8 +680,16 @@ export const functionsService = {
 
       const spotId = payload.id || `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const now = new Date().toISOString();
-      const lat = payload.location?.lat ?? -1.286389;
-      const lng = payload.location?.lng ?? 36.817223;
+      const lat = payload.location?.lat;
+      const lng = payload.location?.lng;
+      if (
+        typeof lat !== 'number' ||
+        typeof lng !== 'number' ||
+        !Number.isFinite(lat) ||
+        !Number.isFinite(lng)
+      ) {
+        throw new Error('A valid location is required.');
+      }
 
       const newReport = {
         id: spotId,
@@ -721,14 +729,14 @@ export const functionsService = {
    * Dispatches emergency SMS to saved contacts, sends FCM push notification, and writes to safety_alerts.
    */
   async sendSOS(payload: {
-    alertId?: string;
-    tripId?: string;
-    userId?: string;
-    vehicleRegNumber?: string;
-    saccoId?: string;
-    location?: { lat: number; lng: number };
-    speedKmH?: number;
-    message?: string;
+    alertId?: string | undefined;
+    tripId?: string | undefined;
+    userId?: string | undefined;
+    vehicleRegNumber?: string | undefined;
+    saccoId?: string | undefined;
+    location?: { lat: number; lng: number } | undefined;
+    speedKmH?: number | undefined;
+    message?: string | undefined;
   }): Promise<{
     success: boolean;
     alertId: string;
@@ -770,22 +778,26 @@ export const functionsService = {
 
       const alertId = payload.alertId || `sos_${Date.now()}`;
       const userRef = doc(db, 'users', userId);
-      const userSnap = await getDoc(userRef);
-      const userData = userSnap.data() || {};
-      const emergencyContacts = userData.emergencyContacts || [];
+      let emergencyContacts: Array<{ name: string; relationship: string; phone?: string }> = [];
+      try {
+        const userSnap = await getDoc(userRef);
+        const userData = userSnap.data() || {};
+        emergencyContacts = userData.emergencyContacts || [];
+      } catch (userErr) {
+        console.warn('[functionsService] Unable to load emergency contacts in client fallback:', userErr);
+      }
 
       const contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }> = [];
-
       for (const c of emergencyContacts) {
         contactsSummary.push({
           name: c.name,
           relationship: c.relationship,
-          status: 'dispatched',
+          status: 'failed',
         });
       }
 
       // Save alert to safety_alerts
-      const alertData = {
+      const alertData: Record<string, unknown> = {
         id: alertId,
         tripId: payload.tripId || `trip_${alertId}`,
         userId,
@@ -794,13 +806,17 @@ export const functionsService = {
         type: 'sos',
         severity: 'critical',
         message: payload.message || 'Emergency SOS activated by passenger',
-        latitude: payload.location?.lat ?? -1.286389,
-        longitude: payload.location?.lng ?? 36.817223,
         speedKmH: payload.speedKmH ?? 0,
         timestamp: new Date().toISOString(),
         status: 'active',
         emergencyContactsCount: emergencyContacts.length,
       };
+
+      if (payload.location && typeof payload.location.lat === 'number' && typeof payload.location.lng === 'number') {
+        alertData.latitude = payload.location.lat;
+        alertData.longitude = payload.location.lng;
+        alertData.location = payload.location;
+      }
 
       try {
         await setDoc(doc(db, 'safety_alerts', alertId), alertData, { merge: true });
@@ -809,10 +825,10 @@ export const functionsService = {
       }
 
       return {
-        success: true,
+        success: false,
         alertId,
-        contactsNotifiedCount: emergencyContacts.length,
-        fcmDispatchedCount: 1,
+        contactsNotifiedCount: 0,
+        fcmDispatchedCount: 0,
         dlqCount: 0,
         contactsSummary,
       };

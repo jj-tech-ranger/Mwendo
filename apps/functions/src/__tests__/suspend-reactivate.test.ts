@@ -150,6 +150,26 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
     });
   });
 
+  it('LOW-01: rejects caller with token { activeRole: "admin", isSuspended: true } with permission-denied', async () => {
+    const suspendedAdminRequest = {
+      data: { targetUid: 'target_user_01' },
+      auth: {
+        uid: 'admin_suspended_01',
+        token: { activeRole: 'admin', isSuspended: true, name: 'Suspended Admin' },
+      },
+    } as any;
+
+    await expect(suspendUser.run(suspendedAdminRequest)).rejects.toMatchObject({
+      code: 'permission-denied',
+      message: 'Suspended accounts cannot perform administrative actions.',
+    });
+
+    await expect(reactivateUser.run(suspendedAdminRequest)).rejects.toMatchObject({
+      code: 'permission-denied',
+      message: 'Suspended accounts cannot perform administrative actions.',
+    });
+  });
+
   it('SEC-004: caller with token.activeRole === admin succeeds even with no matching Firestore document', async () => {
     const missingCallerRequest = {
       data: { targetUid: 'target_user_01', reason: 'Emergency suspension' },

@@ -173,7 +173,19 @@ export async function processSendSosLogic(
   const alertId = payload.alertId || `sos_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const userId = payload.userId || 'anonymous';
   const timestamp = payload.timestamp || new Date().toISOString();
-  const location = payload.location || { lat: -1.286389, lng: 36.817223 };
+  const rawLat = payload.location?.lat ?? (payload as { latitude?: number }).latitude;
+  const rawLng = payload.location?.lng ?? (payload as { longitude?: number }).longitude;
+
+  if (
+    typeof rawLat !== 'number' ||
+    typeof rawLng !== 'number' ||
+    !Number.isFinite(rawLat) ||
+    !Number.isFinite(rawLng)
+  ) {
+    throw new HttpsError('invalid-argument', 'A valid location is required.');
+  }
+
+  const location = { lat: rawLat, lng: rawLng };
   const speedKmH = payload.speedKmH || 0;
 
   // 0. SEC-005: Enforce per-user rate limit (Max 3 SOS triggers per hour)

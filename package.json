@@ -10,6 +10,7 @@
     "check:bundle-security": "node scripts/check-bundle-security.js",
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "typecheck:functions": "npm run --prefix apps/functions lint",

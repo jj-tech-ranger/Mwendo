@@ -41,12 +41,26 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
   // AUTH-004 Hardening Complete (formerly SEC-009): Route-level authorization strictly evaluates
   // the custom claim from the ID token (claimedActiveRole / claims.activeRole), matching firestore.rules
   // and Cloud Function security boundaries. Firestore document fields (user.role / user.activeRole)
-  // are retained strictly for UI display purposes and are never trusted for authorization checks.
+  // are retained strictly for UI display purposes and are never trusted for authorization checks (HIGH-05).
   const effectiveRole =
     user.claimedActiveRole ??
     (claims?.activeRole as UserRole | undefined) ??
-    (user.claims?.activeRole as UserRole | undefined) ??
-    user.role;
+    (user.claims?.activeRole as UserRole | undefined);
+
+  if (!effectiveRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-md">
+          <span className="material-symbols-outlined text-primary text-4xl animate-spin">
+            sync
+          </span>
+          <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+            Authenticating session...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
     return <Navigate to="/auth/unauthorized" replace />;

@@ -12,12 +12,13 @@ interface TripState {
   durationSeconds: number;
   overspeedCount: number;
   routeCoordinates: GPSPoint[];
+  saccoId?: string | undefined;
   saccoName: string;
   routeName: string;
   plateNumber: string;
 
   // Actions
-  startTrip: (params: { plateNumber: string; saccoName: string; routeName: string }) => void;
+  startTrip: (params: { plateNumber: string; saccoName?: string | undefined; saccoId?: string | undefined; routeName?: string | undefined }) => void;
   updateTelemetry: (speed: number, gps?: GPSPoint) => void;
   pauseTrip: () => void;
   resumeTrip: () => void;
@@ -35,11 +36,12 @@ export const useTripStore = create<TripState>((set, get) => ({
   durationSeconds: 0,
   overspeedCount: 0,
   routeCoordinates: [],
+  saccoId: undefined,
   saccoName: '',
   routeName: '',
   plateNumber: '',
 
-  startTrip: ({ plateNumber, saccoName, routeName }) => {
+  startTrip: ({ plateNumber, saccoName, saccoId, routeName = 'Standard Route' }) => {
     const state = get();
     if (state.activeTrip && state.isTracking) {
       throw new Error('TRIP001: An active trip is already in progress.');
@@ -48,14 +50,17 @@ export const useTripStore = create<TripState>((set, get) => ({
     const currentUser = useAuthStore.getState().user;
     const userId = currentUser?.uid || currentUser?.id;
     const uuid = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const effectiveSaccoId = saccoId || 'unassigned';
+    const effectiveSaccoName = saccoName || (effectiveSaccoId === 'unassigned' ? 'Independent / Unassigned' : effectiveSaccoId);
+
     const newTrip: Trip = {
       id: `trip_${uuid}`,
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
       ...(userId ? { userId } : {}),
       vehicleRegNumber: plateNumber.toUpperCase(),
       plateNumber: plateNumber.toUpperCase(),
-      saccoId: 'sacco_metrolink',
-      saccoName,
+      saccoId: effectiveSaccoId,
+      saccoName: effectiveSaccoName,
       routeName,
       status: 'active',
       currentSpeedKmH: 0,
@@ -79,7 +84,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       overspeedCount: 0,
       routeCoordinates: [],
       plateNumber,
-      saccoName,
+      saccoId: effectiveSaccoId,
+      saccoName: effectiveSaccoName,
       routeName,
     });
   },

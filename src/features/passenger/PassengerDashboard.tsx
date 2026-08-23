@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -21,12 +23,30 @@ export const PassengerDashboard: React.FC = () => {
   const [sacco, setSacco] = useState('');
   const [route, setRoute] = useState('');
 
-  const handleStartTrip = () => {
+  const handleStartTrip = async () => {
     if (!plateNumber.trim()) return;
+    const cleanPlate = plateNumber.trim().toUpperCase();
+    const vehicleDocId = cleanPlate.replace(/\s+/g, '_');
+
+    let resolvedSaccoId = 'unassigned';
+    let resolvedSaccoName = sacco || 'Independent / Unassigned';
+
+    try {
+      const vehicleDoc = await getDoc(doc(db, 'vehicles', vehicleDocId));
+      if (vehicleDoc.exists()) {
+        const vData = vehicleDoc.data();
+        if (vData.saccoId) resolvedSaccoId = vData.saccoId;
+        if (vData.saccoName) resolvedSaccoName = vData.saccoName;
+      }
+    } catch (err) {
+      console.warn('[PassengerDashboard] Vehicle lookup failed or restricted, falling back to provisional:', err);
+    }
+
     startTrip({
-      plateNumber,
-      saccoName: sacco,
-      routeName: route,
+      plateNumber: cleanPlate,
+      saccoId: resolvedSaccoId,
+      saccoName: resolvedSaccoName,
+      routeName: route || 'Standard Route',
     });
     navigate('/passenger/start-trip');
   };

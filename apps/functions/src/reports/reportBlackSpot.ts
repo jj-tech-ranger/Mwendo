@@ -39,6 +39,18 @@ export async function processReportBlackSpotLogic(
     throw new HttpsError('unauthenticated', 'User must be authenticated to report a road hazard.');
   }
 
+  const lat = payload.location?.lat ?? payload.latitude;
+  const lng = payload.location?.lng ?? payload.longitude;
+
+  if (
+    typeof lat !== 'number' ||
+    typeof lng !== 'number' ||
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lng)
+  ) {
+    throw new HttpsError('invalid-argument', 'A valid location is required.');
+  }
+
   // 1. SEC-005: Enforce rate limit (Max 10 hazard reports per 24h)
   if (typeof db.runTransaction === 'function') {
     await enforceRateLimit(db, userId, 'black_spot');
@@ -46,9 +58,6 @@ export async function processReportBlackSpotLogic(
 
   const spotId = payload.id || `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const now = new Date().toISOString();
-
-  const lat = payload.location?.lat ?? payload.latitude ?? -1.286389;
-  const lng = payload.location?.lng ?? payload.longitude ?? 36.817223;
 
   const docData = {
     id: spotId,

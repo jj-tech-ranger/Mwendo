@@ -15,14 +15,17 @@ export interface MapMarker {
 }
 
 export interface MapComponentProps {
-  markers?: MapMarker[];
-  showRouteTrace?: boolean;
-  showHeatmapOverlay?: boolean;
-  centerAddress?: string;
-  initialCenter?: { lat: number; lng: number };
-  initialZoom?: number;
-  onMarkerClick?: (marker: MapMarker) => void;
-  className?: string;
+  markers?: MapMarker[] | undefined;
+  showRouteTrace?: boolean | undefined;
+  showHeatmapOverlay?: boolean | undefined;
+  centerAddress?: string | undefined;
+  initialCenter?: { lat: number; lng: number } | undefined;
+  initialZoom?: number | undefined;
+  onMarkerClick?: ((marker: MapMarker) => void) | undefined;
+  className?: string | undefined;
+  enablePinDrop?: boolean | undefined;
+  onPinDrop?: ((coords: { lat: number; lng: number }) => void) | undefined;
+  pinnedLocation?: { lat: number; lng: number } | null | undefined;
 }
 
 const DEFAULT_CENTER: [number, number] = [-1.286389, 36.817223]; // Nairobi Metro Corridor
@@ -81,6 +84,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   initialZoom = 12,
   onMarkerClick,
   className,
+  enablePinDrop = false,
+  onPinDrop,
+  pinnedLocation = null,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -108,7 +114,9 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
     const firstMarker = markers[0];
-    const startCenter: [number, number] = initialCenter
+    const startCenter: [number, number] = pinnedLocation
+      ? [pinnedLocation.lat, pinnedLocation.lng]
+      : initialCenter
       ? [initialCenter.lat, initialCenter.lng]
       : firstMarker
       ? [firstMarker.lat, firstMarker.lng]
@@ -147,7 +155,22 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       heatmapLayerRef.current = null;
       routeLayerRef.current = null;
     };
-  }, [initialCenter, initialZoom]);
+  }, [initialCenter, initialZoom, pinnedLocation]);
+
+  // Click listener for manual pin dropping
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !enablePinDrop) return;
+
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      onPinDrop?.({ lat: e.latlng.lat, lng: e.latlng.lng });
+    };
+
+    map.on('click', handleMapClick);
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [enablePinDrop, onPinDrop]);
 
   // Update Markers, Heatmaps, and Route
   useEffect(() => {
@@ -160,6 +183,29 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     if (routeLayerRef.current) {
       routeLayerRef.current.remove();
       routeLayerRef.current = null;
+    }
+
+    // Add Pinned Location Marker if manual pin drop or active selection
+    if (pinnedLocation) {
+      const pinIcon = L.divIcon({
+        className: 'custom-leaflet-pin-marker-wrapper',
+        html: `
+          <div 
+            id="map-marker-dropped-pin"
+            data-testid="map-marker-dropped-pin"
+            data-lat="${pinnedLocation.lat}"
+            data-lng="${pinnedLocation.lng}"
+            class="w-10 h-10 rounded-full shadow-2xl flex items-center justify-center cursor-pointer bg-rose-600 text-white ring-4 ring-rose-500/40 animate-bounce"
+            title="Selected Hazard Location"
+          >
+            <span class="material-symbols-outlined text-2xl leading-none select-none">location_on</span>
+          </div>
+        `,
+        iconSize: [40, 40],
+        iconAnchor: [20, 36],
+      });
+      const pinMarker = L.marker([pinnedLocation.lat, pinnedLocation.lng], { icon: pinIcon });
+      pinMarker.addTo(markersLayerRef.current!);
     }
 
     // Add Markers
@@ -206,10 +252,12 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     if (markers.length > 1) {
       const bounds = L.latLngBounds(markers.map((m) => [m.lat, m.lng]));
       map.fitBounds(bounds, { padding: [45, 45], maxZoom: 15 });
+    } else if (pinnedLocation) {
+      map.setView([pinnedLocation.lat, pinnedLocation.lng], initialZoom);
     } else if (firstMarker && !initialCenter) {
       map.setView([firstMarker.lat, firstMarker.lng], initialZoom);
     }
-  }, [markers, showHeatmapOverlay, showRouteTrace, selectedMarker?.id, handleSelectMarker, initialCenter, initialZoom]);
+  }, [markers, showHeatmapOverlay, showRouteTrace, selectedMarker?.id, handleSelectMarker, initialCenter, initialZoom, pinnedLocation]);
 
   // Zoom / Location Control Handlers
   const handleZoomIn = () => {
@@ -267,6 +315,16 @@ export const MapComponent: React.FC<MapComponentProps> = ({
           <span className="truncate max-w-[200px] sm:max-w-xs">{centerAddress}</span>
         </div>
         <div className="flex items-center gap-1.5">
+          {enablePinDrop && (
+            <span
+              id="map-pin-drop-badge"
+              data-testid="map-pin-drop-badge"
+              className="bg-rose-600/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow flex items-center gap-1 animate-pulse"
+            >
+              <span className="material-symbols-outlined text-xs">touch_app</span>
+              {pinnedLocation ? 'Pin Placed' : 'Tap Map to Pin'}
+            </span>
+          )}
           {showHeatmapOverlay && (
             <Badge variant="warning" className="shadow-sm">
               Heatmap Active

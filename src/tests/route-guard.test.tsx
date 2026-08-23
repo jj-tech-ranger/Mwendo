@@ -90,11 +90,13 @@ describe('RoleGuard - Route Level Security', () => {
         email: 'passenger@test.com',
         displayName: 'Passenger',
         role: 'passenger',
+        claimedActiveRole: 'passenger',
         isActive: true,
         isVerified: true,
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
       },
+      claims: { activeRole: 'passenger' },
       isAuthenticated: true,
       isLoading: false,
     });
@@ -112,6 +114,46 @@ describe('RoleGuard - Route Level Security', () => {
 
     expect(screen.getByText('Unauthorized Access')).toBeTruthy();
     expect(screen.queryByText('Admin Dashboard')).toBeNull();
+  });
+
+  it('HIGH-05: user object with role: "admin" but no populated claim fields renders loading/re-authenticating state instead of granting access or redirecting to unauthorized', async () => {
+    // Invariant: effectiveRole never resolves from user.role alone.
+    useAuthStore.setState({
+      user: {
+        id: 'u1',
+        uid: 'u1',
+        email: 'user_unpopulated_claim@test.com',
+        displayName: 'Unpopulated Claims User',
+        role: 'admin', // Document display role says admin, but NO custom claims are populated
+        claimedActiveRole: undefined,
+        claims: undefined,
+        isActive: true,
+        isVerified: true,
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      },
+      claims: null,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/admin']}>
+        <Routes>
+          <Route path="/auth/unauthorized" element={<div>Unauthorized Access</div>} />
+          <Route element={<RoleGuard allowedRoles={['admin']} />}>
+            <Route path="/admin" element={<div>Admin Dashboard</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // 1. Must NOT render the protected Outlet
+    expect(screen.queryByText('Admin Dashboard')).toBeNull();
+    // 2. Must NOT navigate to /auth/unauthorized
+    expect(screen.queryByText('Unauthorized Access')).toBeNull();
+    // 3. Must render the session authenticating loading state
+    expect(screen.getByText('Authenticating session...')).toBeTruthy();
   });
 
   it('allows authorized admin access to /admin', async () => {

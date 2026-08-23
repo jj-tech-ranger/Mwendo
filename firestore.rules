@@ -96,6 +96,7 @@ service cloud.firestore {
              (!('maxSpeedKmH' in data) || isPlausibleSpeed(data.maxSpeedKmH)) &&
              (!('avgSpeedKmH' in data) || isPlausibleSpeed(data.avgSpeedKmH)) &&
              (!('startTime' in data) || isPlausibleTimestamp(data.startTime)) &&
+             (!('endTime' in data) || isPlausibleTimestamp(data.endTime)) &&
              (!('timestamp' in data) || isPlausibleTimestamp(data.timestamp));
     }
 
@@ -105,6 +106,15 @@ service cloud.firestore {
              (!('recordedSpeedKmH' in data) || isPlausibleSpeed(data.recordedSpeedKmH)) &&
              (!('speedLimitKmH' in data) || isPlausibleSpeed(data.speedLimitKmH)) &&
              (!('timestamp' in data) || isPlausibleTimestamp(data.timestamp));
+    }
+
+    function isValidBlackSpotData(data) {
+      return ((!('latitude' in data) && !('longitude' in data)) ||
+              (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
+             (!('location' in data) || data.location == null || (
+               ('lat' in data.location) && ('lng' in data.location) &&
+               isWithinKenyaBounds(data.location.lat, data.location.lng)
+             ));
     }
 
     // Flat Analytics Wildcard Rule
@@ -189,9 +199,10 @@ service cloud.firestore {
     match /saccos/{saccoId} {
       allow read: if isSignedIn();
       allow create: if isAuthority() || isAdmin();
-      // Disallow client updates modifying safetyScore (must be computed by server Cloud Functions Gen2)
-      allow update: if (isAuthority() || isAdmin() || isSaccoManager(saccoId))
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['safetyScore']);
+      // HIGH-03: SACCO manager status tampering & safetyScore rewrite protection
+      allow update: if (isAuthority() || isAdmin()) ||
+        (isSaccoManager(saccoId) &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactEmail', 'contactPhone', 'settings', 'updatedAt']));
       allow delete: if isAdmin();
     }
 
@@ -204,9 +215,34 @@ service cloud.firestore {
     // Black Spots Collection
     match /black_spots/{spotId} {
       allow read: if isRegisteredUser();
-      allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
-      allow update: if isAuthority() || isAdmin() || (
-        isRegisteredUser() && resource.data.reportedByUid == request.auth.uid
+      allow create: if isRegisteredUser() &&
+                       request.resource.data.reportedByUid == request.auth.uid &&
+                       isValidBlackSpotData(request.resource.data) &&
+                       (!('verifiedByAuthority' in request.resource.data) || request.resource.data.verifiedByAuthority == false || isAuthority() || isAdmin()) &&
+                       (!('status' in request.resource.data) || request.resource.data.status == 'pending' || isAuthority() || isAdmin());
+      allow update: if (
+        (isAuthority() || isAdmin()) && isValidBlackSpotData(request.resource.data)
+      ) || (
+        isRegisteredUser() &&
+        resource.data.reportedByUid == request.auth.uid &&
+        request.resource.data.reportedByUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'title',
+          'name',
+          'description',
+          'hazardDescription',
+          'hazardType',
+          'severity',
+          'locationName',
+          'routeName',
+          'county',
+          'photoUrl',
+          'latitude',
+          'longitude',
+          'location',
+          'updatedAt'
+        ]) &&
+        isValidBlackSpotData(request.resource.data)
       );
       allow delete: if isAuthority() || isAdmin();
     }
@@ -270,8 +306,10 @@ service cloud.firestore {
     // Audit Logs Collection
     match /audit_logs/{logId} {
       allow read: if isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId);
-      allow create: if (isAuthority() || isAdmin() || hasActiveRole('sacco_manager'))
-        && request.resource.data.actorRole == getActiveRole();
+      allow create: if isAdmin() || isAuthority() ||
+        (hasActiveRole('sacco_manager') &&
+         request.resource.data.actorRole == getActiveRole() &&
+         request.resource.data.saccoId == request.auth.token.saccoId);
       allow update, delete: if false;
     }
 
