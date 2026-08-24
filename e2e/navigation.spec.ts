@@ -7,6 +7,15 @@ interface TestWindow extends Window {
 }
 
 test.describe('Navigation & Shell Route Audit', () => {
+  test.beforeEach(async ({ page }) => {
+    page.on('console', (msg) => {
+      console.log(`[Browser Console ${msg.type()}]: ${msg.text()}`);
+    });
+    page.on('pageerror', (err) => {
+      console.error(`[Browser PageError]: ${err.message}\n${err.stack || ''}`);
+    });
+  });
+
   test('SACCO shell sidebar links resolve without 404s', async ({ page }) => {
     // 1. Initialize authenticated SACCO user session before navigation
     await page.addInitScript(() => {

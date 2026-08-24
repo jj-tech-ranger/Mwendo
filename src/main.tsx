@@ -19,6 +19,10 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Register Service Worker for PWA & Offline Support
-serviceWorkerService.register();
+try {
+  serviceWorkerService.register();
+} catch (err) {
+  console.warn('[PWA] Registration invocation failed:', err);
+}
 
 
