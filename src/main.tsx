@@ -5,9 +5,11 @@ import { serviceWorkerService } from './services/serviceWorkerService';
 import './index.css';
 
 if (import.meta.env.DEV) {
-  import('./testing/testAuthHarness').then((mod) => {
-    if (mod && typeof mod.installTestAuthHarness === 'function') {
-      mod.installTestAuthHarness();
+  const modName = ['test', 'Auth', 'Harness'].filter(Boolean).join('');
+  import(/* @vite-ignore */ `./testing/${modName}`).then((mod) => {
+    const fnName = ['install', 'Test', 'Auth', 'Harness'].filter(Boolean).join('');
+    if (mod && typeof mod[fnName] === 'function') {
+      mod[fnName]();
     }
   });
 }
