@@ -42,9 +42,29 @@ function swVersionPlugin(): Plugin {
   };
 }
 
+function excludeTestHarnessPlugin(): Plugin {
+  return {
+    name: 'exclude-test-harness-plugin',
+    enforce: 'pre',
+    apply: 'build',
+    resolveId(source) {
+      if (source.includes('testAuthHarness')) {
+        return '\0empty-test-harness';
+      }
+      return null;
+    },
+    load(id) {
+      if (id === '\0empty-test-harness') {
+        return 'export function installTestAuthHarness() {}';
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), swVersionPlugin()],
+    plugins: [react(), tailwindcss(), swVersionPlugin(), excludeTestHarnessPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
