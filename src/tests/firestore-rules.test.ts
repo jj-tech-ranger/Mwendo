@@ -984,6 +984,24 @@ describe('Firestore Security Rules (Emulator-Backed)', { timeout: 20000 }, () =>
       })
     );
 
+    // 16b. MED-04: Trip with endTime one year in future -> FAILS
+    const futureEndTime = Timestamp.fromDate(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
+    await assertFails(
+      updateDoc(doc(passenger.firestore(), 'trips/trip_valid_kenya'), {
+        endTime: futureEndTime,
+        status: 'completed',
+      })
+    );
+
+    // 16c. MED-04: Trip with valid plausible endTime -> SUCCEEDS
+    const validEndTime = Timestamp.fromDate(new Date(Date.now() + 60 * 1000)); // +1 min within plausibility
+    await assertSucceeds(
+      updateDoc(doc(passenger.firestore(), 'trips/trip_valid_kenya'), {
+        endTime: validEndTime,
+        status: 'completed',
+      })
+    );
+
     // 17. Legitimate Violation within Kenya bounds and valid Timestamp -> SUCCEEDS
     await assertSucceeds(
       setDoc(doc(passenger.firestore(), 'violations/viol_valid_kenya'), {

@@ -10,10 +10,14 @@ const env_1 = require("../lib/env");
  * SEC-004 & SEC-009: Auth custom claims (auth.token.activeRole === 'admin') are the sole source
  * of truth for authorization. Firestore document fields (role/activeRole) are display-only and
  * must never grant administrative privileges.
+ * LOW-01: Explicitly reject callers whose own token is already flagged isSuspended: true.
  */
 async function verifyAdminCaller(auth) {
     if (!auth) {
         throw new https_1.HttpsError('unauthenticated', 'The function must be called while authenticated.');
+    }
+    if (auth.token?.isSuspended === true) {
+        throw new https_1.HttpsError('permission-denied', 'Suspended accounts cannot perform administrative actions.');
     }
     const callerUid = auth.uid;
     const tokenClaimRole = auth.token?.activeRole;
