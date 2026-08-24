@@ -27,8 +27,8 @@ const initialLang = getSavedLanguage();
 
 i18n.use(initReactI18next).init({
   resources: {
-    en: { translation: { ...en, welcome: welcomeEn } },
-    sw: { translation: { ...sw, welcome: welcomeSw } },
+    en: { translation: { ...en, welcome: { ...en.welcome, ...welcomeEn } } },
+    sw: { translation: { ...sw, welcome: { ...sw.welcome, ...welcomeSw } } },
   },
   lng: initialLang,
   fallbackLng: 'en',

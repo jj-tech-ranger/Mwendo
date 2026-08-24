@@ -72,4 +72,14 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: 9. Run Playwright E2E Tests
+        env:
+          VITE_FIREBASE_API_KEY: AIzaSyDUMMYTESTKEY1234567890123456789
+          VITE_FIREBASE_AUTH_DOMAIN: demo-mwendo-salama-audit.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: demo-mwendo-salama-audit
+          VITE_FIREBASE_STORAGE_BUCKET: demo-mwendo-salama-audit.appspot.com
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "123456789012"
+          VITE_FIREBASE_APP_ID: "1:123456789012:web:test"
+          VITE_FIREBASE_DATABASE_ID: "(default)"
+          GCLOUD_PROJECT: demo-mwendo-salama-audit
+          FIREBASE_PROJECT: demo-mwendo-salama-audit
         run: npx playwright test
