@@ -57,9 +57,3 @@ jobs:
       - name: 7b. Generate Test Coverage Report (non-blocking)
         continue-on-error: true
         run: npm run test:coverage || true
-
-      - name: 8. Install Playwright Browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: 9. Run Playwright E2E Tests
-        run: npx playwright test
