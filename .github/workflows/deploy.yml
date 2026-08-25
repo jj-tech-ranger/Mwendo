@@ -145,11 +145,13 @@ jobs:
           npx firebase-tools deploy \
             --only functions:suspendUser \
             --project mwendosalama-cf777 \
-            --non-interactive
+            --non-interactive \
+            --force
 
       - name: Deploy remaining backend
         run: |
           npx firebase-tools deploy \
             --only functions,storage,firestore \
             --project mwendosalama-cf777 \
-            --non-interactive
+            --non-interactive \
+            --force
