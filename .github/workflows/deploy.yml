@@ -148,6 +148,12 @@ jobs:
             --non-interactive \
             --force
 
+      - name: Authenticate to Google Cloud (Refresh Token)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
+          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+
       - name: Deploy remaining backend
         run: |
           npx firebase-tools deploy \
