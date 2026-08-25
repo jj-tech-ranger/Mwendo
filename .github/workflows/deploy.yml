@@ -1,4 +1,4 @@
-name: Deploy Mwendo Production Pipeline
+name: Deploy Mwendo Salama
 
 on:
   push:
@@ -11,125 +11,147 @@ permissions:
   id-token: write
 
 env:
-  PROJECT_ID: mwendosalama-cf777
-  NODE_VERSION: '20'
-  WIF_PROVIDER: 'projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions'
-  WIF_SERVICE_ACCOUNT: 'github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com'
+  FIREBASE_PROJECT_ID: mwendosalama-cf777
 
 jobs:
-  validate:
-    name: Security & Quality Checks
+  quality-gate:
+    name: Production Quality Gate
     runs-on: ubuntu-latest
+    env:
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
+      VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
+      VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
+      VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
+      VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Runtime
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          node-version: "22"
+          cache: npm
 
-      - name: Install Dependencies
+      - name: 1. Install root dependencies
         run: npm ci
 
-      - name: Validate TypeScript Types
-        run: npm run typecheck --if-present
+      - name: 2. Install Functions dependencies
+        run: cd apps/functions && npm ci
 
-      - name: Run ESLint
-        run: npm run lint --if-present
+      - name: 3. Root Linter & Typecheck
+        run: npm run lint
 
-      - name: Run Test Suites
-        run: npm run test --if-present
+      - name: 4. Functions Linter & Typecheck
+        run: cd apps/functions && npm run lint
 
-      - name: Run Bundle Security Audit
+      - name: 5. Build frontend & Bundle Security Audit
         run: |
-          if [ -f "scripts/check-bundle-security.js" ]; then
-            node scripts/check-bundle-security.js
-          fi
+          npm run build
+          npm run check:bundle-security
+
+      - name: 6. Build Functions
+        working-directory: apps/functions
+        run: npm run build
+
+      - name: 7. Run Vitest tests
+        run: npm test
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 1
+
+      - name: Upload functions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-dist
+          path: apps/functions/lib/
+          retention-days: 1
+
+  deploy-hosting:
+    name: Deploy Firebase Hosting
+    runs-on: ubuntu-latest
+    needs: quality-gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
+          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+
+      - name: Deploy Firebase Hosting
+        run: |
+          npx firebase-tools deploy \
+            --only hosting \
+            --project mwendosalama-cf777 \
+            --non-interactive
 
   deploy-backend:
-    name: Deploy Backend & Cloud Functions
-    needs: validate
+    name: Deploy Firebase Backend
     runs-on: ubuntu-latest
+    needs: quality-gate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Runtime
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          node-version: "22"
+          cache: npm
 
-      - name: Install Root Dependencies
-        run: npm ci
-
-      - name: Install and Build Cloud Functions
+      - name: Install dependencies
         run: |
-          cd apps/functions
           npm ci
-          npm run build
-          cd ../..
+          cd apps/functions && npm ci
 
-      # Authenticate to Google Cloud for the initial function deploy
-      - name: Authenticate to Google Cloud (Phase 1)
+      - name: Download functions artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: functions-dist
+          path: apps/functions/lib
+
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
+          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
 
-      - name: Deploy Firestore Rules & Indexes
+      - name: Deploy suspendUser
         run: |
-          npx firebase-tools deploy --only firestore:rules,firestore:indexes --project ${{ env.PROJECT_ID }}
+          npx firebase-tools deploy \
+            --only functions:suspendUser \
+            --project mwendosalama-cf777 \
+            --non-interactive \
+            --force
 
-      - name: Deploy Storage Rules
+      - name: Deploy remaining backend
         run: |
-          npx firebase-tools deploy --only storage --project ${{ env.PROJECT_ID }}
-
-      - name: Deploy Core Function (suspendUser)
-        run: |
-          npx firebase-tools deploy --only functions:suspendUser --project ${{ env.PROJECT_ID }}
-
-      # Re-authentication: Exchanges for a fresh token before deploying the scheduled functions & remaining backend
-      - name: Re-authenticate to Google Cloud (Phase 2)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
-
-      - name: Deploy Remaining Functions & Schedulers
-        run: |
-          npx firebase-tools deploy --only functions --project ${{ env.PROJECT_ID }}
-
-  deploy-frontend:
-    name: Build & Deploy Frontend
-    needs: deploy-backend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js Runtime
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install Root Dependencies
-        run: npm ci
-
-      - name: Build Web Application
-        run: npm run build
-        env:
-          VITE_FIREBASE_PROJECT_ID: ${{ env.PROJECT_ID }}
-
-      - name: Authenticate to Google Cloud (Hosting)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
-
-      - name: Deploy to Firebase Hosting
-        run: |
-          npx firebase-tools deploy --only hosting --project ${{ env.PROJECT_ID }}
+          npx firebase-tools deploy \
+            --only functions,storage,firestore \
+            --project mwendosalama-cf777 \
+            --non-interactive \
+            --force
