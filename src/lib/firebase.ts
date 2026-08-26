@@ -134,36 +134,98 @@ try {
 
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app, 'europe-west1');
-export const remoteConfig: RemoteConfig = getRemoteConfig(app);
+
+const hasRealConfig =
+  !isTestEnv &&
+  firebaseConfigStatus.isValid &&
+  Boolean(rawConfig.apiKey) &&
+  rawConfig.apiKey !== 'missing-api-key' &&
+  !rawConfig.apiKey.startsWith('YOUR_') &&
+  !rawConfig.apiKey.startsWith('AIzaSyFake') &&
+  !rawConfig.apiKey.toLowerCase().includes('dummy') &&
+  !rawConfig.apiKey.toLowerCase().includes('placeholder') &&
+  !rawConfig.apiKey.toLowerCase().includes('test') &&
+  rawConfig.apiKey.length > 20;
+
+let remoteConfigInstance: RemoteConfig | null = null;
+export const getRemoteConfigInstance = (): RemoteConfig | null => {
+  if (!remoteConfigInstance && hasRealConfig && typeof window !== 'undefined') {
+    try {
+      remoteConfigInstance = getRemoteConfig(app);
+    } catch (e) {
+      console.warn('[RemoteConfig] Failed to initialize RemoteConfig:', e);
+      remoteConfigInstance = null;
+    }
+  }
+  return remoteConfigInstance;
+};
+export const remoteConfig: RemoteConfig | null = null;
 
 let messagingInstance: Messaging | null = null;
-isMessagingSupported().then((supported) => {
-  if (supported) {
+let isMessagingInitAttempted = false;
+
+export const getMessagingInstance = (): Messaging | null => {
+  if (!messagingInstance && !isMessagingInitAttempted && hasRealConfig && typeof window !== 'undefined') {
+    isMessagingInitAttempted = true;
     try {
-      messagingInstance = getMessaging(app);
-    } catch (e) {
-      console.warn('[Messaging] Failed to initialize FCM:', e);
+      isMessagingSupported()
+        .then((supported) => {
+          if (supported) {
+            try {
+              messagingInstance = getMessaging(app);
+            } catch (e) {
+              console.warn('[Messaging] Failed to initialize FCM:', e);
+            }
+          }
+        })
+        .catch(() => {
+          // FCM not supported or network blocked
+        });
+    } catch {
+      // Ignored
     }
   }
-});
-export const getMessagingInstance = () => messagingInstance;
+  return messagingInstance;
+};
 
 let analyticsInstance: Analytics | null = null;
-isAnalyticsSupported().then((supported) => {
-  if (supported) {
+let isAnalyticsInitAttempted = false;
+
+export const getAnalyticsInstance = (): Analytics | null => {
+  if (
+    !analyticsInstance &&
+    !isAnalyticsInitAttempted &&
+    hasRealConfig &&
+    typeof window !== 'undefined'
+  ) {
+    const hasStoredConsent =
+      window.localStorage.getItem('mwendosalama_kenya_dpa_2019_consent') === 'granted';
+    if (!hasStoredConsent) {
+      return null;
+    }
+
+    isAnalyticsInitAttempted = true;
     try {
-      analyticsInstance = getAnalytics(app);
-      // Kenya Data Protection Act (DPA) 2019: Collection MUST default to disabled until explicit user consent is confirmed
-      const hasStoredConsent =
-        typeof window !== 'undefined' &&
-        window.localStorage.getItem('mwendosalama_kenya_dpa_2019_consent') === 'granted';
-      setAnalyticsCollectionEnabled(analyticsInstance, hasStoredConsent);
-    } catch (e) {
-      console.warn('[Analytics] Failed to initialize Analytics:', e);
+      isAnalyticsSupported()
+        .then((supported) => {
+          if (supported) {
+            try {
+              analyticsInstance = getAnalytics(app);
+              setAnalyticsCollectionEnabled(analyticsInstance, true);
+            } catch (e) {
+              console.warn('[Analytics] Failed to initialize Analytics:', e);
+            }
+          }
+        })
+        .catch(() => {
+          // Analytics not supported or blocked
+        });
+    } catch {
+      // Ignored
     }
   }
-});
-export const getAnalyticsInstance = () => analyticsInstance;
+  return analyticsInstance;
+};
 
 let appCheckInstance: AppCheck | null = null;
 if (
@@ -173,16 +235,15 @@ if (
   import.meta.env.VITE_RECAPTCHA_SITE_KEY
 ) {
   try {
-    const isDebugEnv =
-      import.meta.env.DEV ||
+    // App Check debug mode is strictly restricted to local development environments
+    const isLocalHost =
       window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN);
+      window.location.hostname === '127.0.0.1';
+    const isDebugEnv = import.meta.env.DEV || isLocalHost;
 
     if (isDebugEnv) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN =
-        import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN || true;
+      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     }
 
     const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;

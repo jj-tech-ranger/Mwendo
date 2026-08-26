@@ -1,5 +1,5 @@
 import { fetchAndActivate, getValue } from 'firebase/remote-config';
-import { remoteConfig } from '../lib/firebase';
+import { getRemoteConfigInstance } from '../lib/firebase';
 
 export interface RemoteFeatureFlags {
   enableSOS: boolean;
@@ -20,6 +20,10 @@ export const remoteConfigService = {
    * Fetch and activate remote configuration parameters
    */
   async initConfig(): Promise<RemoteFeatureFlags> {
+    const remoteConfig = getRemoteConfigInstance();
+    if (!remoteConfig) {
+      return DEFAULT_FLAGS;
+    }
     try {
       remoteConfig.settings = {
         minimumFetchIntervalMillis: 3600000, // 1 hour
@@ -42,6 +46,10 @@ export const remoteConfigService = {
   },
 
   getFlag<K extends keyof RemoteFeatureFlags>(key: K): RemoteFeatureFlags[K] {
+    const remoteConfig = getRemoteConfigInstance();
+    if (!remoteConfig) {
+      return DEFAULT_FLAGS[key];
+    }
     try {
       const val = getValue(remoteConfig, key as string);
       if (typeof DEFAULT_FLAGS[key] === 'boolean') {
