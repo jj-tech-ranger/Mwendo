@@ -42,7 +42,7 @@ export interface MessagingProvider {
 }
 
 /**
- * Default SMS Dispatcher (Twilio API integration with fallback simulator)
+ * Default SMS Dispatcher (Optional future server-side SMS provider. No credentials required for MVP.)
  */
 export class DefaultSmsProvider implements SmsProvider {
   private accountSid: string | undefined;

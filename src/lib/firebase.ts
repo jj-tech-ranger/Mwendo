@@ -18,6 +18,13 @@ const isTestEnv =
   import.meta.env.MODE === 'test' ||
   (typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST)));
 
+export interface FirebaseConfigValidation {
+  isValid: boolean;
+  missingKeys: string[];
+  isTestEnv: boolean;
+  errorMessage: string | null;
+}
+
 const defaultTestConfig = {
   apiKey: 'AIzaSyFakeTestApiKeyForVitestSuite0123456789',
   authDomain: 'demo-mwendo-salama-audit.firebaseapp.com',
@@ -36,6 +43,37 @@ const rawConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+const REQUIRED_CONFIG_KEYS = [
+  { key: 'apiKey', envVar: 'VITE_FIREBASE_API_KEY' },
+  { key: 'authDomain', envVar: 'VITE_FIREBASE_AUTH_DOMAIN' },
+  { key: 'projectId', envVar: 'VITE_FIREBASE_PROJECT_ID' },
+  { key: 'storageBucket', envVar: 'VITE_FIREBASE_STORAGE_BUCKET' },
+  { key: 'messagingSenderId', envVar: 'VITE_FIREBASE_MESSAGING_SENDER_ID' },
+  { key: 'appId', envVar: 'VITE_FIREBASE_APP_ID' },
+] as const;
+
+const missingKeys = REQUIRED_CONFIG_KEYS
+  .filter(({ key }) => {
+    const val = rawConfig[key as keyof typeof rawConfig];
+    return !val || typeof val !== 'string' || val.trim() === '' || val.startsWith('YOUR_');
+  })
+  .map(({ envVar }) => envVar);
+
+export const firebaseConfigStatus: FirebaseConfigValidation = {
+  isValid: isTestEnv || missingKeys.length === 0,
+  missingKeys: isTestEnv ? [] : missingKeys,
+  isTestEnv,
+  errorMessage:
+    !isTestEnv && missingKeys.length > 0
+      ? `Missing required Firebase environment variable(s): ${missingKeys.join(', ')}. Please configure these in your .env file or deployment environment.`
+      : null,
+};
+
+if (!firebaseConfigStatus.isValid && typeof window !== 'undefined') {
+  console.error('[Firebase] Configuration validation error:', firebaseConfigStatus.errorMessage);
+}
+
+// In test environment or when config is missing, use safe fallback to avoid unhandled exceptions during module evaluation
 const firebaseConfig = isTestEnv
   ? {
       apiKey: rawConfig.apiKey || defaultTestConfig.apiKey,
@@ -45,11 +83,16 @@ const firebaseConfig = isTestEnv
       messagingSenderId: rawConfig.messagingSenderId || defaultTestConfig.messagingSenderId,
       appId: rawConfig.appId || defaultTestConfig.appId,
     }
-  : rawConfig;
-
-if (!isTestEnv && (!firebaseConfig.apiKey || !firebaseConfig.projectId)) {
-  console.error('[Firebase] Missing required Firebase environment variables! Check your .env file.');
-}
+  : firebaseConfigStatus.isValid
+  ? rawConfig
+  : {
+      apiKey: rawConfig.apiKey || 'missing-api-key',
+      authDomain: rawConfig.authDomain || 'missing-auth-domain.firebaseapp.com',
+      projectId: rawConfig.projectId || 'missing-project-id',
+      storageBucket: rawConfig.storageBucket || 'missing-storage-bucket.appspot.com',
+      messagingSenderId: rawConfig.messagingSenderId || '000000000000',
+      appId: rawConfig.appId || '1:000000000000:web:000000000000',
+    };
 
 let app: FirebaseApp;
 if (!getApps().length) {

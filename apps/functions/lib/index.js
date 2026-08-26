@@ -2,6 +2,9 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.verifyTotpChallenge = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
+const v2_1 = require("firebase-functions/v2");
+// Enforce regional architecture for all Gen 2 Cloud Functions
+(0, v2_1.setGlobalOptions)({ region: 'europe-west1' });
 if (!(0, app_1.getApps)().length) {
     (0, app_1.initializeApp)();
 }

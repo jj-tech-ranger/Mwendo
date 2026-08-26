@@ -8,7 +8,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const messaging_1 = require("firebase-admin/messaging");
 const rateLimit_1 = require("../lib/rateLimit");
 /**
- * Default SMS Dispatcher (Twilio API integration with fallback simulator)
+ * Default SMS Dispatcher (Optional future server-side SMS provider. No credentials required for MVP.)
  */
 class DefaultSmsProvider {
     accountSid;

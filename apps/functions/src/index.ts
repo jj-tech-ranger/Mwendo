@@ -1,4 +1,8 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
+import { setGlobalOptions } from 'firebase-functions/v2';
+
+// Enforce regional architecture for all Gen 2 Cloud Functions
+setGlobalOptions({ region: 'europe-west1' });
 
 if (!getApps().length) {
   initializeApp();

@@ -11,7 +11,8 @@ permissions:
   id-token: write
 
 env:
-  FIREBASE_PROJECT_ID: mwendosalama-cf777
+  # Centralized Firebase Project ID reference - requires explicit repository secret
+  FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
 
 jobs:
   quality-gate:
@@ -27,7 +28,6 @@ jobs:
       VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
       VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
       VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-      VITE_GOOGLE_MAPS_PLATFORM_KEY: ${{ secrets.VITE_GOOGLE_MAPS_PLATFORM_KEY }}
       VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
 
     steps:
@@ -94,17 +94,28 @@ jobs:
           name: frontend-dist
           path: dist
 
+      - name: Verify Deployment Configuration
+        run: |
+          if [ -z "${{ env.FIREBASE_PROJECT_ID }}" ]; then
+            echo "ERROR: FIREBASE_PROJECT_ID secret is required for deployment."
+            exit 1
+          fi
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
+            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT secrets are required for deployment."
+            exit 1
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
-          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy Firebase Hosting
         run: |
           npx firebase-tools deploy \
             --only hosting \
-            --project mwendosalama-cf777 \
+            --project "${{ env.FIREBASE_PROJECT_ID }}" \
             --non-interactive
 
   deploy-backend:
@@ -134,30 +145,41 @@ jobs:
           name: functions-dist
           path: apps/functions/lib
 
+      - name: Verify Deployment Configuration
+        run: |
+          if [ -z "${{ env.FIREBASE_PROJECT_ID }}" ]; then
+            echo "ERROR: FIREBASE_PROJECT_ID secret is required for deployment."
+            exit 1
+          fi
+          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
+            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT secrets are required for deployment."
+            exit 1
+          fi
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
-          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy suspendUser
         run: |
           npx firebase-tools deploy \
             --only functions:suspendUser \
-            --project mwendosalama-cf777 \
+            --project "${{ env.FIREBASE_PROJECT_ID }}" \
             --non-interactive \
             --force
 
       - name: Authenticate to Google Cloud (Refresh Token)
         uses: google-github-actions/auth@v2
         with:
-          workload_identity_provider: "projects/942169450337/locations/global/workloadIdentityPools/github-actions-pool/providers/github-actions"
-          service_account: "github-actions-deployer@mwendosalama-cf777.iam.gserviceaccount.com"
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Deploy remaining backend
         run: |
           npx firebase-tools deploy \
             --only functions,storage,firestore \
-            --project mwendosalama-cf777 \
+            --project "${{ env.FIREBASE_PROJECT_ID }}" \
             --non-interactive \
             --force
