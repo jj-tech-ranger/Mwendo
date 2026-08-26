@@ -11,7 +11,6 @@ permissions:
   id-token: write
 
 env:
-  # Centralized Firebase Project ID reference - requires explicit repository secret
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
 
 jobs:
@@ -40,28 +39,28 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - name: 1. Install root dependencies
+      - name: Install root dependencies
         run: npm ci
 
-      - name: 2. Install Functions dependencies
+      - name: Install Functions dependencies
         run: cd apps/functions && npm ci
 
-      - name: 3. Root Linter & Typecheck
+      - name: Root Linter & Typecheck
         run: npm run lint
 
-      - name: 4. Functions Linter & Typecheck
+      - name: Functions Linter & Typecheck
         run: cd apps/functions && npm run lint
 
-      - name: 5. Build frontend & Bundle Security Audit
+      - name: Build frontend & Bundle Security Audit
         run: |
           npm run build
           npm run check:bundle-security
 
-      - name: 6. Build Functions
+      - name: Build Functions
         working-directory: apps/functions
         run: npm run build
 
-      - name: 7. Run Vitest tests
+      - name: Run Vitest tests
         run: npm test
 
       - name: Upload frontend artifact
@@ -78,48 +77,8 @@ jobs:
           path: apps/functions/lib/
           retention-days: 1
 
-  deploy-hosting:
-    name: Deploy Firebase Hosting
-    runs-on: ubuntu-latest
-    needs: quality-gate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist
-
-      - name: Verify Deployment Configuration
-        run: |
-          if [ -z "${{ env.FIREBASE_PROJECT_ID }}" ]; then
-            echo "ERROR: FIREBASE_PROJECT_ID secret is required for deployment."
-            exit 1
-          fi
-          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
-            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT secrets are required for deployment."
-            exit 1
-          fi
-
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Deploy Firebase Hosting
-        run: |
-          npx firebase-tools deploy \
-            --only hosting \
-            --project "${{ env.FIREBASE_PROJECT_ID }}" \
-            --non-interactive
-
-  deploy-backend:
-    name: Deploy Firebase Backend
+  deploy:
+    name: Deploy Firebase Production
     runs-on: ubuntu-latest
     needs: quality-gate
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -139,22 +98,37 @@ jobs:
           npm ci
           cd apps/functions && npm ci
 
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
       - name: Download functions artifact
         uses: actions/download-artifact@v4
         with:
           name: functions-dist
           path: apps/functions/lib
 
-      - name: Verify Deployment Configuration
+      - name: Verify deployment configuration
         run: |
-          if [ -z "${{ env.FIREBASE_PROJECT_ID }}" ]; then
-            echo "ERROR: FIREBASE_PROJECT_ID secret is required for deployment."
+          set -euo pipefail
+          test -n "${FIREBASE_PROJECT_ID}" || {
+            echo "ERROR: FIREBASE_PROJECT_ID secret is required."
             exit 1
-          fi
-          if [ -z "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" ] || [ -z "${{ secrets.GCP_SERVICE_ACCOUNT }}" ]; then
-            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT secrets are required for deployment."
+          }
+          test "${FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
+            echo "ERROR: FIREBASE_PROJECT_ID must be mwendo-salama-prod for production deployment."
             exit 1
-          fi
+          }
+          test -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" || {
+            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER secret is required."
+            exit 1
+          }
+          test -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" || {
+            echo "ERROR: GCP_SERVICE_ACCOUNT secret is required."
+            exit 1
+          }
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -162,24 +136,10 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Deploy suspendUser
+      - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: |
           npx firebase-tools deploy \
-            --only functions:suspendUser \
-            --project "${{ env.FIREBASE_PROJECT_ID }}" \
-            --non-interactive \
-            --force
-
-      - name: Authenticate to Google Cloud (Refresh Token)
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Deploy remaining backend
-        run: |
-          npx firebase-tools deploy \
-            --only functions,storage,firestore \
-            --project "${{ env.FIREBASE_PROJECT_ID }}" \
+            --only hosting,functions,firestore,storage \
+            --project "${FIREBASE_PROJECT_ID}" \
             --non-interactive \
             --force
