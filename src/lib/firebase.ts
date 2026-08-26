@@ -12,7 +12,12 @@ import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getFunctions, Functions } from 'firebase/functions';
 import { getRemoteConfig, RemoteConfig } from 'firebase/remote-config';
 import { getMessaging, Messaging, isSupported as isMessagingSupported } from 'firebase/messaging';
-import { getAnalytics, Analytics, isSupported as isAnalyticsSupported } from 'firebase/analytics';
+import {
+  getAnalytics,
+  Analytics,
+  isSupported as isAnalyticsSupported,
+  setAnalyticsCollectionEnabled,
+} from 'firebase/analytics';
 import { initializeAppCheck, ReCaptchaV3Provider, AppCheck } from 'firebase/app-check';
 const isTestEnv =
   import.meta.env.MODE === 'test' ||
@@ -128,7 +133,7 @@ try {
 }
 
 export const storage: FirebaseStorage = getStorage(app);
-export const functions: Functions = getFunctions(app);
+export const functions: Functions = getFunctions(app, 'europe-west1');
 export const remoteConfig: RemoteConfig = getRemoteConfig(app);
 
 let messagingInstance: Messaging | null = null;
@@ -148,6 +153,11 @@ isAnalyticsSupported().then((supported) => {
   if (supported) {
     try {
       analyticsInstance = getAnalytics(app);
+      // Kenya Data Protection Act (DPA) 2019: Collection MUST default to disabled until explicit user consent is confirmed
+      const hasStoredConsent =
+        typeof window !== 'undefined' &&
+        window.localStorage.getItem('mwendosalama_kenya_dpa_2019_consent') === 'granted';
+      setAnalyticsCollectionEnabled(analyticsInstance, hasStoredConsent);
     } catch (e) {
       console.warn('[Analytics] Failed to initialize Analytics:', e);
     }
@@ -167,8 +177,6 @@ if (
       import.meta.env.DEV ||
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.includes('.run.app') ||
-      window.location.hostname.includes('.web.app') ||
       Boolean(import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG_TOKEN);
 
     if (isDebugEnv) {
