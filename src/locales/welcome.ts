@@ -66,6 +66,7 @@ export const welcomeEn = {
     s4Desc: 'Give authorized managers a clearer picture of fleet safety performance while maintaining appropriate access controls.',
     ctaTitle: 'Ready to make your fleet safer?',
     ctaDesc: 'Mwendo Salama helps SACCOs use road-safety information to support safer, more accountable public transport operations.',
+    goToPortal: 'Go to SACCO Portal',
   },
   about: {
     tag: 'About Mwendo Salama',
@@ -148,6 +149,7 @@ export const welcomeSw = {
     s4Desc: 'Wape wasimamizi walioidhinishwa picha wazi ya utendaji wa usalama wa magari huku ukiweka udhibiti unaofaa wa ufikiaji.',
     ctaTitle: 'Uko tayari kufanya magari yako yawe salama zaidi?',
     ctaDesc: 'Mwendo Salama husaidia SACCO kutumia taarifa za usalama barabarani kusaidia usafiri wa umma ulio salama na wenye uwajibikaji zaidi.',
+    goToPortal: 'Nenda kwenye Tovuti ya SACCO',
   },
   about: {
     tag: 'Kuhusu Mwendo Salama',
