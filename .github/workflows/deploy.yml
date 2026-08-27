@@ -192,10 +192,12 @@ jobs:
       - name: Verify authenticated Google identity
         run: |
           set -euo pipefail
-          gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -Fx "${EXPECTED_GCP_SERVICE_ACCOUNT}" || {
-            echo "ERROR: GitHub Actions did not authenticate as the approved production deployer service account."
+          authenticated_account="$(gcloud auth list --format='value(account)' | head -n 1)"
+          if [ "${authenticated_account}" != "${EXPECTED_GCP_SERVICE_ACCOUNT}" ]; then
+            echo "ERROR: GitHub Actions authenticated as '${authenticated_account:-<none>}' instead of the approved production deployer service account."
             exit 1
-          }
+          fi
+          echo "Authenticated Google identity verified: ${EXPECTED_GCP_SERVICE_ACCOUNT}"
 
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: |
