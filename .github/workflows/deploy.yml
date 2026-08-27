@@ -122,6 +122,11 @@ jobs:
     needs: quality-gate
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
+    env:
+      MWENDO_DEMO_ADMIN_PASSWORD: ${{ secrets.MWENDO_DEMO_ADMIN_PASSWORD }}
+      MWENDO_DEMO_SACCO_PASSWORD: ${{ secrets.MWENDO_DEMO_SACCO_PASSWORD }}
+      MWENDO_DEMO_AUTHORITY_PASSWORD: ${{ secrets.MWENDO_DEMO_AUTHORITY_PASSWORD }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -165,6 +170,17 @@ jobs:
               exit 1
               ;;
           esac
+          required_demo_secrets=(
+            MWENDO_DEMO_ADMIN_PASSWORD
+            MWENDO_DEMO_SACCO_PASSWORD
+            MWENDO_DEMO_AUTHORITY_PASSWORD
+          )
+          for var in "${required_demo_secrets[@]}"; do
+            if [ -z "${!var:-}" ]; then
+              echo "ERROR: Required demo account secret $var is missing."
+              exit 1
+            fi
+          done
 
       - name: Install dependencies
         run: |
@@ -212,6 +228,11 @@ jobs:
             exit 1
           fi
           echo "Authenticated Google identity verified: ${EXPECTED_GCP_SERVICE_ACCOUNT}"
+
+      - name: Provision production demo accounts
+        run: |
+          set -euo pipefail
+          npm run provision:demo-accounts
 
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: |
