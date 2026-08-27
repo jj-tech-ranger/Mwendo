@@ -12,6 +12,7 @@ permissions:
 
 env:
   FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+  EXPECTED_GCP_SERVICE_ACCOUNT: mwendo-github-deployer-409@mwendo-salama-prod.iam.gserviceaccount.com
 
 jobs:
   quality-gate:
@@ -38,6 +39,44 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+
+      - name: Verify required production frontend configuration
+        run: |
+          set -euo pipefail
+          required_vars=(
+            VITE_FIREBASE_API_KEY
+            VITE_FIREBASE_AUTH_DOMAIN
+            VITE_FIREBASE_PROJECT_ID
+            VITE_FIREBASE_STORAGE_BUCKET
+            VITE_FIREBASE_MESSAGING_SENDER_ID
+            VITE_FIREBASE_APP_ID
+          )
+          for var in "${required_vars[@]}"; do
+            if [ -z "${!var:-}" ]; then
+              echo "ERROR: Required production secret $var is missing."
+              exit 1
+            fi
+          done
+          test "${VITE_FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
+            echo "ERROR: VITE_FIREBASE_PROJECT_ID must be mwendo-salama-prod."
+            exit 1
+          }
+          test "${VITE_FIREBASE_AUTH_DOMAIN}" = "mwendo-salama-prod.firebaseapp.com" || {
+            echo "ERROR: VITE_FIREBASE_AUTH_DOMAIN does not match the production project."
+            exit 1
+          }
+          test "${VITE_FIREBASE_STORAGE_BUCKET}" = "mwendo-salama-prod.firebasestorage.app" || {
+            echo "ERROR: VITE_FIREBASE_STORAGE_BUCKET does not match the production bucket."
+            exit 1
+          }
+          test "${VITE_FIREBASE_MESSAGING_SENDER_ID}" = "1004280240722" || {
+            echo "ERROR: VITE_FIREBASE_MESSAGING_SENDER_ID does not match the production project."
+            exit 1
+          }
+          test "${VITE_FIREBASE_APP_ID}" = "1:1004280240722:web:e339c20b645e839b3c5d8b" || {
+            echo "ERROR: VITE_FIREBASE_APP_ID does not match the production Web App."
+            exit 1
+          }
 
       - name: Install root dependencies
         run: npm ci
@@ -93,6 +132,40 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Verify deployment configuration
+        env:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          test -n "${FIREBASE_PROJECT_ID}" || {
+            echo "ERROR: FIREBASE_PROJECT_ID secret is required."
+            exit 1
+          }
+          test "${FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
+            echo "ERROR: FIREBASE_PROJECT_ID must be mwendo-salama-prod for production deployment."
+            exit 1
+          }
+          test -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}" || {
+            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER secret is required."
+            exit 1
+          }
+          test -n "${GCP_SERVICE_ACCOUNT}" || {
+            echo "ERROR: GCP_SERVICE_ACCOUNT secret is required."
+            exit 1
+          }
+          test "${GCP_SERVICE_ACCOUNT}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}" || {
+            echo "ERROR: GCP_SERVICE_ACCOUNT is not the approved Mwendo production deployer identity."
+            exit 1
+          }
+          case "${GCP_WORKLOAD_IDENTITY_PROVIDER}" in
+            projects/1004280240722/locations/global/workloadIdentityPools/mwendo-github-actions/providers/github-actions) ;;
+            *)
+              echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER does not match the approved Mwendo GitHub OIDC provider."
+              exit 1
+              ;;
+          esac
+
       - name: Install dependencies
         run: |
           npm ci
@@ -110,31 +183,19 @@ jobs:
           name: functions-dist
           path: apps/functions/lib
 
-      - name: Verify deployment configuration
-        run: |
-          set -euo pipefail
-          test -n "${FIREBASE_PROJECT_ID}" || {
-            echo "ERROR: FIREBASE_PROJECT_ID secret is required."
-            exit 1
-          }
-          test "${FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
-            echo "ERROR: FIREBASE_PROJECT_ID must be mwendo-salama-prod for production deployment."
-            exit 1
-          }
-          test -n "${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" || {
-            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER secret is required."
-            exit 1
-          }
-          test -n "${{ secrets.GCP_SERVICE_ACCOUNT }}" || {
-            echo "ERROR: GCP_SERVICE_ACCOUNT secret is required."
-            exit 1
-          }
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Verify authenticated Google identity
+        run: |
+          set -euo pipefail
+          gcloud auth list --filter=status:ACTIVE --format='value(account)' | grep -Fx "${EXPECTED_GCP_SERVICE_ACCOUNT}" || {
+            echo "ERROR: GitHub Actions did not authenticate as the approved production deployer service account."
+            exit 1
+          }
 
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: |
