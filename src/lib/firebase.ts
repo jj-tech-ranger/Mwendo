@@ -112,6 +112,9 @@ const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID;
 let dbInstance: Firestore;
 try {
   const cacheSettings = {
+    // Firestore rejects undefined values by default. User profiles intentionally
+    // contain optional claims/fields, so omit undefined properties at write time.
+    ignoreUndefinedProperties: true,
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager(),
     }),
@@ -260,4 +263,3 @@ if (
 export const getAppCheckInstance = () => appCheckInstance;
 
 export default app;
-
