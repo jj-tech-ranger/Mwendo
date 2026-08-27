@@ -4,6 +4,7 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'mwendo-salama-prod';
 const DEMO_SACCO_ID = 'demo-sacco-mwendo';
+const ADMIN_EMAIL = 'jemutaijemimah@gmail.com';
 
 function requiredSecret(name: string): string {
   const value = process.env[name];
@@ -15,9 +16,9 @@ function requiredSecret(name: string): string {
 
 const DEMO_ACCOUNTS = {
   admin: {
-    email: process.env.MWENDO_DEMO_ADMIN_EMAIL || 'admin.demo@mwendo-salama.test',
+    email: ADMIN_EMAIL,
     password: requiredSecret('MWENDO_DEMO_ADMIN_PASSWORD'),
-    displayName: 'Mwendo Demo Administrator',
+    displayName: 'Mwendo Salama Administrator',
   },
   sacco: {
     email: process.env.MWENDO_DEMO_SACCO_EMAIL || 'sacco.demo@mwendo-salama.test',
