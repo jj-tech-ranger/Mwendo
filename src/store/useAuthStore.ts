@@ -57,7 +57,10 @@ const initialAuth = getInitialAuthState();
 export const useAuthStore = create<AuthState>((set) => ({
   user: initialAuth.user,
   claims: initialAuth.claims,
-  isLoading: false,
+  // Firebase Auth state is asynchronous. Start in a loading state so a direct
+  // navigation to a protected route cannot redirect to /auth/login before
+  // onAuthStateChanged has had a chance to restore the existing session.
+  isLoading: !initialAuth.isAuthenticated,
   isAuthenticated: initialAuth.isAuthenticated,
   setUser: (user, claims) =>
     set({
