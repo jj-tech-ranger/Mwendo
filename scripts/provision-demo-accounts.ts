@@ -1,25 +1,32 @@
 import { getApps, initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getAuth, type UserRecord } from 'firebase-admin/auth';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'mwendo-salama-prod';
-
 const DEMO_SACCO_ID = 'demo-sacco-mwendo';
+
+function requiredSecret(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
 
 const DEMO_ACCOUNTS = {
   admin: {
     email: process.env.MWENDO_DEMO_ADMIN_EMAIL || 'admin.demo@mwendo-salama.test',
-    password: process.env.MWENDO_DEMO_ADMIN_PASSWORD || 'MwendoDemo!Admin2026',
+    password: requiredSecret('MWENDO_DEMO_ADMIN_PASSWORD'),
     displayName: 'Mwendo Demo Administrator',
   },
   sacco: {
     email: process.env.MWENDO_DEMO_SACCO_EMAIL || 'sacco.demo@mwendo-salama.test',
-    password: process.env.MWENDO_DEMO_SACCO_PASSWORD || 'MwendoDemo!Sacco2026',
+    password: requiredSecret('MWENDO_DEMO_SACCO_PASSWORD'),
     displayName: 'Mwendo Demo SACCO Manager',
   },
   authority: {
     email: process.env.MWENDO_DEMO_AUTHORITY_EMAIL || 'ntsa.demo@mwendo-salama.test',
-    password: process.env.MWENDO_DEMO_AUTHORITY_PASSWORD || 'MwendoDemo!Ntsa2026',
+    password: requiredSecret('MWENDO_DEMO_AUTHORITY_PASSWORD'),
     displayName: 'Mwendo Demo NTSA Inspector',
   },
 } as const;
@@ -184,26 +191,23 @@ async function provision(): Promise<void> {
     {
       role: 'admin',
       email: DEMO_ACCOUNTS.admin.email,
-      password: DEMO_ACCOUNTS.admin.password,
       uid: adminUser.uid,
     },
     {
       role: 'sacco_manager',
       email: DEMO_ACCOUNTS.sacco.email,
-      password: DEMO_ACCOUNTS.sacco.password,
       uid: saccoUser.uid,
       saccoId: DEMO_SACCO_ID,
     },
     {
       role: 'authority / NTSA',
       email: DEMO_ACCOUNTS.authority.email,
-      password: DEMO_ACCOUNTS.authority.password,
       uid: authorityUser.uid,
       authorityScope: 'national',
     },
   ]);
 
-  console.log('\nSecurity note: these are demo credentials only. Change or delete them before any public production use.');
+  console.log('\nPasswords are intentionally not printed or stored in the repository.');
 }
 
 provision().catch((error: unknown) => {
