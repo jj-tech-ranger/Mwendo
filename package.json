@@ -15,7 +15,8 @@
     "typecheck:functions": "npm run --prefix apps/functions lint",
     "lint:functions": "npm run --prefix apps/functions lint",
     "lint": "tsc --noEmit && eslint .",
-    "lint:all": "npm run lint && npm run --prefix apps/functions lint"
+    "lint:all": "npm run lint && npm run --prefix apps/functions lint",
+    "provision:demo-accounts": "tsx scripts/provision-demo-accounts.ts"
   },
   "dependencies": {
     "@google/genai": "^2.18.0",
@@ -44,6 +45,7 @@
     "react-i18next": "^17.0.12",
     "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
+    "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
     "vite": "^6.2.3",
     "zod": "^4.4.3",
@@ -58,14 +60,13 @@
     "@types/react-dom": "^19.2.4",
     "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.21",
-    "axe-core": "^4.13.0",
     "esbuild": "^0.25.0",
     "eslint": "^10.8.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "firebase-functions": "^7.3.2",
     "firebase-tools": "^15.28.1",
     "jest-axe": "^11.0.0",
-    "jsdom": "^30.0.1",
+    "jsdom": "^30.0.0",
     "sharp": "^0.35.3",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.23.12",
