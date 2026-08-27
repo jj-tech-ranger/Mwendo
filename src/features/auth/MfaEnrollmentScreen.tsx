@@ -13,6 +13,27 @@ interface MfaEnrollmentProps {
   onSuccess?: () => void;
 }
 
+interface FirebaseAuthErrorLike {
+  code?: string;
+  message?: string;
+}
+
+function formatMfaInitializationError(error: unknown): string {
+  const firebaseError = error as FirebaseAuthErrorLike;
+  const code = firebaseError?.code;
+  const message = firebaseError?.message;
+
+  if (code || message) {
+    return `Failed to initialize TOTP MFA setup${code ? ` (${code})` : ''}. ${message || 'Please try again.'}`;
+  }
+
+  if (error instanceof Error && error.message) {
+    return `Failed to initialize TOTP MFA setup. ${error.message}`;
+  }
+
+  return 'Failed to initialize TOTP MFA setup. Please try again.';
+}
+
 export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
   isModal = false,
   onClose,
@@ -44,8 +65,8 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
       const data = await mfaService.getEnrollmentSecret(currentUser);
       setSetupData(data);
     } catch (err: unknown) {
-      console.error('Failed to generate TOTP secret:', err);
-      setErrorMsg('Failed to initialize TOTP MFA setup. Please try again.');
+      console.error('[MfaEnrollmentScreen] Failed to generate TOTP secret:', err);
+      setErrorMsg(formatMfaInitializationError(err));
     } finally {
       setLoadingSecret(false);
     }
@@ -146,7 +167,6 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
         </div>
       ) : setupData ? (
         <form onSubmit={handleVerifyAndEnroll} className="space-y-md">
-          {/* Step 1: Scan QR Code */}
           <div className="space-y-sm bg-surface-container-low p-md rounded-2xl border border-outline-variant/20">
             <span className="font-label-mono text-[10px] uppercase font-bold text-primary block">
               {t('auth.mfa.step1')}
@@ -191,7 +211,6 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({
             </div>
           </div>
 
-          {/* Step 2: Verification Code */}
           <div className="space-y-2">
             <label className="font-label-mono text-[10px] uppercase font-bold text-on-surface-variant block">
               {t('auth.mfa.step2')}
