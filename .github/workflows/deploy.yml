@@ -194,6 +194,15 @@ jobs:
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Verify Firebase CLI
+        run: |
+          set -euo pipefail
+          echo "Node: $(node --version)"
+          echo "npm: $(npm --version)"
+          echo "Firebase CLI: $(npx firebase-tools --version)"
+          echo "Firebase Tools package:"
+          npm ls firebase-tools --depth=0 || true
+
       - name: Verify authenticated Google identity
         run: |
           set -euo pipefail
