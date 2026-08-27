@@ -212,11 +212,16 @@ export const authService = {
     };
 
     try {
-      await setDoc(userRef, {
+      // Firestore rejects undefined values. Claims such as saccoId and authorityScope
+      // are optional for passengers and are legitimately absent from a new profile.
+      // JSON serialization removes only undefined properties while preserving the
+      // rest of this profile, including nested optional claim fields.
+      const firestoreProfile = JSON.parse(JSON.stringify({
         ...newProfile,
         activeRole: defaultRole,
         roles: [defaultRole],
-      });
+      }));
+      await setDoc(userRef, firestoreProfile);
     } catch (e) {
       console.warn('[authService] Could not persist new user profile to Firestore (offline mode active):', e);
     }
@@ -443,4 +448,3 @@ export const authService = {
     }
   },
 };
-
