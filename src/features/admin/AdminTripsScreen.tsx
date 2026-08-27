@@ -6,7 +6,7 @@ import { Trip, TripStatus } from '../../types';
 
 export const AdminTripsScreen: React.FC = () => {
   const [trips, setTrips] = useState<Trip[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
