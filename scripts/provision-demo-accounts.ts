@@ -42,6 +42,38 @@ if (!getApps().length) {
 const auth = getAuth();
 const db = getFirestore();
 
+async function enableTotpMfa(): Promise<void> {
+  console.log('Checking production TOTP MFA configuration...');
+
+  const projectConfig = await auth.projectConfigManager().getProjectConfig();
+  const existingProviders = projectConfig.multiFactorConfig?.providerConfigs ?? [];
+
+  const hasTotpProvider = existingProviders.some(
+    (provider) => 'totpProviderConfig' in provider,
+  );
+
+  if (hasTotpProvider) {
+    console.log('TOTP MFA provider is already configured.');
+    return;
+  }
+
+  await auth.projectConfigManager().updateProjectConfig({
+    multiFactorConfig: {
+      providerConfigs: [
+        ...existingProviders,
+        {
+          state: 'ENABLED',
+          totpProviderConfig: {
+            adjacentIntervals: 5,
+          },
+        },
+      ],
+    },
+  });
+
+  console.log('TOTP MFA provider enabled for the production project.');
+}
+
 async function upsertAuthUser(email: string, password: string, displayName: string): Promise<UserRecord> {
   try {
     const existing = await auth.getUserByEmail(email);
@@ -103,6 +135,8 @@ async function writeUserProfile(
 
 async function provision(): Promise<void> {
   console.log(`Provisioning Mwendo Salama demo accounts in ${PROJECT_ID}...`);
+
+  await enableTotpMfa();
 
   const adminUser = await upsertAuthUser(
     DEMO_ACCOUNTS.admin.email,
