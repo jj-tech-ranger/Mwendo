@@ -37,11 +37,15 @@ export const Button: React.FC<ButtonProps> = ({
     <button
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
+      aria-busy={isLoading}
       {...props}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">
-          <span className="material-symbols-outlined animate-spin text-lg">sync</span>
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+          />
           <span>{children}</span>
         </span>
       ) : (
