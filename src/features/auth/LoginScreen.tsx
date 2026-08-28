@@ -8,6 +8,7 @@ import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { authService } from '../../services/authService';
+import type { UserProfile } from '../../types';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -15,6 +16,7 @@ const loginSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
+type RouteProfile = Pick<UserProfile, 'activeRole' | 'role' | 'isMfaEnrolled'>;
 
 export const LoginScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -28,7 +30,7 @@ export const LoginScreen: React.FC = () => {
     resolver: zodResolver(loginSchema),
   });
 
-  const routeProfile = (profile: { activeRole?: string; role?: string; isMfaEnrolled?: boolean }) => {
+  const routeProfile = (profile: RouteProfile) => {
     const role = profile.activeRole || profile.role;
     if (role === 'admin' || role === 'authority') {
       navigate(profile.isMfaEnrolled ? '/auth/mfa-challenge' : '/auth/mfa-enrollment');
