@@ -22,12 +22,11 @@ interface PersistedTripState {
 }
 
 interface TripState extends PersistedTripState {
-  // Actions
   startTrip: (params: { plateNumber: string; saccoName?: string | undefined; saccoId?: string | undefined; routeName?: string | undefined }) => void;
   updateTelemetry: (speed: number, gps?: GPSPoint) => void;
   pauseTrip: () => void;
   resumeTrip: () => void;
-  endTrip: () => Trip | null;
+  endTrip: (status?: Trip['status']) => Trip | null;
   resetTrip: () => void;
 }
 
@@ -206,13 +205,13 @@ export const useTripStore = create<TripState>((set, get) => ({
     persistTrip(get());
   },
 
-  endTrip: () => {
+  endTrip: (status = 'completed') => {
     const state = get();
     if (!state.activeTrip) return null;
 
     const completedTrip: Trip = {
       ...state.activeTrip,
-      status: 'completed',
+      status,
       endTime: new Date().toISOString(),
       durationSeconds: state.durationSeconds,
       maxSpeedKmH: state.maxSpeed,
@@ -220,9 +219,7 @@ export const useTripStore = create<TripState>((set, get) => ({
     };
 
     clearPersistedTrip();
-    set({
-      ...EMPTY_TRIP_STATE,
-    });
+    set({ ...EMPTY_TRIP_STATE });
 
     return completedTrip;
   },
