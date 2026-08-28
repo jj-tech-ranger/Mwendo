@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { httpsCallable, HttpsCallableResult } from 'firebase/functions';
 import { Button } from '../../components/ui/Button';
-import { db, auth } from '../../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth, functions } from '../../lib/firebase';
 
 interface ServiceCheck {
   name: string;
@@ -13,6 +13,18 @@ interface ServiceCheck {
 
 type CheckStatus = ServiceCheck['status'];
 
+interface BackendHealthCheck {
+  service: 'backend' | 'firestore';
+  status: 'healthy' | 'error';
+  latencyMs: number;
+  details: string;
+}
+
+interface HealthCheckResponse {
+  checkedAt: string;
+  checks: BackendHealthCheck[];
+}
+
 const getErrorCode = (err: unknown): string => {
   if (typeof err === 'object' && err !== null && 'code' in err) {
     return String((err as { code?: unknown }).code ?? '');
@@ -20,48 +32,80 @@ const getErrorCode = (err: unknown): string => {
   return '';
 };
 
-const checkFirestore = async (): Promise<{ status: CheckStatus; latencyMs: number; details: string }> => {
-  const start = performance.now();
-  try {
-    await getDoc(doc(db, 'system_config', 'global'));
-    return {
-      status: 'healthy',
-      latencyMs: Math.round(performance.now() - start),
-      details: 'Connected and responding to a Firestore read.',
-    };
-  } catch (err: unknown) {
-    const latencyMs = Math.round(performance.now() - start);
-    const code = getErrorCode(err);
-    if (code === 'permission-denied' || code === 'not-found') {
-      return {
-        status: 'healthy',
-        latencyMs,
-        details: 'Firestore responded; the probe document is not readable or does not exist.',
-      };
-    }
-    return {
-      status: 'error',
-      latencyMs,
-      details: code ? `Firestore request failed (${code}).` : 'Firestore request failed.',
-    };
-  }
+const getErrorMessage = (err: unknown): string => {
+  if (err instanceof Error && err.message) return err.message;
+  return 'The diagnostic request could not be completed.';
 };
 
 export const AdminSystemHealthScreen: React.FC = () => {
   const [isTesting, setIsTesting] = useState(false);
+  const [backend, setBackend] = useState<Pick<ServiceCheck, 'status' | 'latencyMs' | 'details'>>({
+    status: 'checking',
+    details: 'Connecting to the backend diagnostic service...',
+  });
   const [firestore, setFirestore] = useState<Pick<ServiceCheck, 'status' | 'latencyMs' | 'details'>>({
     status: 'checking',
-    details: 'Checking Firestore connectivity...',
+    details: 'Waiting for the backend Firestore probe...',
   });
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   const checkHealth = useCallback(async () => {
     setIsTesting(true);
-    setFirestore((current) => ({ ...current, status: 'checking', details: 'Checking Firestore connectivity...' }));
-    const result = await checkFirestore();
-    setFirestore(result);
-    setLastChecked(new Date());
-    setIsTesting(false);
+    setBackend({ status: 'checking', details: 'Calling the authenticated backend health probe...' });
+    setFirestore({ status: 'checking', details: 'Waiting for the backend Firestore probe...' });
+
+    const start = performance.now();
+    try {
+      const healthCheck = httpsCallable<void, HealthCheckResponse>(functions, 'healthCheck');
+      const result: HttpsCallableResult<HealthCheckResponse> = await healthCheck();
+      const response = result.data;
+      const backendResult = response.checks.find((check) => check.service === 'backend');
+      const firestoreResult = response.checks.find((check) => check.service === 'firestore');
+      const requestLatency = Math.round(performance.now() - start);
+
+      setBackend(
+        backendResult
+          ? {
+              status: backendResult.status,
+              latencyMs: requestLatency,
+              details: backendResult.details,
+            }
+          : {
+              status: 'error',
+              latencyMs: requestLatency,
+              details: 'Backend returned no runtime health result.',
+            }
+      );
+
+      setFirestore(
+        firestoreResult
+          ? {
+              status: firestoreResult.status,
+              latencyMs: firestoreResult.latencyMs,
+              details: firestoreResult.details,
+            }
+          : {
+              status: 'error',
+              details: 'Backend returned no Firestore health result.',
+            }
+      );
+      setLastChecked(new Date(response.checkedAt));
+    } catch (err: unknown) {
+      const code = getErrorCode(err);
+      const details = code
+        ? `Backend diagnostic request failed (${code}). ${getErrorMessage(err)}`
+        : getErrorMessage(err);
+      const latencyMs = Math.round(performance.now() - start);
+      setBackend({ status: 'error', latencyMs, details });
+      setFirestore({
+        status: 'error',
+        latencyMs,
+        details: 'The backend probe did not return a Firestore result, so database health cannot be confirmed.',
+      });
+      setLastChecked(new Date());
+    } finally {
+      setIsTesting(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -69,33 +113,42 @@ export const AdminSystemHealthScreen: React.FC = () => {
   }, [checkHealth]);
 
   const authStatus: CheckStatus = auth.currentUser ? 'healthy' : 'unconfigured';
-  const services: ServiceCheck[] = [
-    {
-      name: 'Primary Cloud Database',
-      type: 'Real-Time Data Store',
-      ...firestore,
-    },
-    {
-      name: 'Identity & Authentication Gateway',
-      type: 'Security & Claims Provider',
-      status: authStatus,
-      details: auth.currentUser
-        ? `Authenticated session active (${auth.currentUser.email || auth.currentUser.uid}).`
-        : 'Firebase Auth is loaded, but no authenticated session is active.',
-    },
-    {
-      name: 'Audit & Incident Pipeline',
-      type: 'System Auditing & Logs',
-      status: 'unconfigured',
-      details: 'No client-side health probe is configured for the audit pipeline.',
-    },
-    {
-      name: 'Vehicle GPS Ingestion Pipeline',
-      type: 'Real-Time GPS Location Stream',
-      status: 'unconfigured',
-      details: 'No live ingestion health probe is configured on this admin client.',
-    },
-  ];
+
+  const services: ServiceCheck[] = useMemo(
+    () => [
+      {
+        name: 'Cloud Functions Runtime',
+        type: 'Authenticated Backend Runtime',
+        ...backend,
+      },
+      {
+        name: 'Primary Cloud Database',
+        type: 'Real-Time Data Store',
+        ...firestore,
+      },
+      {
+        name: 'Identity & Authentication Gateway',
+        type: 'Security & Claims Provider',
+        status: authStatus,
+        details: auth.currentUser
+          ? `Authenticated administrator session active (${auth.currentUser.email || auth.currentUser.uid}).`
+          : 'Firebase Auth is loaded, but no authenticated session is active.',
+      },
+      {
+        name: 'Audit & Incident Pipeline',
+        type: 'System Auditing & Logs',
+        status: 'unconfigured',
+        details: 'No dedicated backend audit health probe exists yet; status is intentionally not inferred.',
+      },
+      {
+        name: 'Vehicle GPS Ingestion Pipeline',
+        type: 'Real-Time GPS Location Stream',
+        status: 'unconfigured',
+        details: 'No dedicated ingestion health probe exists yet; status is intentionally not inferred.',
+      },
+    ],
+    [authStatus, backend, firestore]
+  );
 
   const overallStatus = services.some((service) => service.status === 'error')
     ? 'error'
@@ -104,6 +157,15 @@ export const AdminSystemHealthScreen: React.FC = () => {
       : services.some((service) => service.status === 'unconfigured')
         ? 'degraded'
         : 'healthy';
+
+  const overallLabel =
+    overallStatus === 'healthy'
+      ? 'Operational'
+      : overallStatus === 'checking'
+        ? 'Checking'
+        : overallStatus === 'degraded'
+          ? 'Partially monitored'
+          : 'Attention required';
 
   return (
     <div className="bg-[#0A0F1D] text-slate-100 p-lg sm:p-xl rounded-2xl border border-slate-800 space-y-lg font-label-mono shadow-2xl">
@@ -124,9 +186,10 @@ export const AdminSystemHealthScreen: React.FC = () => {
             <h2 className="text-base text-emerald-400 font-bold uppercase tracking-widest">
               Infrastructure Health & Status
             </h2>
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">{overallLabel}</span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Live client connectivity diagnostics.{' '}
+            Backend-backed diagnostics.{' '}
             {lastChecked ? `Last checked: ${lastChecked.toLocaleTimeString()}` : 'Initial check in progress...'}
           </p>
         </div>
@@ -138,7 +201,7 @@ export const AdminSystemHealthScreen: React.FC = () => {
           disabled={isTesting}
         >
           <span className="material-symbols-outlined text-base" aria-hidden="true">swap_calls</span>
-          {isTesting ? 'Checking Database...' : 'Run Diagnostics Ping'}
+          {isTesting ? 'Running Diagnostics...' : 'Run Diagnostics Ping'}
         </Button>
       </div>
 
@@ -189,10 +252,10 @@ export const AdminSystemHealthScreen: React.FC = () => {
       <div className="bg-[#111827] border border-slate-800 rounded-xl p-md space-y-sm">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-base text-slate-400" aria-hidden="true">info</span>
-          <span className="text-xs font-bold text-white">System Infrastructure Monitoring</span>
+          <span className="text-xs font-bold text-white">Monitoring integrity</span>
         </div>
         <p className="text-xs text-slate-400 leading-relaxed">
-          This screen reports only checks that the browser can actually perform. Backend pipelines without a dedicated health probe are shown as unconfigured rather than incorrectly reported as healthy.
+          Green means the system performed a real check successfully. Audit and GPS ingestion remain unconfigured until their own backend probes are implemented; the dashboard will not infer health from unrelated Firebase connectivity.
         </p>
       </div>
     </div>
