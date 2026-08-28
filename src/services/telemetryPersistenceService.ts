@@ -1,4 +1,5 @@
 import { GPSSample } from '../lib/engine';
+import { ACTIVE_TRIP_STORAGE_KEY } from '../store/useTripStore';
 import { offlineStorage } from './offlineStorage';
 
 const KEY_PREFIX = 'active_trip_telemetry_';
@@ -26,7 +27,22 @@ export const telemetryPersistenceService = {
   },
 
   async clear(tripId: string): Promise<void> {
-    writeQueue = writeQueue.then(() => offlineStorage.removeItem(keyForTrip(tripId)));
+    writeQueue = writeQueue.then(async () => {
+      await offlineStorage.removeItem(keyForTrip(tripId));
+
+      // The completed-trip save is performed before this method is called.
+      // Clearing both recovery records together prevents a finished trip from
+      // being resurrected after a reload while preserving crash recovery until
+      // the trip is safely queued.
+      if (typeof window !== 'undefined') {
+        try {
+          window.localStorage.removeItem(ACTIVE_TRIP_STORAGE_KEY);
+        } catch {
+          // Ignore localStorage failures; the completed trip is already saved.
+        }
+      }
+    });
+
     await writeQueue;
   },
 };
