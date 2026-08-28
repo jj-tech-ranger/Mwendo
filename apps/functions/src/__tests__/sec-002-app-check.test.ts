@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { suspendUser, reactivateUser } from '../admin/suspendUser';
+import { healthCheck } from '../admin/healthCheck';
 import { syncPublicPins } from '../pins/syncPublicPins';
 import { computeVehicleRisk } from '../risk/computeVehicleRisk';
 import { updateDailyAnalytics } from '../analytics/updateDailyAnalytics';
@@ -46,23 +47,27 @@ describe('SEC-002: App Check Enforcement across 2nd-gen Cloud Functions', () => 
   });
 
   describe('Callable Cloud Functions configuration', () => {
-    it('all six target callable functions are defined and exported correctly', () => {
+    it('all seven target callable functions are defined and exported correctly', () => {
       expect(suspendUser).toBeDefined();
       expect(reactivateUser).toBeDefined();
+      expect(healthCheck).toBeDefined();
       expect(syncPublicPins).toBeDefined();
       expect(computeVehicleRisk).toBeDefined();
       expect(updateDailyAnalytics).toBeDefined();
       expect(rebuildSaccoAnalytics).toBeDefined();
     });
 
-    it('all six functions maintain functional handlers callable via .run()', async () => {
-      // Unauthenticated invocation should reject with 'unauthenticated'
+    it('all protected callable functions reject unauthenticated invocation', async () => {
+      // Unauthenticated invocation should reject with 'unauthenticated'.
       const unauthRequest = { auth: null, data: {} } as any;
 
       await expect(suspendUser.run(unauthRequest)).rejects.toMatchObject({
         code: 'unauthenticated',
       });
       await expect(reactivateUser.run(unauthRequest)).rejects.toMatchObject({
+        code: 'unauthenticated',
+      });
+      await expect(healthCheck.run(unauthRequest)).rejects.toMatchObject({
         code: 'unauthenticated',
       });
       await expect(syncPublicPins.run(unauthRequest)).rejects.toMatchObject({
@@ -76,6 +81,20 @@ describe('SEC-002: App Check Enforcement across 2nd-gen Cloud Functions', () => 
       });
       await expect(rebuildSaccoAnalytics.run(unauthRequest)).rejects.toMatchObject({
         code: 'unauthenticated',
+      });
+    });
+
+    it('healthCheck rejects authenticated non-admin roles before touching Firestore', async () => {
+      const nonAdminRequest = {
+        auth: {
+          uid: 'test-manager',
+          token: { role: 'sacco_manager' },
+        },
+        data: {},
+      } as any;
+
+      await expect(healthCheck.run(nonAdminRequest)).rejects.toMatchObject({
+        code: 'permission-denied',
       });
     });
   });
