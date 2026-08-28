@@ -17,6 +17,7 @@ export { updateDailyAnalytics, dailyAnalyticsScheduled } from './analytics/updat
 export { syncPublicPins } from './pins/syncPublicPins';
 export { sendSOS } from './alerts/sendSOS';
 export { reportBlackSpot } from './reports/reportBlackSpot';
+export { createInspection } from './inspections/createInspection';
 export { dailyPurge } from './scheduled/dailyPurge';
 export { weeklyReport } from './scheduled/weeklyReport';
 export { monthlyArchival } from './scheduled/monthlyArchival';
