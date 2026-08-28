@@ -175,6 +175,9 @@ service cloud.firestore {
     }
 
     // Trips Collection
+    // Trip records are safety evidence. Clients create their own trip record, but only
+    // trusted authority/admin actors may mutate an existing trip. This prevents a passenger
+    // or SACCO manager from rewriting status, speed metrics, violations, timestamps, or GPS data.
     match /trips/{tripId} {
       allow read: if isSignedIn() && (
         resource.data.userId == request.auth.uid ||
@@ -183,16 +186,7 @@ service cloud.firestore {
         hasActiveRole('authority')
       );
       allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data);
-      allow update: if (
-        isAuthority() && isValidTripData(request.resource.data)
-      ) || (
-        isSignedIn() && resource.data.userId == request.auth.uid &&
-        request.resource.data.userId == resource.data.userId &&
-        keepsSaccoId() && isValidTripData(request.resource.data)
-      ) || (
-        isSignedIn() && resource.data.saccoId != null && isSaccoManager(resource.data.saccoId) &&
-        request.resource.data.saccoId == resource.data.saccoId && isValidTripData(request.resource.data)
-      );
+      allow update: if isAuthority() && isValidTripData(request.resource.data);
       allow delete: if isAdmin();
     }
 
