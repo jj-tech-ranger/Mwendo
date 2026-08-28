@@ -321,7 +321,18 @@ export const ActiveTripScreen: React.FC = () => {
   };
 
   if (summaryData) {
-    const isHighRisk = summaryData.maxSpeedKmH > 90 || (summaryData.overspeedEventsCount ?? 0) > 0;
+    const isIncompleteSignalLost = summaryData.status === 'incomplete_signal_lost';
+    const isHighRisk = !isIncompleteSignalLost && (summaryData.maxSpeedKmH > 90 || (summaryData.overspeedEventsCount ?? 0) > 0);
+    const summaryScore = isIncompleteSignalLost ? '—' : isHighRisk ? '72' : '94';
+    const summaryBadgeVariant = isIncompleteSignalLost ? 'warning' : isHighRisk ? 'warning' : 'success';
+    const summaryBadgeText = isIncompleteSignalLost
+      ? 'Trip Incomplete — GPS Signal Lost'
+      : isHighRisk
+        ? 'Moderate Risk Detected'
+        : 'Safe Trip Completed';
+    const summaryDescription = isIncompleteSignalLost
+      ? `GPS signal was unavailable for ${GPS_RECOVERY_TIMEOUT_SECONDS} seconds. The trip was stopped and marked incomplete so the recorded data is not presented as a fully verified trip.`
+      : `${summaryData.routeName} (${summaryData.saccoName})`;
 
     return (
       <div className="min-h-screen bg-background text-on-background p-4 sm:p-6 max-w-lg mx-auto space-y-6 animate-in fade-in">
@@ -333,32 +344,44 @@ export const ActiveTripScreen: React.FC = () => {
           <div className="w-8" />
         </div>
 
-        <Card className="p-6 text-center space-y-4 shadow-md">
+        <Card className={`p-6 text-center space-y-4 shadow-md ${isIncompleteSignalLost ? 'border border-amber-500/40' : ''}`}>
           <div className="relative w-32 h-32 mx-auto flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" className="text-surface-container-high" fill="transparent" />
-              <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" strokeDasharray={250} strokeDashoffset={isHighRisk ? 80 : 30} className={isHighRisk ? 'text-amber-500' : 'text-emerald-600'} fill="transparent" strokeLinecap="round" />
+              <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" strokeDasharray={250} strokeDashoffset={isIncompleteSignalLost ? 250 : isHighRisk ? 80 : 30} className={isIncompleteSignalLost ? 'text-amber-500' : isHighRisk ? 'text-amber-500' : 'text-emerald-600'} fill="transparent" strokeLinecap="round" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black font-mono">{isHighRisk ? '72' : '94'}</span>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">/ 100</span>
+              <span className="text-3xl font-black font-mono">{summaryScore}</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">{isIncompleteSignalLost ? 'N/A' : '/ 100'}</span>
             </div>
           </div>
           <div>
-            <Badge variant={isHighRisk ? 'warning' : 'success'} className="px-3 py-1 font-bold">{isHighRisk ? 'Moderate Risk Detected' : 'Safe Trip Completed'}</Badge>
-            <p className="text-xs text-on-surface-variant mt-2">{summaryData.routeName} ({summaryData.saccoName})</p>
+            <Badge variant={summaryBadgeVariant} className="px-3 py-1 font-bold">{summaryBadgeText}</Badge>
+            <p className="text-xs text-on-surface-variant mt-2">{summaryDescription}</p>
           </div>
         </Card>
 
+        {isIncompleteSignalLost && (
+          <Card className="p-4 border border-amber-500/40 bg-amber-500/5">
+            <div className="flex items-start gap-3 text-xs">
+              <span className="material-symbols-outlined text-amber-600 text-xl">location_off</span>
+              <div>
+                <div className="font-bold text-on-surface">Why was this trip marked incomplete?</div>
+                <p className="text-on-surface-variant mt-1">Mwendo could not receive a valid GPS position within the recovery window. The available telemetry was retained, but the trip is not treated as a fully verified completed journey.</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
-          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Total Duration</span><div className="text-xl font-black font-mono">{formatDuration(summaryData.durationSeconds || 1122)}</div></Card>
-          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Max Speed</span><div className={`text-xl font-black font-mono ${summaryData.maxSpeedKmH > 90 ? 'text-error' : 'text-on-surface'}`}>{summaryData.maxSpeedKmH || 78} km/h</div></Card>
-          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Average Speed</span><div className="text-xl font-black font-mono">54 km/h</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Total Duration</span><div className="text-xl font-black font-mono">{formatDuration(summaryData.durationSeconds || 0)}</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Max Speed</span><div className={`text-xl font-black font-mono ${summaryData.maxSpeedKmH > 90 ? 'text-error' : 'text-on-surface'}`}>{summaryData.maxSpeedKmH || 0} km/h</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Average Speed</span><div className="text-xl font-black font-mono">{summaryData.avgSpeedKmH || 0} km/h</div></Card>
           <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Overspeed Events</span><div className={`text-xl font-black font-mono ${(summaryData.overspeedEventsCount ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>{summaryData.overspeedEventsCount ?? 0}</div></Card>
         </div>
 
         <Card className="p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs"><span className="font-bold text-on-surface">Route GPS Track</span><span className="font-mono text-emerald-700">Verified</span></div>
+          <div className="flex items-center justify-between text-xs"><span className="font-bold text-on-surface">Route GPS Track</span><span className={`font-mono ${isIncompleteSignalLost ? 'text-amber-700' : 'text-emerald-700'}`}>{isIncompleteSignalLost ? 'Incomplete' : 'Verified'}</span></div>
           <div className="h-28 bg-surface-container-high rounded-xl flex items-center justify-center relative overflow-hidden border border-outline-variant/30">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/10 to-teal-900/10" />
             <div className="flex items-center gap-2 text-xs font-mono font-semibold text-on-surface-variant z-10"><span className="material-symbols-outlined text-primary text-base">near_me</span>{summaryData.plateNumber} · Thika Road Corridor</div>
