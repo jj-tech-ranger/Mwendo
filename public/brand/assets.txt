@@ -1,0 +1,4 @@
+├── logo-light.png
+├── logo-dark.png
+├── favicon-light.png
+└── favicon-dark.png
