@@ -8,13 +8,13 @@ import { ThemeToggle } from '../common/ThemeToggle';
 import { LanguageToggle } from '../common/LanguageToggle';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { BrandLoader } from '../ui/LoadingIndicators';
 
 export const SaccoShell: React.FC = () => {
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const user = useAuthStore((s) => s.user);
-
   const currentSaccoId = getEffectiveSaccoId(user?.saccoId);
   const currentSaccoName = currentSaccoId ? getSaccoName(currentSaccoId) : null;
 
@@ -53,159 +53,39 @@ export const SaccoShell: React.FC = () => {
   return (
     <div className="min-h-screen bg-background text-on-background flex flex-col font-body-md">
       <OfflineBanner />
-
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar (Fixed left ~260px) */}
-        <aside
-          className={cn(
-            'bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col justify-between transition-all duration-300 z-30 select-none',
-            isCollapsed ? 'w-20' : 'w-64'
-          )}
-        >
-          {/* Sidebar Top Header */}
+        <aside className={cn('bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col justify-between transition-all duration-300 z-30 select-none', isCollapsed ? 'w-20' : 'w-64')}>
           <div className="p-4 flex items-center justify-between border-b border-outline-variant/20">
             <div className="flex items-center gap-3 overflow-hidden">
               <img src={BRAND_ASSETS.appIcon} alt="Mwendo Salama" className="w-9 h-9 rounded-lg" />
-              {!isCollapsed && (
-                <div>
-                  <h1 className="font-headline-lg-mobile text-sm text-primary leading-tight font-black">
-                    Mwendo Salama
-                  </h1>
-                  <span className="font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider block">
-                    {t('sacco.shell.manager')}
-                  </span>
-                </div>
-              )}
+              {!isCollapsed && <div><h1 className="font-headline-lg-mobile text-sm text-primary leading-tight font-black">Mwendo Salama</h1><span className="font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider block">{t('sacco.shell.manager')}</span></div>}
             </div>
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              aria-label={isCollapsed ? t('sacco.shell.expandSidebar') : t('sacco.shell.collapseSidebar')}
-              className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container"
-            >
-              <span className="material-symbols-outlined text-xl">
-                {isCollapsed ? 'chevron_right' : 'chevron_left'}
-              </span>
-            </button>
+            <button onClick={() => setIsCollapsed(!isCollapsed)} aria-label={isCollapsed ? t('sacco.shell.expandSidebar') : t('sacco.shell.collapseSidebar')} className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container"><span className="material-symbols-outlined text-xl">{isCollapsed ? 'chevron_right' : 'chevron_left'}</span></button>
           </div>
-
-          {/* SACCO Active Display */}
-          {currentSaccoName && !isCollapsed && (
-            <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 flex items-center gap-1.5 text-xs overflow-hidden">
-              <span className="material-symbols-outlined text-primary text-base">domain</span>
-              <span className="font-bold text-primary truncate">{currentSaccoName}</span>
-            </div>
-          )}
-
-          {/* Navigation Items */}
+          {currentSaccoName && !isCollapsed && <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 flex items-center gap-1.5 text-xs overflow-hidden"><span className="material-symbols-outlined text-primary text-base">domain</span><span className="font-bold text-primary truncate">{currentSaccoName}</span></div>}
           <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/sacco'}
-                className={({ isActive }) =>
-                  cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-colors',
-                    isActive
-                      ? 'bg-primary text-on-primary shadow-sm'
-                      : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
-                  )
-                }
-              >
-                <span className="material-symbols-outlined text-lg">{item.icon}</span>
-                {!isCollapsed && <span>{item.label}</span>}
-              </NavLink>
-            ))}
+            {navItems.map((item) => <NavLink key={item.path} to={item.path} end={item.path === '/sacco'} className={({ isActive }) => cn('flex items-center gap-3 px-3 py-2 rounded-xl font-bold text-xs transition-colors', isActive ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface')}><span className="material-symbols-outlined text-lg">{item.icon}</span>{!isCollapsed && <span>{item.label}</span>}</NavLink>)}
           </nav>
-
-          {/* Sidebar Footer Controls */}
           <div className="p-3 border-t border-outline-variant/20 space-y-2">
-            <div className={cn('flex items-center justify-between gap-2', isCollapsed && 'flex-col')}>
-              <ThemeToggle />
-              <LanguageToggle />
-            </div>
-            {!isCollapsed && (
-              <div className="text-center font-mono text-[9px] text-on-surface-variant/70 uppercase">
-                {currentSaccoId} • {t('sacco.shell.portal')}
-              </div>
-            )}
+            <div className={cn('flex items-center justify-between gap-2', isCollapsed && 'flex-col')}><ThemeToggle /><LanguageToggle /></div>
+            {!isCollapsed && <div className="text-center font-mono text-[9px] text-on-surface-variant/70 uppercase">{currentSaccoId} • {t('sacco.shell.portal')}</div>}
           </div>
         </aside>
-
-        {/* Main Content View Container */}
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-          {/* Top Header Bar */}
           <header className="h-16 border-b border-outline-variant/20 bg-surface px-6 flex items-center justify-between sticky top-0 z-20 shadow-xs">
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-mono font-bold text-on-surface-variant uppercase tracking-wider">
-                {currentSaccoName}
-              </span>
-              <span className="text-on-surface-variant/40">/</span>
-              <span className="font-black text-sm text-on-surface">{getBreadcrumb()}</span>
-            </div>
-
+            <div className="flex items-center gap-3"><span className="text-xs font-mono font-bold text-on-surface-variant uppercase tracking-wider">{currentSaccoName}</span><span className="text-on-surface-variant/40">/</span><span className="font-black text-sm text-on-surface">{getBreadcrumb()}</span></div>
             <div className="flex items-center gap-4">
-              <div className="relative hidden md:block">
-                <span className="material-symbols-outlined absolute left-2.5 top-2 text-on-surface-variant text-sm">
-                  search
-                </span>
-                <input
-                  type="text"
-                  placeholder={t('sacco.shell.searchPlaceholder')}
-                  className="pl-8 pr-3 py-1.5 bg-surface-container text-xs rounded-lg border border-outline-variant/40 w-64 focus:outline-hidden focus:border-primary"
-                />
-              </div>
-
-              {/* Notification Bell */}
-              <button
-                className="relative p-2 rounded-lg hover:bg-surface-container text-on-surface-variant"
-                aria-label={t('sacco.shell.notifications')}
-                title={t('sacco.shell.notifications')}
-              >
-                <span className="material-symbols-outlined text-xl">notifications</span>
-                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-error" />
-              </button>
-
+              <div className="relative hidden md:block"><span className="material-symbols-outlined absolute left-2.5 top-2 text-on-surface-variant text-sm">search</span><input type="text" placeholder={t('sacco.shell.searchPlaceholder')} className="pl-8 pr-3 py-1.5 bg-surface-container text-xs rounded-lg border border-outline-variant/40 w-64 focus:outline-hidden focus:border-primary" /></div>
+              <button className="relative p-2 rounded-lg hover:bg-surface-container text-on-surface-variant" aria-label={t('sacco.shell.notifications')} title={t('sacco.shell.notifications')}><span className="material-symbols-outlined text-xl">notifications</span><span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-error" /></button>
               <div className="h-6 w-px bg-outline-variant/30" />
-
-              {/* Manager User Profile Avatar */}
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs">
-                  {user?.displayName ? user.displayName.charAt(0) : 'M'}
-                </div>
-                <div className="hidden sm:block text-left text-xs">
-                  <div className="font-bold text-on-surface leading-none">
-                    {user?.displayName || t('sacco.shell.defaultUser')}
-                  </div>
-                  <div className="text-[10px] text-on-surface-variant font-mono">
-                    {currentSaccoName}
-                  </div>
-                </div>
-              </div>
+              <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-xs">{user?.displayName ? user.displayName.charAt(0) : 'M'}</div><div className="hidden sm:block text-left text-xs"><div className="font-bold text-on-surface leading-none">{user?.displayName || t('sacco.shell.defaultUser')}</div><div className="text-[10px] text-on-surface-variant font-mono">{currentSaccoName}</div></div></div>
             </div>
           </header>
-
           <main className="p-6 max-w-7xl w-full mx-auto flex-1">
-            <React.Suspense
-              fallback={
-                <div className="min-h-[400px] flex items-center justify-center p-8">
-                  <div className="flex flex-col items-center gap-3">
-                    <span className="material-symbols-outlined text-primary text-3xl animate-spin">
-                      progress_activity
-                    </span>
-                    <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-                      {t('sacco.shell.loadingWorkspace')}
-                    </span>
-                  </div>
-                </div>
-              }
-            >
-              <Outlet />
-            </React.Suspense>
+            <React.Suspense fallback={<div className="min-h-[400px] flex items-center justify-center p-8" aria-live="polite"><BrandLoader size="md" /></div>}><Outlet /></React.Suspense>
           </main>
         </div>
       </div>
     </div>
   );
 };
-
