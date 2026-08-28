@@ -14,6 +14,8 @@ import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/e
 import { remoteConfigService } from '../../services/remoteConfigService';
 import { Trip } from '../../types';
 
+const GPS_RECOVERY_TIMEOUT_SECONDS = 75;
+
 export const ActiveTripScreen: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -36,11 +38,28 @@ export const ActiveTripScreen: React.FC = () => {
   const [setupRoute, setSetupRoute] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
   const [summaryData, setSummaryData] = useState<Trip | null>(null);
+  const [gpsSignalLost, setGpsSignalLost] = useState(false);
+  const [gpsRecoverySeconds, setGpsRecoverySeconds] = useState(GPS_RECOVERY_TIMEOUT_SECONDS);
 
   // Ref to hold SpeedSmoother instance per active trip
   const speedSmootherRef = useRef<SpeedSmoother>(new SpeedSmoother(0.35, 30));
   // Ref array to buffer accepted GPSSamples for the duration of the trip
   const gpsSamplesBufferRef = useRef<GPSSample[]>([]);
+  // GPS watchdog refs prevent stale callbacks and duplicate auto-completion.
+  const gpsWatchdogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gpsWatchdogIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tripCompletionInProgressRef = useRef(false);
+
+  const clearGpsWatchdog = () => {
+    if (gpsWatchdogTimeoutRef.current) {
+      clearTimeout(gpsWatchdogTimeoutRef.current);
+      gpsWatchdogTimeoutRef.current = null;
+    }
+    if (gpsWatchdogIntervalRef.current) {
+      clearInterval(gpsWatchdogIntervalRef.current);
+      gpsWatchdogIntervalRef.current = null;
+    }
+  };
 
   // Timer for duration counter
   useEffect(() => {
@@ -55,13 +74,62 @@ export const ActiveTripScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [isTracking, isPaused]);
 
-  // Real Geolocation Watcher
+  // Real Geolocation Watcher + GPS-loss recovery watchdog.
   useEffect(() => {
-    if (!isTracking || isPaused) return;
+    if (!isTracking || isPaused) {
+      clearGpsWatchdog();
+      setGpsSignalLost(false);
+      setGpsRecoverySeconds(GPS_RECOVERY_TIMEOUT_SECONDS);
+      return;
+    }
     if (!('geolocation' in navigator)) return;
+
+    let disposed = false;
+
+    const handleGpsRecovered = () => {
+      if (disposed) return;
+      clearGpsWatchdog();
+      setGpsSignalLost(false);
+      setGpsRecoverySeconds(GPS_RECOVERY_TIMEOUT_SECONDS);
+    };
+
+    const handleGpsLost = () => {
+      if (disposed || tripCompletionInProgressRef.current) return;
+
+      clearGpsWatchdog();
+      setGpsSignalLost(true);
+      setGpsRecoverySeconds(GPS_RECOVERY_TIMEOUT_SECONDS);
+
+      const deadline = Date.now() + GPS_RECOVERY_TIMEOUT_SECONDS * 1000;
+
+      gpsWatchdogIntervalRef.current = setInterval(() => {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        setGpsRecoverySeconds(remaining);
+
+        if (remaining <= 0 && gpsWatchdogIntervalRef.current) {
+          clearInterval(gpsWatchdogIntervalRef.current);
+          gpsWatchdogIntervalRef.current = null;
+        }
+      }, 1000);
+
+      gpsWatchdogTimeoutRef.current = setTimeout(() => {
+        if (disposed || tripCompletionInProgressRef.current) return;
+        tripCompletionInProgressRef.current = true;
+        void handleConfirmEndTrip('incomplete_signal_lost');
+      }, GPS_RECOVERY_TIMEOUT_SECONDS * 1000);
+    };
+
+    const armGpsWatchdog = () => {
+      clearGpsWatchdog();
+      gpsWatchdogTimeoutRef.current = setTimeout(handleGpsLost, GPS_RECOVERY_TIMEOUT_SECONDS * 1000);
+    };
+
+    armGpsWatchdog();
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        handleGpsRecovered();
+
         const rawSpeedMs = pos.coords.speed;
         const rawSpeedKmH = rawSpeedMs !== null && rawSpeedMs >= 0 ? Math.round(rawSpeedMs * 3.6) : currentSpeed;
         
@@ -84,14 +152,24 @@ export const ActiveTripScreen: React.FC = () => {
             speedKmH: smoothedSpeedKmH,
           });
         }
+
+        // A successful geolocation callback means the signal is healthy even if
+        // the sample is rejected by the speed smoother.
+        armGpsWatchdog();
       },
       (err) => {
+        if (disposed) return;
         console.warn('Geolocation position error:', err);
+        handleGpsLost();
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
     );
 
-    return () => navigator.geolocation.clearWatch(watchId);
+    return () => {
+      disposed = true;
+      clearGpsWatchdog();
+      navigator.geolocation.clearWatch(watchId);
+    };
   }, [isTracking, isPaused]);
 
   // Initial Auto Start if coming from Dashboard
@@ -99,6 +177,7 @@ export const ActiveTripScreen: React.FC = () => {
     if (!isTracking && !summaryData) {
       speedSmootherRef.current.reset();
       gpsSamplesBufferRef.current = [];
+      tripCompletionInProgressRef.current = false;
       if (setupPlate) {
         startTrip({
           plateNumber: setupPlate,
@@ -111,6 +190,9 @@ export const ActiveTripScreen: React.FC = () => {
     }
   }, []);
 
+  // Ensure watchdog timers cannot survive component unmount.
+  useEffect(() => () => clearGpsWatchdog(), []);
+
   // Format Duration seconds -> MM:SS
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -118,7 +200,11 @@ export const ActiveTripScreen: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
   };
 
-  const handleConfirmEndTrip = async () => {
+  const handleConfirmEndTrip = async (status: Trip['status'] = 'completed') => {
+    if (status === 'incomplete_signal_lost') {
+      clearGpsWatchdog();
+    }
+
     const routeCoords = useTripStore.getState().routeCoordinates;
     const currentUser = useAuthStore.getState().user;
 
@@ -127,7 +213,7 @@ export const ActiveTripScreen: React.FC = () => {
     const detectedViolations = detectOverspeedViolations(gpsSamplesBufferRef.current, speedLimit);
     const calculatedOverspeedCount = detectedViolations.length;
 
-    const completed = endTrip();
+    const completed = endTrip(status);
     const userId = currentUser?.uid || currentUser?.id;
     const result: Trip = completed
       ? {
@@ -151,7 +237,7 @@ export const ActiveTripScreen: React.FC = () => {
           durationSeconds,
           overspeedEventsCount: calculatedOverspeedCount,
           violationsCount: calculatedOverspeedCount,
-          status: 'completed',
+          status,
           startTime: new Date().toISOString(),
           endTime: new Date().toISOString(),
         };
@@ -364,6 +450,22 @@ export const ActiveTripScreen: React.FC = () => {
         </button>
       </div>
 
+      {/* GPS Recovery Banner */}
+      {gpsSignalLost && (
+        <div className="relative z-20 mt-3 rounded-xl border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-xs text-amber-100 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-400 text-base">location_off</span>
+            <div className="min-w-0 flex-1">
+              <div className="font-bold text-white">GPS signal lost</div>
+              <div className="text-[11px] text-amber-200/90">
+                Reconnecting… trip will be marked incomplete in {gpsRecoverySeconds}s if GPS does not return.
+              </div>
+            </div>
+            <span className="font-mono font-black text-amber-300">{gpsRecoverySeconds}s</span>
+          </div>
+        </div>
+      )}
+
       {/* Speedometer Gauge Canvas */}
       <div className="relative z-10 my-auto py-6 text-center space-y-6">
         {/* Main Speed Gauge */}
@@ -523,7 +625,10 @@ export const ActiveTripScreen: React.FC = () => {
             </Button>
             <Button
               className="flex-1 bg-error hover:bg-error/90 text-on-error text-xs font-bold"
-              onClick={handleConfirmEndTrip}
+              onClick={() => {
+                tripCompletionInProgressRef.current = true;
+                void handleConfirmEndTrip();
+              }}
             >
               End Trip Now
             </Button>
