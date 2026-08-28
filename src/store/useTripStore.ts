@@ -28,6 +28,7 @@ interface TripState extends PersistedTripState {
   resumeTrip: () => void;
   endTrip: (status?: Trip['status']) => Trip | null;
   resetTrip: () => void;
+  clearActiveTripPersistence: () => void;
 }
 
 const EMPTY_TRIP_STATE: PersistedTripState = {
@@ -218,10 +219,15 @@ export const useTripStore = create<TripState>((set, get) => ({
       overspeedEventsCount: state.overspeedCount,
     };
 
-    clearPersistedTrip();
+    // Keep the persisted active-trip recovery record until the caller has
+    // safely saved or queued the completed trip.
     set({ ...EMPTY_TRIP_STATE });
 
     return completedTrip;
+  },
+
+  clearActiveTripPersistence: () => {
+    clearPersistedTrip();
   },
 
   resetTrip: () => {
