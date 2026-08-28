@@ -21,81 +21,70 @@ const JourneyVisual: React.FC = () => (
   <div className="relative h-full min-h-[520px] overflow-hidden rounded-[36px] bg-primary p-8 text-on-primary lg:min-h-[680px]">
     <style>{`
       @keyframes routeFlow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -420; } }
-      @keyframes beaconPulse { 0%,100% { transform: scale(.72); opacity: .18; } 50% { transform: scale(1.18); opacity: .72; } }
+      @keyframes beaconPulse { 0%,100% { transform: scale(.78); opacity: .2; } 50% { transform: scale(1.12); opacity: .7; } }
       @keyframes orbit { from { transform: rotate(0deg) translateX(88px) rotate(0deg); } to { transform: rotate(360deg) translateX(88px) rotate(-360deg); } }
-      @keyframes floatCard { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
-      @keyframes signal { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1); } }
-      @keyframes sweep { 0% { transform: translateX(-130%); opacity: 0; } 15%,75% { opacity: .5; } 100% { transform: translateX(130%); opacity: 0; } }
-      .mw-route-flow { animation: routeFlow 7s linear infinite; }
-      .mw-beacon { transform-box: fill-box; transform-origin: center; animation: beaconPulse 3.2s ease-in-out infinite; }
-      .mw-orbit { transform-box: fill-box; transform-origin: center; animation: orbit 8s linear infinite; }
-      .mw-float { animation: floatCard 5s ease-in-out infinite; }
-      .mw-signal { animation: signal 2.2s ease-in-out infinite; }
-      .mw-sweep { animation: sweep 5s ease-in-out infinite; }
-      @media(prefers-reduced-motion:reduce){.mw-route-flow,.mw-beacon,.mw-orbit,.mw-float,.mw-signal,.mw-sweep{animation:none!important}}
+      @keyframes floatCard { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-7px,0); } }
+      @keyframes signal { 0%,100% { opacity: .18; transform: scale(.78); } 50% { opacity: .85; transform: scale(1.08); } }
+      @keyframes sweep { 0% { transform: translateX(-140%); opacity: 0; } 18%,70% { opacity: .28; } 100% { transform: translateX(140%); opacity: 0; } }
+      @keyframes cardIn { from { opacity: 0; transform: translate3d(0,12px,0) scale(.97); } to { opacity: 1; transform: translate3d(0,0,0) scale(1); } }
+      .mw-route-flow { animation: routeFlow 8s linear infinite; }
+      .mw-beacon { transform-box: fill-box; transform-origin: center; animation: beaconPulse 3.6s ease-in-out infinite; }
+      .mw-orbit { transform-box: fill-box; transform-origin: center; animation: orbit 9s linear infinite; }
+      .mw-float { animation: floatCard 5.5s ease-in-out infinite; }
+      .mw-signal { transform-box: fill-box; transform-origin: center; animation: signal 2.6s ease-in-out infinite; }
+      .mw-sweep { animation: sweep 7s ease-in-out infinite; }
+      .mw-card-in { animation: cardIn .8s cubic-bezier(.22,1,.36,1) both; }
+      @media(prefers-reduced-motion:reduce){.mw-route-flow,.mw-beacon,.mw-orbit,.mw-float,.mw-signal,.mw-sweep,.mw-card-in{animation:none!important}}
     `}</style>
-
     <div className="absolute -right-28 -top-28 h-96 w-96 rounded-full border border-on-primary/10" />
     <div className="absolute -bottom-40 -left-28 h-[28rem] w-[28rem] rounded-full border border-on-primary/10" />
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_42%,rgba(255,255,255,.12),transparent_30%)]" />
-
     <div className="relative z-10 flex h-full flex-col justify-between">
       <div className="flex items-center justify-between gap-4">
         <img src="/brand/logo-dark.png" alt="Mwendo Salama" className="h-11 w-auto" />
         <span className="rounded-full border border-on-primary/10 bg-on-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em]">Kenya safety network</span>
       </div>
-
       <div className="relative flex flex-1 items-center justify-center py-8">
         <svg viewBox="0 0 520 460" className="h-full w-full max-w-xl" fill="none" aria-hidden="true">
           <defs>
             <linearGradient id="login-route" x1="70" y1="385" x2="470" y2="45" gradientUnits="userSpaceOnUse">
-              <stop stopColor="rgba(255,255,255,.2)" />
-              <stop offset=".55" stopColor="rgba(255,255,255,.65)" />
-              <stop offset="1" stopColor="rgba(255,255,255,.95)" />
+              <stop stopColor="rgba(255,255,255,.18)" />
+              <stop offset=".55" stopColor="rgba(255,255,255,.62)" />
+              <stop offset="1" stopColor="rgba(255,255,255,.94)" />
             </linearGradient>
           </defs>
-
           <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="rgba(255,255,255,.09)" strokeWidth="38" strokeLinecap="round" />
           <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="url(#login-route)" strokeWidth="3" strokeLinecap="round" strokeDasharray="10 17" className="mw-route-flow" />
-
           <circle cx="70" cy="385" r="10" fill="white" />
           <circle cx="470" cy="45" r="10" fill="white" />
           <circle cx="70" cy="385" r="22" stroke="rgba(255,255,255,.18)" className="mw-signal" />
-          <circle cx="470" cy="45" r="22" stroke="rgba(255,255,255,.18)" className="mw-signal" style={{ animationDelay: '1s' }} />
-
+          <circle cx="470" cy="45" r="22" stroke="rgba(255,255,255,.18)" className="mw-signal" style={{ animationDelay: '1.3s' }} />
           <g transform="translate(260 220)">
             <circle r="78" fill="rgba(255,255,255,.055)" className="mw-beacon" />
             <circle r="48" stroke="rgba(255,255,255,.13)" strokeWidth="1" strokeDasharray="3 8" />
-            <g className="mw-orbit">
-              <circle cx="0" cy="0" r="5" fill="#a7f3b0" />
-            </g>
+            <g className="mw-orbit"><circle cx="0" cy="0" r="5" fill="#a7f3b0" /></g>
             <circle r="34" fill="white" />
             <circle r="13" fill="#1A5C2E" />
           </g>
-
-          <g transform="translate(92 100)" className="mw-float">
-            <rect width="142" height="54" rx="17" fill="rgba(255,255,255,.105)" stroke="rgba(255,255,255,.08)" />
-            <circle cx="23" cy="27" r="7" fill="#86efac" />
-            <text x="40" y="24" fill="white" fontSize="11" fontWeight="700">SAFE ROUTE</text>
-            <text x="40" y="39" fill="rgba(255,255,255,.62)" fontSize="9">Live monitoring</text>
-          </g>
-
-          <g transform="translate(336 306)" className="mw-float" style={{ animationDelay: '1.2s' }}>
-            <rect width="132" height="54" rx="17" fill="rgba(255,255,255,.105)" stroke="rgba(255,255,255,.08)" />
-            <circle cx="23" cy="27" r="7" fill="#fde68a" />
-            <text x="40" y="24" fill="white" fontSize="11" fontWeight="700">ROAD ALERT</text>
-            <text x="40" y="39" fill="rgba(255,255,255,.62)" fontSize="9">Ready when needed</text>
-          </g>
-
           <rect x="0" y="0" width="160" height="460" fill="url(#login-route)" opacity=".06" className="mw-sweep" />
         </svg>
-      </div>
-
-      <div className="max-w-lg">
-        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-on-primary/60">
-          <span className="h-1.5 w-1.5 rounded-full bg-on-primary/70" />
-          Mwendo Salama
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          <div className="mw-card-in absolute left-[8%] top-[20%] w-[180px] rounded-[20px] border border-white/10 bg-white/[.11] p-3.5 shadow-lg backdrop-blur-md sm:left-[10%] sm:w-[194px]" style={{ animationDelay: '.15s' }}>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><span className="material-symbols-outlined text-lg">route</span></span>
+              <div className="min-w-0"><p className="truncate text-[11px] font-extrabold tracking-wide text-white">Safe route</p><p className="mt-0.5 text-[9px] text-white/60">Live monitoring</p></div>
+            </div>
+          </div>
+          <div className="mw-card-in absolute bottom-[20%] right-[5%] w-[180px] rounded-[20px] border border-white/10 bg-white/[.11] p-3.5 shadow-lg backdrop-blur-md sm:right-[8%] sm:w-[194px]" style={{ animationDelay: '.35s' }}>
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-200/15 text-amber-200"><span className="material-symbols-outlined text-lg">warning</span></span>
+              <div className="min-w-0"><p className="truncate text-[11px] font-extrabold tracking-wide text-white">Road alert</p><p className="mt-0.5 text-[9px] text-white/60">Ready when needed</p></div>
+            </div>
+          </div>
         </div>
+      </div>
+      <div className="max-w-lg">
+        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-on-primary/60"><span className="h-1.5 w-1.5 rounded-full bg-on-primary/70" />Mwendo Salama</div>
         <h2 className="text-3xl font-extrabold leading-tight sm:text-4xl">Every journey deserves a safer route.</h2>
         <p className="mt-4 max-w-md text-sm leading-6 text-on-primary/70">Track journeys, understand road risks, and help make public transport safer across Kenya.</p>
       </div>
@@ -121,65 +110,37 @@ export const LoginScreen: React.FC = () => {
 
   const onSubmit = async (data: LoginFormValues) => {
     setErrorMsg(null);
-    try {
-      routeProfile(await authService.signInWithEmail(data.email, data.password));
-    } catch (err: unknown) {
+    try { routeProfile(await authService.signInWithEmail(data.email, data.password)); }
+    catch (err: unknown) {
       const authErr = err as { code?: string; message?: string; resolver?: unknown };
-      if (authErr.code === 'auth/multi-factor-auth-required') {
-        navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } });
-        return;
-      }
-      console.error('Sign in error:', err);
-      setErrorMsg(authErr.message || t('auth.login.invalidCredentials'));
+      if (authErr.code === 'auth/multi-factor-auth-required') { navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } }); return; }
+      console.error('Sign in error:', err); setErrorMsg(authErr.message || t('auth.login.invalidCredentials'));
     }
   };
 
   const handleGoogleSignIn = async () => {
-    setErrorMsg(null);
-    setIsGoogleLoading(true);
-    try {
-      routeProfile(await authService.signInWithGoogle());
-    } catch (err: unknown) {
+    setErrorMsg(null); setIsGoogleLoading(true);
+    try { routeProfile(await authService.signInWithGoogle()); }
+    catch (err: unknown) {
       const authErr = err as { code?: string; resolver?: unknown };
-      if (authErr.code === 'auth/multi-factor-auth-required') {
-        navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } });
-        return;
-      }
-      console.error('Google sign in error:', err);
-      setErrorMsg('Failed to sign in with Google');
-    } finally {
-      setIsGoogleLoading(false);
-    }
+      if (authErr.code === 'auth/multi-factor-auth-required') { navigate('/auth/mfa-challenge', { state: { resolver: authErr.resolver } }); return; }
+      console.error('Google sign in error:', err); setErrorMsg('Failed to sign in with Google');
+    } finally { setIsGoogleLoading(false); }
   };
 
   const handleGuestSignIn = async () => {
-    setErrorMsg(null);
-    setIsGuestLoading(true);
-    try {
-      await authService.signInGuest();
-      navigate('/passenger');
-    } catch (err: unknown) {
-      console.error('Guest sign in error:', err);
-      setErrorMsg('Failed to sign in as guest');
-    } finally {
-      setIsGuestLoading(false);
-    }
+    setErrorMsg(null); setIsGuestLoading(true);
+    try { await authService.signInGuest(); navigate('/passenger'); }
+    catch (err: unknown) { console.error('Guest sign in error:', err); setErrorMsg('Failed to sign in as guest'); }
+    finally { setIsGuestLoading(false); }
   };
 
   const handleSendMagicLink = async () => {
     const email = getValues('email');
-    if (!email) {
-      setErrorMsg(t('auth.login.emailPlaceholder'));
-      return;
-    }
+    if (!email) { setErrorMsg(t('auth.login.emailPlaceholder')); return; }
     setErrorMsg(null);
-    try {
-      await authService.sendMagicLink(email);
-      setMagicLinkSent(true);
-    } catch (err: unknown) {
-      console.error('Magic link error:', err);
-      setErrorMsg('Failed to send magic link');
-    }
+    try { await authService.sendMagicLink(email); setMagicLinkSent(true); }
+    catch (err: unknown) { console.error('Magic link error:', err); setErrorMsg('Failed to send magic link'); }
   };
 
   return (
@@ -188,15 +149,8 @@ export const LoginScreen: React.FC = () => {
         <section className="hidden lg:block"><JourneyVisual /></section>
         <section className="flex items-center justify-center px-5 py-8 sm:px-8 lg:rounded-[36px] lg:bg-surface-container-low lg:px-10 xl:px-14">
           <div className="w-full max-w-lg">
-            <div className="mb-8 flex items-center justify-between">
-              <PrimaryLogo className="h-9 w-auto lg:hidden" />
-              <Link to="/" className="text-xs font-bold text-on-surface-variant hover:text-primary">← Back to home</Link>
-            </div>
-            <div className="mb-8">
-              <div className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-primary">Welcome back</div>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('auth.login.title')}</h1>
-              <p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">{t('auth.login.subtitle')}</p>
-            </div>
+            <div className="mb-8 flex items-center justify-between"><PrimaryLogo className="h-9 w-auto lg:hidden" /><Link to="/" className="text-xs font-bold text-on-surface-variant hover:text-primary">← Back to home</Link></div>
+            <div className="mb-8"><div className="mb-2 text-xs font-bold uppercase tracking-[.16em] text-primary">Welcome back</div><h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t('auth.login.title')}</h1><p className="mt-2 max-w-md text-sm leading-6 text-on-surface-variant">{t('auth.login.subtitle')}</p></div>
             {errorMsg && <div role="alert" className="mb-5 rounded-2xl bg-error-container p-4 text-sm text-on-error-container">{errorMsg}</div>}
             {magicLinkSent && <div role="status" className="mb-5 rounded-2xl bg-sage-light p-4 text-sm text-primary">{t('auth.login.magicLinkSent')}</div>}
             <div className="rounded-[28px] bg-surface p-5 shadow-sm ring-1 ring-outline-variant/30 sm:p-7">
