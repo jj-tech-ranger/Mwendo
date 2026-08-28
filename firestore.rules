@@ -56,6 +56,12 @@ service cloud.firestore {
       return hasActiveRole('driver');
     }
 
+    // Tenant ownership must not be changed by a client acting through an existing tenant grant.
+    function keepsSaccoId() {
+      return !('saccoId' in resource.data) ||
+             (!('saccoId' in request.resource.data) || request.resource.data.saccoId == resource.data.saccoId);
+    }
+
     // VT-003: Kenya geographic bounds (approx lat -4.7 to 5.5, lon 33.5 to 41.9 with generous margin to avoid edge rejections)
     function isWithinKenyaBounds(lat, lon) {
       return (lat is int || lat is float || lat is number) &&
@@ -177,11 +183,16 @@ service cloud.firestore {
         hasActiveRole('authority')
       );
       allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data);
-      allow update: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
-        isAuthority()
-      ) && isValidTripData(request.resource.data);
+      allow update: if (
+        isAuthority() && isValidTripData(request.resource.data)
+      ) || (
+        isSignedIn() && resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId &&
+        keepsSaccoId() && isValidTripData(request.resource.data)
+      ) || (
+        isSignedIn() && resource.data.saccoId != null && isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId && isValidTripData(request.resource.data)
+      );
       allow delete: if isAdmin();
     }
 
@@ -189,9 +200,12 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
       allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
-      // Disallow client updates modifying riskScore or riskTier (must be computed by server Cloud Functions Gen2)
-      allow update: if (isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId))
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore', 'riskTier']);
+      // Disallow client updates modifying riskScore/riskTier or moving a vehicle between SACCOs.
+      allow update: if isAuthority() || isAdmin() || (
+        isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId
+      )
+      && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore', 'riskTier']);
       allow delete: if isAdmin();
     }
 
@@ -256,10 +270,14 @@ service cloud.firestore {
         hasActiveRole('authority')
       );
       allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) ||
+      allow update: if (
         isAuthority()
+      ) || (
+        isSignedIn() && resource.data.userId == request.auth.uid &&
+        request.resource.data.userId == resource.data.userId && keepsSaccoId()
+      ) || (
+        isSignedIn() && resource.data.saccoId != null && isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId
       );
       allow delete: if isAdmin();
     }
@@ -273,7 +291,13 @@ service cloud.firestore {
         hasActiveRole('authority')
       );
       allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidViolationData(request.resource.data);
-      allow update: if ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority() || isAdmin()) && isValidViolationData(request.resource.data);
+      allow update: if (
+        isAuthority()
+      ) || (
+        isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId &&
+        isValidViolationData(request.resource.data)
+      );
       allow delete: if isAdmin();
     }
 
@@ -285,7 +309,10 @@ service cloud.firestore {
         resource.data.reportedByUid == request.auth.uid
       );
       allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
-      allow update: if isAuthority() || isAdmin() || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId));
+      allow update: if isAuthority() || isAdmin() || (
+        isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId
+      );
       allow delete: if isAdmin();
     }
 
@@ -293,7 +320,10 @@ service cloud.firestore {
     match /drivers/{driverId} {
       allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
       allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
-      allow update: if isAuthority() || isAdmin() || isSaccoManager(resource.data.saccoId);
+      allow update: if isAuthority() || isAdmin() || (
+        isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId
+      );
       allow delete: if isAdmin();
     }
 
@@ -317,7 +347,10 @@ service cloud.firestore {
     match /team_users/{teamUserId} {
       allow read: if isSignedIn() && (isAdmin() || isSaccoManager(resource.data.saccoId));
       allow create: if isSaccoManager(request.resource.data.saccoId);
-      allow update: if isAdmin() || isSaccoManager(resource.data.saccoId);
+      allow update: if isAdmin() || (
+        isSaccoManager(resource.data.saccoId) &&
+        request.resource.data.saccoId == resource.data.saccoId
+      );
       allow delete: if isAdmin() || isSaccoManager(resource.data.saccoId);
     }
 
