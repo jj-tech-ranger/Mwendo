@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Trip, GPSPoint } from '../types';
 import { useAuthStore } from './useAuthStore';
 
-const ACTIVE_TRIP_STORAGE_KEY = 'mwendo.activeTrip.v1';
+export const ACTIVE_TRIP_STORAGE_KEY = 'mwendo.activeTrip.v1';
 const TELEMETRY_PERSIST_INTERVAL_MS = 5_000;
 
 interface PersistedTripState {
