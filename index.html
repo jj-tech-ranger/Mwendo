@@ -12,10 +12,42 @@
     <link rel="icon" type="image/png" href="/brand/favicon-light.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" href="/brand/favicon-dark.png" media="(prefers-color-scheme: dark)" />
     <title>Mwendo Salama | PSV Passenger Safety Platform</title>
+
+    <style>
+      /* Material Symbols are ligature fonts. Hide the literal ligature text
+         until the font is ready so users never see names such as "shield"
+         or "location_on" flash during first paint. The reserved inline-block
+         space prevents layout shifts when the icon becomes visible. */
+      .icons-loading .material-symbols-outlined {
+        visibility: hidden;
+        display: inline-block;
+        min-width: 1em;
+      }
+    </style>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
+
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const revealIcons = () => root.classList.remove('icons-loading');
+        const timeout = window.setTimeout(revealIcons, 2500);
+
+        if (document.fonts && document.fonts.load) {
+          document.fonts.load('24px "Material Symbols Outlined"')
+            .catch(() => undefined)
+            .finally(() => {
+              window.clearTimeout(timeout);
+              revealIcons();
+            });
+        } else {
+          revealIcons();
+        }
+      })();
+    </script>
   </head>
   <body class="bg-surface text-on-surface font-body-md min-h-screen antialiased selection:bg-primary-container selection:text-on-primary-container overflow-x-hidden">
     <div id="root"></div>
