@@ -1,350 +1,38 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BRAND_ASSETS, PrimaryLogo } from '../../components/assets/BrandAssets';
+import { PrimaryLogo } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../services/authService';
 
 type PermissionStep = 'location' | 'notification' | 'sms' | 'camera' | 'storage';
+type PermissionConfig = { id: PermissionStep; icon: string; eyebrow: string; title: string; body: string; primaryCta: string; accent: string; requestFn: () => Promise<boolean> };
 
-// Permission Steps Vector Illustrations
-const LocationIllustration: React.FC = () => (
-  <svg viewBox="0 0 320 240" className="w-full h-full max-h-56 select-none" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="160" cy="120" r="100" stroke="#1b4d2e" strokeWidth="1.5" strokeDasharray="4 4" className="opacity-30" />
-    <circle cx="160" cy="120" r="70" stroke="#1b4d2e" strokeWidth="2" className="opacity-40" />
-    <circle cx="160" cy="120" r="40" fill="#1b4d2e" fillOpacity="0.08" stroke="#1b4d2e" strokeWidth="2" className="animate-pulse" />
-    
-    {/* Grid / Corridor Line */}
-    <path d="M 40 180 Q 120 160 160 120 T 280 60" stroke="#1b4d2e" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 6" />
-    <path d="M 40 180 Q 120 160 160 120 T 280 60" stroke="#10b981" strokeWidth="2" strokeLinecap="round" />
-
-    {/* Vehicle Beacon at Center */}
-    <g transform="translate(160, 120)">
-      <circle cx="0" cy="0" r="22" fill="#1b4d2e" />
-      <circle cx="0" cy="0" r="28" stroke="#10b981" strokeWidth="2" className="animate-ping opacity-75" />
-      <path d="M -8 -8 L 8 0 L -8 8 L -4 0 Z" fill="#ffffff" transform="rotate(-35)" />
-    </g>
-
-    {/* HUD Stats Overlay */}
-    <g transform="translate(30, 30)">
-      <rect width="105" height="34" rx="8" fill="#ffffff" fillOpacity="0.9" stroke="#1b4d2e" strokeWidth="1" />
-      <circle cx="14" cy="17" r="4" fill="#10b981" />
-      <text x="24" y="16" fontFamily="monospace" fontSize="9" fontWeight="bold" fill="#1b4d2e">GPS: LOCK</text>
-      <text x="24" y="27" fontFamily="monospace" fontSize="9" fill="#555555">ACC: &lt; 5m</text>
-    </g>
-    <g transform="translate(195, 175)">
-      <rect width="95" height="34" rx="8" fill="#ffffff" fillOpacity="0.9" stroke="#1b4d2e" strokeWidth="1" />
-      <text x="12" y="16" fontFamily="monospace" fontSize="9" fontWeight="bold" fill="#1b4d2e">SPEED: 74 KM/H</text>
-      <text x="12" y="27" fontFamily="monospace" fontSize="9" fill="#10b981">SAFE CORRIDOR</text>
-    </g>
-  </svg>
-);
-
-const NotificationIllustration: React.FC = () => (
-  <svg viewBox="0 0 320 240" className="w-full h-full max-h-56 select-none" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Sound Waves */}
-    <circle cx="160" cy="115" r="85" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="5 5" className="opacity-40 animate-pulse" />
-    <circle cx="160" cy="115" r="60" stroke="#f59e0b" strokeWidth="2" className="opacity-60" />
-
-    {/* Speed Sign Backdrop */}
-    <g transform="translate(160, 115)">
-      <circle cx="0" cy="0" r="44" fill="#ffffff" stroke="#dc2626" strokeWidth="8" />
-      <text x="0" y="12" textAnchor="middle" fontFamily="system-ui, sans-serif" fontWeight="900" fontSize="34" fill="#111827">80</text>
-      <text x="0" y="24" textAnchor="middle" fontFamily="monospace" fontSize="8" fontWeight="bold" fill="#6b7280">KM/H</text>
-    </g>
-
-    {/* Floating Notification Cards */}
-    <g transform="translate(35, 160)">
-      <rect width="250" height="42" rx="10" fill="#ffffff" fillOpacity="0.95" stroke="#1b4d2e" strokeWidth="1.5" filter="drop-shadow(0 4px 6px rgba(0,0,0,0.08))" />
-      <circle cx="22" cy="21" r="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="1.5" />
-      <path d="M 22 15 L 22 21 M 22 24 L 22.01 24" stroke="#d97706" strokeWidth="2" strokeLinecap="round" />
-      <text x="40" y="18" fontFamily="system-ui, sans-serif" fontSize="11" fontWeight="bold" fill="#1f2937">Overspeed Warning</text>
-      <text x="40" y="32" fontFamily="system-ui, sans-serif" fontSize="9" fill="#6b7280">Matatu exceeding 80 km/h limit on corridor</text>
-    </g>
-  </svg>
-);
-
-const SmsIllustration: React.FC = () => (
-  <svg viewBox="0 0 320 240" className="w-full h-full max-h-56 select-none" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Broadcast Radio Waves */}
-    <path d="M 120 70 A 60 60 0 0 1 200 70" stroke="#dc2626" strokeWidth="3" strokeLinecap="round" className="opacity-70 animate-pulse" />
-    <path d="M 100 50 A 85 85 0 0 1 220 50" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" className="opacity-40 animate-ping" />
-
-    {/* SOS Tower / Shield */}
-    <g transform="translate(160, 110)">
-      <path d="M 0 -35 L 32 -18 L 32 20 C 32 38 0 52 0 52 C 0 52 -32 38 -32 20 L -32 -18 Z" fill="#dc2626" stroke="#991b1b" strokeWidth="2" />
-      <text x="0" y="14" textAnchor="middle" fontFamily="system-ui, sans-serif" fontWeight="900" fontSize="18" fill="#ffffff">SOS</text>
-    </g>
-
-    {/* Dispatch Details Badge */}
-    <g transform="translate(45, 175)">
-      <rect width="230" height="38" rx="8" fill="#ffffff" fillOpacity="0.95" stroke="#dc2626" strokeWidth="1" />
-      <text x="14" y="16" fontFamily="monospace" fontSize="10" fontWeight="bold" fill="#dc2626">DISPATCH: 112 / 999 READY</text>
-      <text x="14" y="28" fontFamily="monospace" fontSize="8.5" fill="#4b5563">Live GPS coordinates appended to SMS</text>
-    </g>
-  </svg>
-);
-
-const CameraIllustration: React.FC = () => (
-  <svg viewBox="0 0 320 240" className="w-full h-full max-h-56 select-none" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Viewfinder Reticle */}
-    <rect x="50" y="30" width="220" height="150" rx="14" fill="#1b4d2e" fillOpacity="0.05" stroke="#1b4d2e" strokeWidth="2" strokeDasharray="8 6" />
-    
-    {/* Corner Brackets */}
-    <path d="M 40 50 L 40 30 L 60 30" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-    <path d="M 280 50 L 280 30 L 260 30" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-    <path d="M 40 160 L 40 180 L 60 180" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-    <path d="M 280 160 L 280 180 L 260 180" stroke="#10b981" strokeWidth="3" strokeLinecap="round" />
-
-    {/* Camera Lens */}
-    <circle cx="160" cy="105" r="42" fill="#ffffff" stroke="#1b4d2e" strokeWidth="3" />
-    <circle cx="160" cy="105" r="28" fill="#1b4d2e" fillOpacity="0.1" stroke="#10b981" strokeWidth="2" />
-    <circle cx="160" cy="105" r="14" fill="#1b4d2e" />
-    <circle cx="154" cy="99" r="4" fill="#ffffff" />
-
-    {/* Evidence Tag */}
-    <g transform="translate(60, 192)">
-      <rect width="200" height="28" rx="6" fill="#1b4d2e" />
-      <text x="100" y="18" textAnchor="middle" fontFamily="monospace" fontSize="9.5" fontWeight="bold" fill="#ffffff">EVIDENCE PHOTO VERIFIED</text>
-    </g>
-  </svg>
-);
-
-const StorageIllustration: React.FC = () => (
-  <svg viewBox="0 0 320 240" className="w-full h-full max-h-56 select-none" fill="none" xmlns="http://www.w3.org/2000/svg">
-    {/* Storage Disk Rings */}
-    <ellipse cx="160" cy="70" rx="70" ry="22" fill="#e2e8f0" stroke="#1b4d2e" strokeWidth="2.5" />
-    <path d="M 90 70 V 100 C 90 112 121 122 160 122 C 199 122 230 112 230 100 V 70" fill="#f1f5f9" stroke="#1b4d2e" strokeWidth="2.5" />
-    <path d="M 90 100 V 130 C 90 142 121 152 160 152 C 199 152 230 142 230 130 V 100" fill="#ffffff" stroke="#1b4d2e" strokeWidth="2.5" />
-
-    {/* Synced Check Icon */}
-    <g transform="translate(160, 130)">
-      <circle cx="0" cy="0" r="20" fill="#10b981" stroke="#ffffff" strokeWidth="3" />
-      <path d="M -7 0 L -2 5 L 8 -5" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    </g>
-
-    {/* Offline Cache Status */}
-    <g transform="translate(55, 175)">
-      <rect width="210" height="34" rx="8" fill="#ffffff" stroke="#1b4d2e" strokeWidth="1" />
-      <circle cx="16" cy="17" r="4" fill="#10b981" />
-      <text x="28" y="16" fontFamily="monospace" fontSize="9.5" fontWeight="bold" fill="#1b4d2e">OFFLINE LOCAL VAULT</text>
-      <text x="28" y="27" fontFamily="monospace" fontSize="8.5" fill="#6b7280">Trips cached when signal drops</text>
-    </g>
-  </svg>
-);
+const PermissionVisual: React.FC<{ step: PermissionStep }> = ({ step }) => {
+  const visual: Record<PermissionStep, React.ReactNode> = {
+    location: <div className="relative h-72 w-72 sm:h-80 sm:w-80" aria-hidden="true"><div className="absolute inset-5 rounded-full border border-primary/10"/><div className="absolute inset-12 rounded-full border border-primary/15"/><div className="absolute inset-[4.5rem] rounded-full border border-primary/20"/><div className="absolute inset-0 animate-[spin_18s_linear_infinite] rounded-full border border-dashed border-primary/20"/><div className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-xl"/><div className="absolute left-1/2 top-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[28px] bg-primary text-on-primary shadow-xl"><span className="material-symbols-outlined text-4xl">my_location</span></div><div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border border-primary/30"/><div className="absolute left-7 top-16 rounded-2xl bg-surface/90 px-3 py-2 shadow-lg ring-1 ring-outline-variant/30 backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Live position</p><p className="mt-0.5 text-xs font-semibold text-primary">GPS ready</p></div><div className="absolute bottom-10 right-1 rounded-2xl bg-surface/90 px-3 py-2 shadow-lg ring-1 ring-outline-variant/30 backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Safety zone</p><p className="mt-0.5 text-xs font-semibold text-primary">Monitoring</p></div></div>,
+    notification: <div className="relative h-72 w-72 sm:h-80 sm:w-80" aria-hidden="true"><div className="absolute inset-8 rounded-full bg-amber-400/10 blur-2xl"/><div className="absolute inset-10 rounded-[44px] border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/20"/><div className="absolute left-1/2 top-1/2 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[34px] bg-primary text-on-primary shadow-2xl"><span className="material-symbols-outlined text-5xl">notifications_active</span></div>{[0,1,2].map(i=><div key={i} className="absolute left-1/2 top-1/2 h-40 w-40 -translate-x-1/2 -translate-y-1/2 animate-ping rounded-full border border-amber-500/20" style={{animationDelay:`${i*550}ms`,animationDuration:'2.8s'}}/>)}<div className="absolute left-3 top-16 flex items-center gap-2 rounded-2xl bg-surface px-3 py-2 shadow-lg ring-1 ring-outline-variant/30 animate-[float_4s_ease-in-out_infinite]"><span className="material-symbols-outlined text-lg text-amber-600">warning</span><span className="text-xs font-semibold">Overspeed alert</span></div><div className="absolute bottom-10 right-0 flex items-center gap-2 rounded-2xl bg-surface px-3 py-2 shadow-lg ring-1 ring-outline-variant/30 animate-[float_4s_ease-in-out_infinite_700ms]"><span className="material-symbols-outlined text-lg text-primary">shield</span><span className="text-xs font-semibold">Safety update</span></div></div>,
+    sms: <div className="relative h-72 w-72 sm:h-80 sm:w-80" aria-hidden="true"><div className="absolute inset-8 rounded-full bg-error/10 blur-2xl"/>{[0,1,2].map(i=><div key={i} className="absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-error/20" style={{transform:`translate(-50%, -50%) scale(${1+i*.32})`,opacity:1-i*.22}}/>)}<div className="absolute left-1/2 top-1/2 flex h-28 w-28 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-error text-on-error shadow-2xl"><span className="material-symbols-outlined text-5xl">sos</span></div><div className="absolute left-2 top-14 rounded-2xl bg-surface px-3 py-2 shadow-lg ring-1 ring-outline-variant/30"><p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Emergency</p><p className="text-xs font-semibold text-error">SOS ready</p></div><div className="absolute bottom-10 right-0 rounded-2xl bg-surface px-3 py-2 shadow-lg ring-1 ring-outline-variant/30"><p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Message</p><p className="text-xs font-semibold">GPS included</p></div></div>,
+    camera: <div className="relative h-72 w-72 sm:h-80 sm:w-80" aria-hidden="true"><div className="absolute inset-5 rounded-[48px] bg-primary/5 ring-1 ring-primary/10"/><div className="absolute inset-12 rounded-[36px] border-2 border-dashed border-primary/30"/><div className="absolute left-1/2 top-1/2 flex h-32 w-32 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface shadow-2xl ring-8 ring-primary/10"><div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-on-primary"><span className="material-symbols-outlined text-4xl">photo_camera</span></div></div><div className="absolute left-14 top-10 h-8 w-8 rounded-tl-xl border-l-4 border-t-4 border-primary"/><div className="absolute right-14 top-10 h-8 w-8 rounded-tr-xl border-r-4 border-t-4 border-primary"/><div className="absolute bottom-10 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-xs font-bold text-on-primary shadow-lg">Evidence captured</div></div>,
+    storage: <div className="relative h-72 w-72 sm:h-80 sm:w-80" aria-hidden="true"><div className="absolute inset-10 rounded-full bg-primary/10 blur-2xl"/><div className="absolute left-1/2 top-1/2 h-40 w-52 -translate-x-1/2 -translate-y-1/2 rounded-[32px] bg-primary/10 ring-1 ring-primary/20"/><div className="absolute left-1/2 top-[44%] flex h-32 w-44 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[26px] bg-surface shadow-xl ring-1 ring-outline-variant/30"><span className="material-symbols-outlined text-6xl text-primary">cloud_done</span></div><div className="absolute bottom-10 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-surface px-4 py-2 text-xs font-semibold shadow-lg ring-1 ring-outline-variant/30"><span className="material-symbols-outlined text-base text-primary">offline_bolt</span>Available offline</div></div>,
+  };
+  return visual[step];
+};
 
 export const PermissionsWizardScreen: React.FC = () => {
   const navigate = useNavigate();
-  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
-  const [grantedStatus, setGrantedStatus] = useState<Record<PermissionStep, boolean>>({
-    location: false,
-    notification: false,
-    sms: false,
-    camera: false,
-    storage: false,
-  });
-
-  const steps: Array<{
-    id: PermissionStep;
-    icon: string;
-    title: string;
-    body: string;
-    primaryCta: string;
-    requestFn: () => Promise<boolean>;
-  }> = [
-    {
-      id: 'location',
-      icon: 'my_location',
-      title: 'Mwendo Salama needs your location',
-      body: 'Powers live speed tracking, GPS smoothing, and black-spot warnings on your corridor. We never share your location publicly.',
-      primaryCta: 'Allow Location Access',
-      requestFn: () =>
-        new Promise((resolve) => {
-          if ('geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-              () => resolve(true),
-              () => resolve(false)
-            );
-          } else {
-            resolve(false);
-          }
-        }),
-    },
-    {
-      id: 'notification',
-      icon: 'notifications_active',
-      title: 'Stay alert on the road',
-      body: 'Receive overspeed warnings when your matatu exceeds speed limits, nearby danger-zone alerts, and weekly safety digests.',
-      primaryCta: 'Enable Notifications',
-      requestFn: async () => {
-        if ('Notification' in window) {
-          const perm = await Notification.requestPermission();
-          return perm === 'granted';
-        }
-        return false;
-      },
-    },
-    {
-      id: 'sms',
-      icon: 'sms',
-      title: 'Enable Emergency SMS',
-      body: 'Lets Mwendo Salama send an instant SOS text with your live GPS location to emergency contacts if you trigger a safety alert.',
-      primaryCta: 'Allow Emergency SMS Access',
-      requestFn: async () => true, // Browser fallback handles sms: deep link
-    },
-    {
-      id: 'camera',
-      icon: 'photo_camera',
-      title: 'Add photo evidence to reports',
-      body: 'Allows taking or uploading photos when reporting black spots or road hazards to help transport authorities verify incidents quickly.',
-      primaryCta: 'Allow Camera Access',
-      requestFn: async () => {
-        try {
-          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            stream.getTracks().forEach((track) => track.stop());
-            return true;
-          }
-        } catch {
-          return false;
-        }
-        return false;
-      },
-    },
-    {
-      id: 'storage',
-      icon: 'folder_zip',
-      title: 'Save trips for offline access',
-      body: 'Saves your journey history and safety reports locally on your device so the app functions seamlessly in low-signal areas.',
-      primaryCta: 'Allow Storage Access',
-      requestFn: async () => {
-        try {
-          localStorage.setItem('storage_perm_test', 'ok');
-          localStorage.removeItem('storage_perm_test');
-          return true;
-        } catch {
-          return false;
-        }
-      },
-    },
-  ];
-
-  const current = steps[activeStepIndex]!;
-
-  const handleNext = async () => {
-    try {
-      const isGranted = await current.requestFn();
-      setGrantedStatus((prev) => ({ ...prev, [current.id]: isGranted }));
-    } catch (err) {
-      console.warn('Permission request error:', err);
-    }
-
-    if (activeStepIndex < steps.length - 1) {
-      setActiveStepIndex((i) => i + 1);
-    } else {
-      if (!useAuthStore.getState().isAuthenticated) {
-        try {
-          await authService.signInGuest();
-        } catch (e) {
-          console.warn('Guest signin error:', e);
-        }
-      }
-      navigate('/passenger');
-    }
-  };
-
-  const handleSkip = async () => {
-    if (activeStepIndex < steps.length - 1) {
-      setActiveStepIndex((i) => i + 1);
-    } else {
-      if (!useAuthStore.getState().isAuthenticated) {
-        try {
-          await authService.signInGuest();
-        } catch (e) {
-          console.warn('Guest signin error:', e);
-        }
-      }
-      navigate('/passenger');
-    }
-  };
-
-  const handleSkipAll = async () => {
-    if (!useAuthStore.getState().isAuthenticated) {
-      try {
-        await authService.signInGuest();
-      } catch (e) {
-        console.warn('Guest signin error:', e);
-      }
-    }
-    navigate('/passenger');
-  };
-
-  return (
-    <div className="h-screen w-screen bg-surface text-on-surface flex flex-col font-body-md overflow-hidden">
-      {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-margin-mobile py-4 bg-transparent">
-        <PrimaryLogo className="h-8 w-auto" />
-        <div className="flex items-center gap-2">
-          <span className="font-label-mono text-xs text-on-surface-variant uppercase">
-            Step {activeStepIndex + 1} of 5
-          </span>
-          <button
-            onClick={handleSkipAll}
-            className="text-xs font-bold text-primary hover:underline px-2 py-1 cursor-pointer"
-          >
-            Skip All
-          </button>
-        </div>
-      </header>
-
-      {/* Top 60% Illustration */}
-      <section className="h-[60%] bg-sage-light dot-grid relative flex flex-col items-center justify-center p-md overflow-hidden">
-        <div className="w-full max-w-sm h-64 bg-white/70 rounded-3xl flex items-center justify-center backdrop-blur-md border border-primary/20 shadow-sm p-4 transition-all duration-300">
-          {current.id === 'location' && <LocationIllustration />}
-          {current.id === 'notification' && <NotificationIllustration />}
-          {current.id === 'sms' && <SmsIllustration />}
-          {current.id === 'camera' && <CameraIllustration />}
-          {current.id === 'storage' && <StorageIllustration />}
-        </div>
-      </section>
-
-      {/* Bottom 40% Sheet */}
-      <section className="h-[40%] bg-surface rounded-t-[32px] -mt-8 z-10 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] flex flex-col px-margin-mobile pt-lg pb-margin-mobile text-center justify-between">
-        <div className="space-y-2">
-          <h1 className="font-headline-lg-mobile sm:font-headline-lg text-on-surface">
-            {current.title}
-          </h1>
-          <p className="font-body-md text-on-surface-variant leading-relaxed">
-            {current.body}
-          </p>
-        </div>
-
-        <div className="space-y-2 pt-2">
-          <Button variant="primary" className="w-full" onClick={handleNext}>
-            <span className="material-symbols-outlined text-lg mr-2">{current.icon}</span>
-            {current.primaryCta}
-          </Button>
-          <Button variant="ghost" className="w-full text-xs text-on-surface-variant" onClick={handleSkip}>
-            Skip for Now
-          </Button>
-        </div>
-
-        {/* Progress dots */}
-        <div className="flex justify-center items-center gap-1.5 pt-1">
-          {steps.map((s, idx) => (
-            <div
-              key={s.id}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                idx === activeStepIndex
-                  ? 'w-6 bg-primary'
-                  : grantedStatus[s.id]
-                  ? 'w-2 bg-emerald-500'
-                  : 'w-2 bg-outline-variant'
-              }`}
-            />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [grantedStatus, setGrantedStatus] = useState<Record<PermissionStep, boolean>>({location:false,notification:false,sms:false,camera:false,storage:false});
+  const steps = useMemo<PermissionConfig[]>(() => [
+    {id:'location',icon:'my_location',eyebrow:'01 · Your journey',title:'Keep your journey visible',body:'Location powers live speed tracking, GPS smoothing, and black-spot warnings on your corridor. Your location is never shared publicly.',primaryCta:'Allow Location Access',accent:'primary',requestFn:()=>new Promise(resolve=>{if('geolocation' in navigator) navigator.geolocation.getCurrentPosition(()=>resolve(true),()=>resolve(false)); else resolve(false);})},
+    {id:'notification',icon:'notifications_active',eyebrow:'02 · Stay informed',title:'Get safety alerts when they matter',body:'Receive overspeed warnings, nearby danger-zone alerts, and useful safety updates while you travel.',primaryCta:'Enable Notifications',accent:'amber',requestFn:async()=> 'Notification' in window ? (await Notification.requestPermission())==='granted' : false},
+    {id:'sms',icon:'sos',eyebrow:'03 · Emergency ready',title:'Make SOS faster when seconds count',body:'Mwendo Salama can prepare an emergency SMS with your location for your chosen contacts when you trigger an SOS.',primaryCta:'Enable Emergency SMS',accent:'error',requestFn:async()=>true},
+    {id:'camera',icon:'photo_camera',eyebrow:'04 · Report with evidence',title:'Turn road reports into evidence',body:'Camera access lets you capture photos when reporting black spots and hazards so incidents can be verified faster.',primaryCta:'Allow Camera Access',accent:'primary',requestFn:async()=>{try{if(!navigator.mediaDevices?.getUserMedia)return false;const stream=await navigator.mediaDevices.getUserMedia({video:true});stream.getTracks().forEach(track=>track.stop());return true;}catch{return false;}}},
+    {id:'storage',icon:'cloud_done',eyebrow:'05 · Stay connected',title:'Keep your trips available offline',body:'Mwendo Salama stores journey data locally so your experience can continue smoothly when network coverage drops.',primaryCta:'Enable Offline Storage',accent:'primary',requestFn:async()=>{try{localStorage.setItem('storage_perm_test','ok');localStorage.removeItem('storage_perm_test');return true;}catch{return false;}}},
+  ],[]);
+  const current=steps[activeStepIndex]!;
+  const finish=async()=>{if(!useAuthStore.getState().isAuthenticated){try{await authService.signInGuest();}catch(e){console.warn('Guest signin error:',e);}}navigate('/passenger');};
+  const handleNext=async()=>{try{const granted=await current.requestFn();setGrantedStatus(prev=>({...prev,[current.id]:granted}));}catch(err){console.warn('Permission request error:',err);}if(activeStepIndex<steps.length-1)setActiveStepIndex(i=>i+1);else await finish();};
+  const handleSkip=async()=>{if(activeStepIndex<steps.length-1)setActiveStepIndex(i=>i+1);else await finish();};
+  return <div className="min-h-screen overflow-x-hidden bg-surface text-on-surface"><style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}}`}</style><header className="relative z-20 flex items-center justify-between px-5 py-5 sm:px-8 lg:px-12"><PrimaryLogo className="h-9 w-auto"/><div className="flex items-center gap-3"><div className="hidden rounded-full bg-surface-container px-3 py-1.5 text-xs font-bold text-on-surface-variant sm:block">Step {activeStepIndex+1} of {steps.length}</div><button type="button" onClick={finish} className="rounded-full px-3 py-2 text-xs font-bold text-on-surface-variant transition hover:bg-surface-container hover:text-primary">Skip setup</button></div></header><main className="mx-auto grid min-h-[calc(100vh-80px)] max-w-7xl items-center gap-8 px-5 pb-8 sm:px-8 lg:grid-cols-[1.05fr_.95fr] lg:gap-14 lg:px-12 lg:pb-12"><section className="relative flex min-h-[390px] items-center justify-center overflow-hidden rounded-[40px] bg-sage-light p-6 sm:min-h-[480px] lg:min-h-[600px]"><div className="absolute -left-24 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl"/><div className="absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-primary/10 blur-3xl"/><div className="relative transition-all duration-500"><PermissionVisual step={current.id}/></div><div className="absolute bottom-5 left-5 right-5 flex items-center justify-between rounded-2xl bg-surface/75 px-4 py-3 backdrop-blur-md ring-1 ring-outline-variant/20"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-on-surface-variant">Mwendo Salama</p><p className="mt-0.5 text-xs font-semibold">Built for safer Kenyan journeys</p></div><span className="material-symbols-outlined text-primary">verified_user</span></div></section><section className="flex flex-col justify-center py-3 lg:py-10"><div className="mb-7 flex items-center gap-2" aria-label={`Step ${activeStepIndex+1} of ${steps.length}`}>{steps.map((step,index)=><div key={step.id} className={`h-1.5 rounded-full transition-all duration-500 ${index===activeStepIndex?'w-10 bg-primary':grantedStatus[step.id]?'w-3 bg-primary/60':'w-3 bg-outline-variant'}`}/>)}</div><p className="mb-3 text-xs font-bold uppercase tracking-[.18em] text-primary">{current.eyebrow}</p><div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-container text-primary"><span className="material-symbols-outlined text-2xl">{current.icon}</span></div><h1 className="max-w-xl text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">{current.title}</h1><p className="mt-5 max-w-xl text-base leading-7 text-on-surface-variant sm:text-lg">{current.body}</p><div className="mt-8 max-w-xl rounded-2xl bg-surface-container-low p-4 ring-1 ring-outline-variant/20"><div className="flex gap-3"><span className="material-symbols-outlined mt-0.5 text-primary">lock</span><p className="text-sm leading-6 text-on-surface-variant"><strong className="text-on-surface">You stay in control.</strong> You can change these permissions later in your device settings.</p></div></div><div className="mt-8 flex max-w-xl flex-col gap-3 sm:flex-row-reverse"><Button variant="primary" className="min-h-12 flex-1 rounded-2xl" onClick={handleNext}><span className="material-symbols-outlined mr-2 text-lg">{current.icon}</span>{current.primaryCta}</Button><Button variant="ghost" className="min-h-12 rounded-2xl px-6 text-on-surface-variant" onClick={handleSkip}>Skip for now</Button></div><p className="mt-5 text-center text-xs text-on-surface-variant sm:text-left">You can continue without granting this permission.</p></section></main></div>;
 };
