@@ -20,25 +20,23 @@ type RouteProfile = Pick<UserProfile, 'activeRole' | 'role' | 'isMfaEnrolled'>;
 const JourneyVisual: React.FC = () => (
   <div className="relative h-full min-h-[520px] overflow-hidden rounded-[36px] bg-primary p-8 text-on-primary lg:min-h-[680px]">
     <style>{`
-      @keyframes routeFlow { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -420; } }
-      @keyframes beaconPulse { 0%,100% { transform: scale(.78); opacity: .2; } 50% { transform: scale(1.12); opacity: .7; } }
-      @keyframes orbit { from { transform: rotate(0deg) translateX(88px) rotate(0deg); } to { transform: rotate(360deg) translateX(88px) rotate(-360deg); } }
-      @keyframes floatCard { 0%,100% { transform: translate3d(0,0,0); } 50% { transform: translate3d(0,-7px,0); } }
-      @keyframes signal { 0%,100% { opacity: .18; transform: scale(.78); } 50% { opacity: .85; transform: scale(1.08); } }
-      @keyframes sweep { 0% { transform: translateX(-140%); opacity: 0; } 18%,70% { opacity: .28; } 100% { transform: translateX(140%); opacity: 0; } }
-      @keyframes cardIn { from { opacity: 0; transform: translate3d(0,12px,0) scale(.97); } to { opacity: 1; transform: translate3d(0,0,0) scale(1); } }
-      .mw-route-flow { animation: routeFlow 8s linear infinite; }
-      .mw-beacon { transform-box: fill-box; transform-origin: center; animation: beaconPulse 3.6s ease-in-out infinite; }
-      .mw-orbit { transform-box: fill-box; transform-origin: center; animation: orbit 9s linear infinite; }
-      .mw-float { animation: floatCard 5.5s ease-in-out infinite; }
-      .mw-signal { transform-box: fill-box; transform-origin: center; animation: signal 2.6s ease-in-out infinite; }
-      .mw-sweep { animation: sweep 7s ease-in-out infinite; }
-      .mw-card-in { animation: cardIn .8s cubic-bezier(.22,1,.36,1) both; }
-      @media(prefers-reduced-motion:reduce){.mw-route-flow,.mw-beacon,.mw-orbit,.mw-float,.mw-signal,.mw-sweep,.mw-card-in{animation:none!important}}
+      @keyframes mwAuthAurora { 0%,100% { transform:translate3d(0,0,0) scale(1); opacity:.4; } 50% { transform:translate3d(20px,-14px,0) scale(1.08); opacity:.7; } }
+      @keyframes mwAuthNode { 0%,100% { opacity:.3; transform:scale(.8); } 50% { opacity:1; transform:scale(1); } }
+      @keyframes mwAuthRing { 0% { transform:scale(.78); opacity:.5; } 70%,100% { transform:scale(1.5); opacity:0; } }
+      @keyframes mwAuthGlow { 0%,100% { opacity:.25; } 50% { opacity:.65; } }
+      .mw-auth-aurora { animation:mwAuthAurora 8s ease-in-out infinite; transform-origin:center; }
+      .mw-auth-node { animation:mwAuthNode 3.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+      .mw-auth-ring { animation:mwAuthRing 3.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
+      .mw-auth-glow { animation:mwAuthGlow 4.5s ease-in-out infinite; }
+      @media(prefers-reduced-motion:reduce){.mw-auth-aurora,.mw-auth-node,.mw-auth-ring,.mw-auth-glow{animation:none!important}}
     `}</style>
     <div className="absolute -right-28 -top-28 h-96 w-96 rounded-full border border-on-primary/10" />
     <div className="absolute -bottom-40 -left-28 h-[28rem] w-[28rem] rounded-full border border-on-primary/10" />
-    <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_42%,rgba(255,255,255,.12),transparent_30%)]" />
+    <div className="absolute inset-0 overflow-hidden">
+      <div className="mw-auth-aurora absolute -right-16 top-20 h-80 w-80 rounded-full bg-emerald-200/10 blur-3xl" />
+      <div className="mw-auth-aurora absolute bottom-20 left-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" style={{ animationDelay: '-3.5s' }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_42%,rgba(255,255,255,.12),transparent_30%)]" />
+    </div>
     <div className="relative z-10 flex h-full flex-col justify-between">
       <div className="flex items-center justify-between gap-4">
         <img src="/brand/logo-dark.png" alt="Mwendo Salama" className="h-11 w-auto" />
@@ -54,33 +52,29 @@ const JourneyVisual: React.FC = () => (
             </linearGradient>
           </defs>
           <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="rgba(255,255,255,.09)" strokeWidth="38" strokeLinecap="round" />
-          <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="url(#login-route)" strokeWidth="3" strokeLinecap="round" strokeDasharray="10 17" className="mw-route-flow" />
+          <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="url(#login-route)" strokeWidth="3" strokeLinecap="round" strokeDasharray="2 13" />
           <circle cx="70" cy="385" r="10" fill="white" />
           <circle cx="470" cy="45" r="10" fill="white" />
-          <circle cx="70" cy="385" r="22" stroke="rgba(255,255,255,.18)" className="mw-signal" />
-          <circle cx="470" cy="45" r="22" stroke="rgba(255,255,255,.18)" className="mw-signal" style={{ animationDelay: '1.3s' }} />
+          <circle cx="70" cy="385" r="22" stroke="rgba(255,255,255,.18)" className="mw-auth-ring" />
+          <circle cx="470" cy="45" r="22" stroke="rgba(255,255,255,.18)" className="mw-auth-ring" style={{ animationDelay: '1.8s' }} />
           <g transform="translate(260 220)">
-            <circle r="78" fill="rgba(255,255,255,.055)" className="mw-beacon" />
-            <circle r="48" stroke="rgba(255,255,255,.13)" strokeWidth="1" strokeDasharray="3 8" />
-            <g className="mw-orbit"><circle cx="0" cy="0" r="5" fill="#a7f3b0" /></g>
+            <circle r="92" fill="rgba(255,255,255,.035)" className="mw-auth-glow" />
+            <circle r="62" stroke="rgba(255,255,255,.12)" strokeDasharray="2 10" />
+            <circle r="48" stroke="rgba(255,255,255,.12)" />
             <circle r="34" fill="white" />
             <circle r="13" fill="#1A5C2E" />
+            <circle cx="0" cy="-62" r="5" fill="#a7f3b0" className="mw-auth-node" />
+            <circle cx="54" cy="31" r="4" fill="#fde68a" className="mw-auth-node" style={{ animationDelay: '1.2s' }} />
+            <circle cx="-52" cy="34" r="4" fill="#bfdbfe" className="mw-auth-node" style={{ animationDelay: '2.2s' }} />
           </g>
-          <rect x="0" y="0" width="160" height="460" fill="url(#login-route)" opacity=".06" className="mw-sweep" />
+          <circle cx="215" cy="240" r="6" fill="#a7f3b0" className="mw-auth-node" />
+          <circle cx="345" cy="130" r="6" fill="#fde68a" className="mw-auth-node" style={{ animationDelay: '1.5s' }} />
         </svg>
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="mw-card-in absolute left-[8%] top-[20%] w-[180px] rounded-[20px] border border-white/10 bg-white/[.11] p-3.5 shadow-lg backdrop-blur-md sm:left-[10%] sm:w-[194px]" style={{ animationDelay: '.15s' }}>
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><span className="material-symbols-outlined text-lg">route</span></span>
-              <div className="min-w-0"><p className="truncate text-[11px] font-extrabold tracking-wide text-white">Safe route</p><p className="mt-0.5 text-[9px] text-white/60">Live monitoring</p></div>
-            </div>
-          </div>
-          <div className="mw-card-in absolute bottom-[20%] right-[5%] w-[180px] rounded-[20px] border border-white/10 bg-white/[.11] p-3.5 shadow-lg backdrop-blur-md sm:right-[8%] sm:w-[194px]" style={{ animationDelay: '.35s' }}>
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-200/15 text-amber-200"><span className="material-symbols-outlined text-lg">warning</span></span>
-              <div className="min-w-0"><p className="truncate text-[11px] font-extrabold tracking-wide text-white">Road alert</p><p className="mt-0.5 text-[9px] text-white/60">Ready when needed</p></div>
-            </div>
-          </div>
+        <div className="pointer-events-none absolute left-[7%] top-[19%] rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
+          <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><span className="material-symbols-outlined text-lg">shield</span></span><div><p className="text-[11px] font-extrabold text-white">Safe route</p><p className="mt-0.5 text-[9px] text-white/60">Protected journey</p></div></div>
+        </div>
+        <div className="pointer-events-none absolute bottom-[18%] right-[5%] rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
+          <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-amber-200"><span className="material-symbols-outlined text-lg">warning</span></span><div><p className="text-[11px] font-extrabold text-white">Road alert</p><p className="mt-0.5 text-[9px] text-white/60">Risk detected ahead</p></div></div>
         </div>
       </div>
       <div className="max-w-lg">
