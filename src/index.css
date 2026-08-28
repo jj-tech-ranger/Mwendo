@@ -77,6 +77,7 @@
     --color-on-secondary: #00382a;
     --color-secondary-container: #00513e;
     --color-on-secondary-container: #a0f3d4;
+    --color-on-secondary-container: #a0f3d4;
     --color-tertiary: #ffb783;
     --color-on-tertiary: #492200;
     --color-tertiary-container: #683300;
@@ -91,7 +92,6 @@
     --color-sage-light: #183328;
   }
 
-  /* Authority Variant (Link Blue / NTSA Blue Accent) */
   .theme-authority {
     --color-primary: #0f4c81;
     --color-on-primary: #ffffff;
@@ -115,7 +115,6 @@
     --color-on-secondary-container: #cbe6ff;
   }
 
-  /* Admin Ops Console Variant (Dark Ops, Mono-leaning) */
   .theme-admin {
     --color-surface: #0a0e14;
     --color-surface-dim: #070a0e;
@@ -145,7 +144,6 @@
   --font-body-sm: 'Inter', sans-serif;
   --font-label-bold: 'Inter', sans-serif;
   --font-label-mono: 'JetBrains Mono', monospace;
-
   --color-surface: var(--color-surface);
   --color-surface-dim: var(--color-surface-dim);
   --color-surface-bright: var(--color-surface-bright);
@@ -170,7 +168,6 @@
   --color-on-secondary: var(--color-on-secondary);
   --color-secondary-container: var(--color-secondary-container);
   --color-on-secondary-container: var(--color-on-secondary-container);
-  --color-on-secondary-container: var(--color-on-secondary-container);
   --color-tertiary: var(--color-tertiary);
   --color-on-tertiary: var(--color-on-tertiary);
   --color-tertiary-container: var(--color-tertiary-container);
@@ -179,13 +176,14 @@
   --color-on-error: var(--color-on-error);
   --color-error-container: var(--color-error-container);
   --color-on-error-container: var(--color-on-error-container);
+  --color-on-error-container: var(--color-on-error-container);
   --color-primary-fixed: var(--color-primary-fixed);
   --color-primary-fixed-dim: var(--color-primary-fixed-dim);
   --color-on-primary-fixed: var(--color-on-primary-fixed);
   --color-on-primary-fixed-variant: var(--color-on-primary-fixed-variant);
   --color-secondary-fixed: var(--color-secondary-fixed);
   --color-secondary-fixed-dim: var(--color-secondary-fixed-dim);
-  --color-on-secondary-fixed: var(--color-secondary-fixed);
+  --color-on-secondary-fixed: var(--color-on-secondary-fixed);
   --color-on-secondary-fixed-variant: var(--color-on-secondary-fixed-variant);
   --color-tertiary-fixed: var(--color-tertiary-fixed);
   --color-tertiary-fixed-dim: var(--color-tertiary-fixed-dim);
@@ -201,6 +199,11 @@
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   display: inline-block;
   line-height: 1;
+}
+
+/* Prevent Material Symbols ligature names from flashing as plain text. */
+.icons-loading .material-symbols-outlined {
+  visibility: hidden;
 }
 
 .dot-grid {
