@@ -5,10 +5,53 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { Skeleton } from '../../components/ui/LoadingIndicators';
 import { useAuthStore } from '../../store/useAuthStore';
 import { blackSpotRepository, safetyAlertRepository } from '../../repositories';
 import { BlackSpot, SafetyAlert } from '../../types';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+
+const AlertListSkeleton: React.FC = () => (
+  <div className="space-y-3" role="status" aria-label="Loading safety alerts">
+    {[0, 1, 2].map((item) => (
+      <Card key={item} className="p-4 space-y-3 border border-outline-variant/30">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-1">
+            <Skeleton variant="circle" className="w-9 h-9 shrink-0" />
+            <Skeleton className="h-4 w-36" />
+          </div>
+          <Skeleton className="h-3 w-14" />
+        </div>
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-4/5" />
+      </Card>
+    ))}
+    <span className="sr-only">Loading active corridor alerts…</span>
+  </div>
+);
+
+const ReportListSkeleton: React.FC = () => (
+  <div className="space-y-3" role="status" aria-label="Loading hazard reports">
+    {[0, 1].map((item) => (
+      <Card key={item} className="p-4 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </div>
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-3/4" />
+        <div className="pt-2 border-t border-outline-variant/20 flex justify-between">
+          <Skeleton className="h-3 w-28" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </Card>
+    ))}
+    <span className="sr-only">Loading your hazard reports…</span>
+  </div>
+);
 
 export const PassengerAlertsScreen: React.FC = () => {
   const { user } = useAuthStore();
@@ -43,8 +86,6 @@ export const PassengerAlertsScreen: React.FC = () => {
 
   const alertsList = alertsData?.alerts || [];
   const reportsList = alertsData?.myReports || [];
-
-  // Calculate passenger Trust Score dynamically from confirmed reports
   const verifiedReportsCount = reportsList.filter((r) => r.verifiedByAuthority || r.status === 'published').length;
   const calculatedTrustScore = Math.min(100, 50 + verifiedReportsCount * 15 + (user ? 10 : 0));
 
@@ -67,7 +108,6 @@ export const PassengerAlertsScreen: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
-      {/* Top Header */}
       <div>
         <h1 className="text-xl font-black text-on-surface">Alerts & Safety Center</h1>
         <p className="text-xs text-on-surface-variant">
@@ -75,7 +115,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </p>
       </div>
 
-      {/* Sub Tabs */}
       <div className="flex bg-surface-container p-1 rounded-xl text-xs font-bold overflow-x-auto">
         <button
           onClick={() => setActiveSubTab('alerts')}
@@ -111,7 +150,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </button>
       </div>
 
-      {/* SUB-TAB 1: ALERTS & NOTIFICATIONS */}
       {activeSubTab === 'alerts' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant">
@@ -120,9 +158,7 @@ export const PassengerAlertsScreen: React.FC = () => {
           </div>
 
           {isLoading ? (
-            <div className="p-8 text-center text-xs text-on-surface-variant font-mono animate-pulse">
-              Loading active corridor alerts...
-            </div>
+            <AlertListSkeleton />
           ) : alertsList.length === 0 ? (
             <EmptyState
               icon="notifications_off"
@@ -166,7 +202,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-TAB 2: TRUST SCORE */}
       {activeSubTab === 'trust' && (
         <div className="space-y-4">
           <Card className="p-6 text-center space-y-3 bg-gradient-to-br from-emerald-900/10 to-teal-900/10 border border-emerald-500/20">
@@ -207,7 +242,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-TAB 3: MY REPORTS */}
       {activeSubTab === 'reports' && (
         <div className="space-y-3">
           <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
@@ -215,9 +249,7 @@ export const PassengerAlertsScreen: React.FC = () => {
           </h2>
 
           {isLoading ? (
-            <div className="p-8 text-center text-xs text-on-surface-variant font-mono animate-pulse">
-              Loading your hazard reports...
-            </div>
+            <ReportListSkeleton />
           ) : reportsList.length === 0 ? (
             <EmptyState
               icon="report_off"
@@ -255,7 +287,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* SUB-TAB 4: ACHIEVEMENTS & BADGES */}
       {activeSubTab === 'achievements' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs font-mono">
@@ -302,7 +333,6 @@ export const PassengerAlertsScreen: React.FC = () => {
         </div>
       )}
 
-      {/* Alert Detail Dialog */}
       <Dialog
         isOpen={!!selectedAlert}
         onClose={() => setSelectedAlert(null)}
