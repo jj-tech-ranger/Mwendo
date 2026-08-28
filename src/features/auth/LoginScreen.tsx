@@ -24,31 +24,25 @@ export const LoginScreen: React.FC = () => {
   const [isGuestLoading, setIsGuestLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    getValues,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormValues>({
+  const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
+
+  const routeProfile = (profile: { activeRole?: string; role?: string; isMfaEnrolled?: boolean }) => {
+    const role = profile.activeRole || profile.role;
+    if (role === 'admin' || role === 'authority') {
+      navigate(profile.isMfaEnrolled ? '/auth/mfa-challenge' : '/auth/mfa-enrollment');
+    } else if (role === 'sacco_manager') {
+      navigate('/sacco');
+    } else {
+      navigate('/passenger');
+    }
+  };
 
   const onSubmit = async (data: LoginFormValues) => {
     setErrorMsg(null);
     try {
-      const profile = await authService.signInWithEmail(data.email, data.password);
-      const role = profile.activeRole || profile.role;
-      if (role === 'admin' || role === 'authority') {
-        if (!profile.isMfaEnrolled) {
-          navigate('/auth/mfa-enrollment');
-        } else {
-          navigate('/auth/mfa-challenge');
-        }
-      } else if (role === 'sacco_manager') {
-        navigate('/sacco');
-      } else {
-        navigate('/passenger');
-      }
+      routeProfile(await authService.signInWithEmail(data.email, data.password));
     } catch (err: unknown) {
       const authErr = err as { code?: string; message?: string; resolver?: unknown };
       if (authErr.code === 'auth/multi-factor-auth-required') {
@@ -64,19 +58,7 @@ export const LoginScreen: React.FC = () => {
     setErrorMsg(null);
     setIsGoogleLoading(true);
     try {
-      const profile = await authService.signInWithGoogle();
-      const role = profile.activeRole || profile.role;
-      if (role === 'admin' || role === 'authority') {
-        if (!profile.isMfaEnrolled) {
-          navigate('/auth/mfa-enrollment');
-        } else {
-          navigate('/auth/mfa-challenge');
-        }
-      } else if (role === 'sacco_manager') {
-        navigate('/sacco');
-      } else {
-        navigate('/passenger');
-      }
+      routeProfile(await authService.signInWithGoogle());
     } catch (err: unknown) {
       const authErr = err as { code?: string; resolver?: unknown };
       if (authErr.code === 'auth/multi-factor-auth-required') {
@@ -121,112 +103,59 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-on-surface flex flex-col justify-center items-center p-margin-mobile">
-      <div className="w-full max-w-sm space-y-lg">
-        <div className="flex flex-col items-center text-center space-y-md">
-          <PrimaryLogo className="h-12 w-auto mb-2" />
-          <h1 className="font-headline-lg text-primary">{t('auth.login.title')}</h1>
-          <p className="font-body-md text-on-surface-variant">
-            {t('auth.login.subtitle')}
-          </p>
+    <main className="min-h-screen bg-surface text-on-surface lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
+      <section className="relative hidden overflow-hidden bg-primary px-12 py-12 text-on-primary lg:flex lg:min-h-screen lg:flex-col lg:justify-between xl:px-20">
+        <div className="absolute -right-24 top-16 h-72 w-72 rounded-full border border-on-primary/10" />
+        <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full border border-on-primary/10" />
+        <div className="relative z-10">
+          <img src="/brand/logo-dark.png" alt="Mwendo Salama" className="h-12 w-auto object-contain" />
         </div>
-
-        {errorMsg && (
-          <div className="p-md rounded-xl bg-error-container text-on-error-container text-body-sm text-center">
-            {errorMsg}
-          </div>
-        )}
-
-        {magicLinkSent && (
-          <div className="p-md rounded-xl bg-sage-light text-primary text-body-sm text-center">
-            {t('auth.login.magicLinkSent')}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-md">
-          <Input
-            label={t('auth.login.emailLabel')}
-            type="email"
-            placeholder={t('auth.login.emailPlaceholder')}
-            icon="mail"
-            error={errors.email?.message}
-            {...register('email')}
-          />
-
-          <Input
-            label={t('auth.login.passwordLabel')}
-            type="password"
-            placeholder={t('auth.login.passwordPlaceholder')}
-            icon="lock"
-            error={errors.password?.message}
-            {...register('password')}
-          />
-
-          <div className="flex justify-end">
-            <Link
-              to="/auth/forgot-password"
-              className="font-label-bold text-xs text-secondary hover:underline"
-            >
-              {t('auth.login.forgotPassword')}
-            </Link>
-          </div>
-
-          <Button type="submit" variant="primary" className="w-full" isLoading={isSubmitting}>
-            {t('auth.login.signInButton')}
-          </Button>
-        </form>
-
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-outline-variant/40" />
-          </div>
-          <div className="relative flex justify-center text-xs font-label-mono">
-            <span className="bg-surface px-2 text-on-surface-variant uppercase">
-              {t('auth.login.orContinueWith')}
-            </span>
+        <div className="relative z-10 max-w-xl space-y-6">
+          <p className="font-label-bold text-sm uppercase tracking-[0.18em] text-on-primary/70">Mwendo Salama</p>
+          <h2 className="font-headline-xl max-w-lg leading-tight">Safer journeys, powered by better road intelligence.</h2>
+          <p className="max-w-md text-base leading-7 text-on-primary/80">Track your journey, understand road risks, and help make public transport safer across Kenya.</p>
+          <div className="flex flex-wrap gap-3 pt-2 text-sm text-on-primary/80">
+            <span className="rounded-full border border-on-primary/15 bg-on-primary/5 px-4 py-2">Real-time safety</span>
+            <span className="rounded-full border border-on-primary/15 bg-on-primary/5 px-4 py-2">Kenya-focused</span>
           </div>
         </div>
+        <p className="relative z-10 text-xs text-on-primary/60">Your safety journey starts here.</p>
+      </section>
 
-        <div className="space-y-sm">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2"
-            onClick={handleGoogleSignIn}
-            isLoading={isGoogleLoading}
-          >
-            <span className="material-symbols-outlined text-xl text-primary">account_circle</span>
-            {t('auth.login.googleSignIn')}
-          </Button>
+      <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8 lg:px-12 xl:px-20">
+        <div className="w-full max-w-md space-y-7">
+          <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
+            <PrimaryLogo className="mb-7 h-10 w-auto lg:hidden" />
+            <div className="mb-2 text-xs font-label-bold uppercase tracking-[0.16em] text-primary">Welcome back</div>
+            <h1 className="font-headline-lg text-on-surface">{t('auth.login.title')}</h1>
+            <p className="mt-2 max-w-sm font-body-md text-on-surface-variant">{t('auth.login.subtitle')}</p>
+          </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full text-xs"
-            onClick={handleSendMagicLink}
-          >
-            {t('auth.login.magicLink')}
-          </Button>
+          {errorMsg && <div role="alert" className="rounded-2xl bg-error-container p-4 text-sm text-on-error-container">{errorMsg}</div>}
+          {magicLinkSent && <div role="status" className="rounded-2xl bg-sage-light p-4 text-sm text-primary">{t('auth.login.magicLinkSent')}</div>}
 
-          <button
-            type="button"
-            onClick={handleGuestSignIn}
-            disabled={isGuestLoading}
-            className="w-full py-2 text-center text-xs font-label-bold text-on-surface-variant hover:text-primary transition-colors"
-          >
-            {isGuestLoading ? t('common.loading') : t('auth.login.continueAsGuest')}
-          </button>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <Input label={t('auth.login.emailLabel')} type="email" placeholder={t('auth.login.emailPlaceholder')} icon="mail" error={errors.email?.message} {...register('email')} />
+            <Input label={t('auth.login.passwordLabel')} type="password" placeholder={t('auth.login.passwordPlaceholder')} icon="lock" error={errors.password?.message} {...register('password')} />
+            <div className="flex justify-end">
+              <Link to="/auth/forgot-password" className="font-label-bold text-sm text-primary hover:underline">{t('auth.login.forgotPassword')}</Link>
+            </div>
+            <Button type="submit" variant="primary" className="w-full min-h-12" isLoading={isSubmitting}>{t('auth.login.signInButton')}</Button>
+          </form>
+
+          <div className="relative py-1"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-outline-variant/50" /></div><div className="relative flex justify-center"><span className="bg-surface px-3 text-xs font-label-mono uppercase text-on-surface-variant">{t('auth.login.orContinueWith')}</span></div></div>
+
+          <div className="space-y-3">
+            <Button type="button" variant="outline" className="min-h-12 w-full" onClick={handleGoogleSignIn} isLoading={isGoogleLoading}><span className="material-symbols-outlined text-xl text-primary">account_circle</span>{t('auth.login.googleSignIn')}</Button>
+            <Button type="button" variant="outline" className="min-h-12 w-full" onClick={handleSendMagicLink}>{t('auth.login.magicLink')}</Button>
+            <button type="button" onClick={handleGuestSignIn} disabled={isGuestLoading} className="min-h-11 w-full rounded-xl px-4 text-sm font-label-bold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary disabled:opacity-60">{isGuestLoading ? t('common.loading') : t('auth.login.continueAsGuest')}</button>
+          </div>
+
+          <div className="border-t border-outline-variant/40 pt-6 text-center lg:text-left">
+            <p className="font-body-sm text-on-surface-variant">{t('auth.login.noAccount')}{' '}<Link to="/auth/register" className="font-label-bold text-primary hover:underline">{t('auth.login.createOne')}</Link></p>
+          </div>
         </div>
-
-        <div className="text-center pt-md border-t border-outline-variant/30">
-          <p className="font-body-sm text-on-surface-variant">
-            {t('auth.login.noAccount')}{' '}
-            <Link to="/auth/register" className="font-label-bold text-primary hover:underline">
-              {t('auth.login.createOne')}
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
