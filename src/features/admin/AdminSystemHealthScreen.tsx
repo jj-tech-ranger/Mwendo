@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '../../components/ui/Button';
 import { db, auth } from '../../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -7,96 +7,118 @@ interface ServiceCheck {
   name: string;
   type: string;
   status: 'healthy' | 'checking' | 'unconfigured' | 'error';
-  latencyMs?: number | undefined;
+  latencyMs?: number;
   details: string;
 }
 
+type CheckStatus = ServiceCheck['status'];
+
+const getErrorCode = (err: unknown): string => {
+  if (typeof err === 'object' && err !== null && 'code' in err) {
+    return String((err as { code?: unknown }).code ?? '');
+  }
+  return '';
+};
+
+const checkFirestore = async (): Promise<{ status: CheckStatus; latencyMs: number; details: string }> => {
+  const start = performance.now();
+  try {
+    await getDoc(doc(db, 'system_config', 'global'));
+    return {
+      status: 'healthy',
+      latencyMs: Math.round(performance.now() - start),
+      details: 'Connected and responding to a Firestore read.',
+    };
+  } catch (err: unknown) {
+    const latencyMs = Math.round(performance.now() - start);
+    const code = getErrorCode(err);
+    if (code === 'permission-denied' || code === 'not-found') {
+      return {
+        status: 'healthy',
+        latencyMs,
+        details: 'Firestore responded; the probe document is not readable or does not exist.',
+      };
+    }
+    return {
+      status: 'error',
+      latencyMs,
+      details: code ? `Firestore request failed (${code}).` : 'Firestore request failed.',
+    };
+  }
+};
+
 export const AdminSystemHealthScreen: React.FC = () => {
   const [isTesting, setIsTesting] = useState(false);
-  const [firestoreLatency, setFirestoreLatency] = useState<number | null>(null);
-  const [firestoreStatus, setFirestoreStatus] = useState<'healthy' | 'checking' | 'error'>('checking');
-  const [lastChecked, setLastChecked] = useState<Date>(new Date());
+  const [firestore, setFirestore] = useState<Pick<ServiceCheck, 'status' | 'latencyMs' | 'details'>>({
+    status: 'checking',
+    details: 'Checking Firestore connectivity...',
+  });
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  const checkHealth = async () => {
+  const checkHealth = useCallback(async () => {
     setIsTesting(true);
-    setFirestoreStatus('checking');
-    const start = performance.now();
-    try {
-      // Test read from Firestore
-      await getDoc(doc(db, 'system_config', 'global'));
-      const end = performance.now();
-      const latency = Math.round(end - start);
-      setFirestoreLatency(latency);
-      setFirestoreStatus('healthy');
-    } catch (err: unknown) {
-      const end = performance.now();
-      const latency = Math.round(end - start);
-      setFirestoreLatency(latency);
-      // If error is permission or not-found, the connection itself is alive
-      const errCode = typeof err === 'object' && err !== null && 'code' in err ? String((err as { code?: unknown }).code) : '';
-      if (errCode === 'permission-denied' || errCode === 'not-found') {
-        setFirestoreStatus('healthy');
-      } else {
-        setFirestoreStatus('error');
-      }
-    } finally {
-      setIsTesting(false);
-      setLastChecked(new Date());
-    }
-  };
-
-  useEffect(() => {
-    checkHealth();
+    setFirestore((current) => ({ ...current, status: 'checking', details: 'Checking Firestore connectivity...' }));
+    const result = await checkFirestore();
+    setFirestore(result);
+    setLastChecked(new Date());
+    setIsTesting(false);
   }, []);
 
+  useEffect(() => {
+    void checkHealth();
+  }, [checkHealth]);
+
+  const authStatus: CheckStatus = auth.currentUser ? 'healthy' : 'unconfigured';
   const services: ServiceCheck[] = [
     {
       name: 'Primary Cloud Database',
       type: 'Real-Time Data Store',
-      status: firestoreStatus,
-      latencyMs: firestoreLatency ?? undefined,
-      details:
-        firestoreStatus === 'healthy'
-          ? `Connected (${firestoreLatency ?? 0}ms round-trip latency)`
-          : firestoreStatus === 'checking'
-          ? 'Verifying socket handshake...'
-          : 'Failed to connect to database backend',
+      ...firestore,
     },
     {
       name: 'Identity & Authentication Gateway',
       type: 'Security & Claims Provider',
-      status: auth.currentUser ? 'healthy' : 'healthy',
+      status: authStatus,
       details: auth.currentUser
-        ? `Authenticated session active (${auth.currentUser.email || auth.currentUser.uid})`
-        : 'Authentication subsystem initialized and operational',
+        ? `Authenticated session active (${auth.currentUser.email || auth.currentUser.uid}).`
+        : 'Firebase Auth is loaded, but no authenticated session is active.',
     },
     {
       name: 'Audit & Incident Pipeline',
       type: 'System Auditing & Logs',
-      status: 'healthy',
-      details: 'Audit log capture operational',
+      status: 'unconfigured',
+      details: 'No client-side health probe is configured for the audit pipeline.',
     },
     {
       name: 'Vehicle GPS Ingestion Pipeline',
       type: 'Real-Time GPS Location Stream',
-      status: 'healthy',
-      details: 'Trip coordinate ingestion stream operational',
+      status: 'unconfigured',
+      details: 'No live ingestion health probe is configured on this admin client.',
     },
   ];
 
+  const overallStatus = services.some((service) => service.status === 'error')
+    ? 'error'
+    : services.some((service) => service.status === 'checking')
+      ? 'checking'
+      : services.some((service) => service.status === 'unconfigured')
+        ? 'degraded'
+        : 'healthy';
+
   return (
     <div className="bg-[#0A0F1D] text-slate-100 p-lg sm:p-xl rounded-2xl border border-slate-800 space-y-lg font-label-mono shadow-2xl">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-md border-b border-slate-800 pb-md">
         <div>
           <div className="flex items-center gap-2">
             <span
               className={`w-3 h-3 rounded-full ${
-                firestoreStatus === 'healthy'
-                  ? 'bg-emerald-500 animate-ping'
-                  : firestoreStatus === 'checking'
-                  ? 'bg-amber-500 animate-pulse'
-                  : 'bg-rose-500'
+                overallStatus === 'healthy'
+                  ? 'bg-emerald-500'
+                  : overallStatus === 'checking'
+                    ? 'bg-amber-500 animate-pulse'
+                    : overallStatus === 'degraded'
+                      ? 'bg-amber-500'
+                      : 'bg-rose-500'
               }`}
             />
             <h2 className="text-base text-emerald-400 font-bold uppercase tracking-widest">
@@ -104,75 +126,73 @@ export const AdminSystemHealthScreen: React.FC = () => {
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Live client connectivity diagnostics and backend integration status. Last checked:{' '}
-            {lastChecked.toLocaleTimeString()}
+            Live client connectivity diagnostics.{' '}
+            {lastChecked ? `Last checked: ${lastChecked.toLocaleTimeString()}` : 'Initial check in progress...'}
           </p>
         </div>
 
         <Button
           variant="outline"
           className="border-emerald-700/50 text-emerald-400 hover:bg-emerald-950/50 gap-2"
-          onClick={checkHealth}
+          onClick={() => void checkHealth()}
           disabled={isTesting}
         >
-          <span className="material-symbols-outlined text-base">swap_calls</span>
-          {isTesting ? 'Pinging Services...' : 'Run Diagnostics Ping'}
+          <span className="material-symbols-outlined text-base" aria-hidden="true">swap_calls</span>
+          {isTesting ? 'Checking Database...' : 'Run Diagnostics Ping'}
         </Button>
       </div>
 
-      {/* Services Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-        {services.map((s, idx) => (
-          <div key={idx} className="bg-[#111827] border border-slate-800 rounded-xl p-md space-y-2">
-            <div className="flex items-center justify-between">
+        {services.map((service) => (
+          <div key={service.name} className="bg-[#111827] border border-slate-800 rounded-xl p-md space-y-2">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-bold text-white block">{s.name}</span>
-                <span className="text-[10px] text-slate-400">{s.type}</span>
+                <span className="text-xs font-bold text-white block">{service.name}</span>
+                <span className="text-[10px] text-slate-400">{service.type}</span>
               </div>
               <span
                 className={`flex items-center gap-1 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                  s.status === 'healthy'
+                  service.status === 'healthy'
                     ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-500/30'
-                    : s.status === 'checking'
-                    ? 'bg-amber-950/80 text-amber-400 border border-amber-500/30'
-                    : s.status === 'unconfigured'
-                    ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                    : 'bg-rose-950/80 text-rose-400 border border-rose-500/30'
+                    : service.status === 'checking'
+                      ? 'bg-amber-950/80 text-amber-400 border border-amber-500/30'
+                      : service.status === 'unconfigured'
+                        ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                        : 'bg-rose-950/80 text-rose-400 border border-rose-500/30'
                 }`}
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    s.status === 'healthy'
+                    service.status === 'healthy'
                       ? 'bg-emerald-400'
-                      : s.status === 'checking'
-                      ? 'bg-amber-400'
-                      : s.status === 'unconfigured'
-                      ? 'bg-slate-400'
-                      : 'bg-rose-400'
+                      : service.status === 'checking'
+                        ? 'bg-amber-400'
+                        : service.status === 'unconfigured'
+                          ? 'bg-slate-400'
+                          : 'bg-rose-400'
                   }`}
                 />
-                {s.status}
+                {service.status}
               </span>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">{s.details}</span>
-              {typeof s.latencyMs === 'number' && (
-                <span className="text-emerald-400 font-bold ml-2">{s.latencyMs} ms</span>
+            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2 text-[11px]">
+              <span className="text-slate-400">{service.details}</span>
+              {typeof service.latencyMs === 'number' && (
+                <span className="text-emerald-400 font-bold ml-2 shrink-0">{service.latencyMs} ms</span>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Observability Connection Info */}
       <div className="bg-[#111827] border border-slate-800 rounded-xl p-md space-y-sm">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-base text-slate-400">info</span>
+          <span className="material-symbols-outlined text-base text-slate-400" aria-hidden="true">info</span>
           <span className="text-xs font-bold text-white">System Infrastructure Monitoring</span>
         </div>
         <p className="text-xs text-slate-400 leading-relaxed">
-          National transport safety infrastructure metrics, real-time alerts, and diagnostic telemetries are monitored continuously across all distributed nodes.
+          This screen reports only checks that the browser can actually perform. Backend pipelines without a dedicated health probe are shown as unconfigured rather than incorrectly reported as healthy.
         </p>
       </div>
     </div>
