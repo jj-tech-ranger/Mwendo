@@ -9,6 +9,7 @@ import { tripRepository } from '../../repositories';
 import { offlineStorage } from '../../services/offlineStorage';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { storageService } from '../../services/storageService';
+import { telemetryPersistenceService } from '../../services/telemetryPersistenceService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
 import { remoteConfigService } from '../../services/remoteConfigService';
@@ -32,7 +33,6 @@ export const ActiveTripScreen: React.FC = () => {
     endTrip,
   } = useTripStore();
 
-  // Local UI State
   const [setupPlate, setSetupPlate] = useState('');
   const [setupSacco, setSetupSacco] = useState('');
   const [setupRoute, setSetupRoute] = useState('');
@@ -40,12 +40,10 @@ export const ActiveTripScreen: React.FC = () => {
   const [summaryData, setSummaryData] = useState<Trip | null>(null);
   const [gpsSignalLost, setGpsSignalLost] = useState(false);
   const [gpsRecoverySeconds, setGpsRecoverySeconds] = useState(GPS_RECOVERY_TIMEOUT_SECONDS);
+  const [telemetryRestored, setTelemetryRestored] = useState(false);
 
-  // Ref to hold SpeedSmoother instance per active trip
   const speedSmootherRef = useRef<SpeedSmoother>(new SpeedSmoother(0.35, 30));
-  // Ref array to buffer accepted GPSSamples for the duration of the trip
   const gpsSamplesBufferRef = useRef<GPSSample[]>([]);
-  // GPS watchdog refs prevent stale callbacks and duplicate auto-completion.
   const gpsWatchdogTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gpsWatchdogIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tripCompletionInProgressRef = useRef(false);
@@ -61,7 +59,6 @@ export const ActiveTripScreen: React.FC = () => {
     }
   };
 
-  // Timer for duration counter
   useEffect(() => {
     if (!isTracking || isPaused) return;
 
@@ -73,6 +70,33 @@ export const ActiveTripScreen: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [isTracking, isPaused]);
+
+  // Restore durable telemetry before accepting new samples for the active trip.
+  useEffect(() => {
+    let cancelled = false;
+    const tripId = activeTrip?.id;
+
+    if (!tripId) {
+      gpsSamplesBufferRef.current = [];
+      setTelemetryRestored(true);
+      return;
+    }
+
+    setTelemetryRestored(false);
+    void telemetryPersistenceService.getSamples(tripId).then((samples) => {
+      if (cancelled) return;
+      gpsSamplesBufferRef.current = samples;
+      setTelemetryRestored(true);
+    }).catch((err) => {
+      if (cancelled) return;
+      console.warn('Unable to restore persisted telemetry:', err);
+      setTelemetryRestored(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTrip?.id]);
 
   // Real Geolocation Watcher + GPS-loss recovery watchdog.
   useEffect(() => {
@@ -132,7 +156,7 @@ export const ActiveTripScreen: React.FC = () => {
 
         const rawSpeedMs = pos.coords.speed;
         const rawSpeedKmH = rawSpeedMs !== null && rawSpeedMs >= 0 ? Math.round(rawSpeedMs * 3.6) : currentSpeed;
-        
+
         const sample: GPSSample = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
@@ -145,6 +169,14 @@ export const ActiveTripScreen: React.FC = () => {
 
         if (isValid) {
           gpsSamplesBufferRef.current.push(sample);
+
+          const tripId = useTripStore.getState().activeTrip?.id;
+          if (tripId && telemetryRestored) {
+            void telemetryPersistenceService.appendSample(tripId, sample).catch((err) => {
+              console.warn('Unable to persist telemetry sample:', err);
+            });
+          }
+
           updateTelemetry(smoothedSpeedKmH, {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
@@ -153,8 +185,6 @@ export const ActiveTripScreen: React.FC = () => {
           });
         }
 
-        // A successful geolocation callback means the signal is healthy even if
-        // the sample is rejected by the speed smoother.
         armGpsWatchdog();
       },
       (err) => {
@@ -170,14 +200,14 @@ export const ActiveTripScreen: React.FC = () => {
       clearGpsWatchdog();
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [isTracking, isPaused]);
+  }, [isTracking, isPaused, telemetryRestored]);
 
-  // Initial Auto Start if coming from Dashboard
   useEffect(() => {
     if (!isTracking && !summaryData) {
       speedSmootherRef.current.reset();
       gpsSamplesBufferRef.current = [];
       tripCompletionInProgressRef.current = false;
+      setTelemetryRestored(false);
       if (setupPlate) {
         startTrip({
           plateNumber: setupPlate,
@@ -185,15 +215,12 @@ export const ActiveTripScreen: React.FC = () => {
           routeName: setupRoute,
         });
       }
-      // Initial telemetry default speed 0
       updateTelemetry(0);
     }
   }, []);
 
-  // Ensure watchdog timers cannot survive component unmount.
   useEffect(() => () => clearGpsWatchdog(), []);
 
-  // Format Duration seconds -> MM:SS
   const formatDuration = (secs: number) => {
     const mins = Math.floor(secs / 60);
     const remainder = secs % 60;
@@ -207,10 +234,21 @@ export const ActiveTripScreen: React.FC = () => {
 
     const routeCoords = useTripStore.getState().routeCoordinates;
     const currentUser = useAuthStore.getState().user;
+    const activeTripId = useTripStore.getState().activeTrip?.id;
 
-    // Detect authoritative violations using detectOverspeedViolations
+    // Flush the serialized local write queue before reading authoritative samples.
+    const persistedSamples = activeTripId
+      ? await telemetryPersistenceService.getSamples(activeTripId)
+      : [];
+    const samplesByTimestamp = new Map<string, GPSSample>();
+    for (const sample of [...persistedSamples, ...gpsSamplesBufferRef.current]) {
+      samplesByTimestamp.set(String(sample.timestamp), sample);
+    }
+    const authoritativeSamples = Array.from(samplesByTimestamp.values());
+    gpsSamplesBufferRef.current = authoritativeSamples;
+
     const speedLimit = remoteConfigService.getFlag('overspeedLimitDisplayed') || 80;
-    const detectedViolations = detectOverspeedViolations(gpsSamplesBufferRef.current, speedLimit);
+    const detectedViolations = detectOverspeedViolations(authoritativeSamples, speedLimit);
     const calculatedOverspeedCount = detectedViolations.length;
 
     const completed = endTrip(status);
@@ -242,11 +280,12 @@ export const ActiveTripScreen: React.FC = () => {
           endTime: new Date().toISOString(),
         };
 
-    // Upload single compressed telemetry blob to Cloud Storage if samples were collected
-    if (routeCoords && routeCoords.length > 0 && currentUser?.uid && navigator.onLine) {
+    const telemetrySamplesForUpload = routeCoords && routeCoords.length > 0 ? routeCoords : authoritativeSamples;
+
+    if (telemetrySamplesForUpload.length > 0 && currentUser?.uid && navigator.onLine) {
       try {
         const path = await storageService.uploadTelemetryBlob(
-          { tripId: result.id, samples: routeCoords, count: routeCoords.length },
+          { tripId: result.id, samples: telemetrySamplesForUpload, count: telemetrySamplesForUpload.length },
           currentUser.uid,
           result.id
         );
@@ -259,7 +298,7 @@ export const ActiveTripScreen: React.FC = () => {
     setSummaryData(result);
     setShowEndModal(false);
 
-    // Save trip document to Firestore / offline storage
+    let saveSucceeded = false;
     try {
       if (navigator.onLine) {
         await tripRepository.save(result);
@@ -267,372 +306,125 @@ export const ActiveTripScreen: React.FC = () => {
         await offlineStorage.setItem(`offline_trip_${result.id}`, result);
         await offlineSyncService.updatePendingCount();
       }
+      saveSucceeded = true;
     } catch (err) {
       console.warn('Error saving trip, saving to offline storage:', err);
       await offlineStorage.setItem(`offline_trip_${result.id}`, result);
       await offlineSyncService.updatePendingCount();
+      saveSucceeded = true;
+    }
+
+    // Only discard the durable active-trip telemetry once the completed trip is safely queued.
+    if (saveSucceeded && activeTripId) {
+      await telemetryPersistenceService.clear(activeTripId);
     }
   };
 
-  // IF TRIP FINISHED - SHOW SUMMARY SCREEN
   if (summaryData) {
     const isHighRisk = summaryData.maxSpeedKmH > 90 || (summaryData.overspeedEventsCount ?? 0) > 0;
 
     return (
       <div className="min-h-screen bg-background text-on-background p-4 sm:p-6 max-w-lg mx-auto space-y-6 animate-in fade-in">
-        {/* Header Bar */}
         <div className="flex items-center justify-between pt-2">
-          <button
-            onClick={() => navigate('/passenger')}
-            className="p-2 rounded-full hover:bg-surface-container-high transition-colors"
-          >
+          <button onClick={() => navigate('/passenger')} className="p-2 rounded-full hover:bg-surface-container-high transition-colors">
             <span className="material-symbols-outlined text-2xl">close</span>
           </button>
-          <span className="text-xs font-mono font-bold uppercase text-on-surface-variant">
-            Trip Summary
-          </span>
+          <span className="text-xs font-mono font-bold uppercase text-on-surface-variant">Trip Summary</span>
           <div className="w-8" />
         </div>
 
-        {/* Safety Score Ring Card */}
         <Card className="p-6 text-center space-y-4 shadow-md">
           <div className="relative w-32 h-32 mx-auto flex items-center justify-center">
             <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="currentColor"
-                strokeWidth="8"
-                className="text-surface-container-high"
-                fill="transparent"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                stroke="currentColor"
-                strokeWidth="8"
-                strokeDasharray={250}
-                strokeDashoffset={isHighRisk ? 80 : 30}
-                className={isHighRisk ? 'text-amber-500' : 'text-emerald-600'}
-                fill="transparent"
-                strokeLinecap="round"
-              />
+              <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" className="text-surface-container-high" fill="transparent" />
+              <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" strokeDasharray={250} strokeDashoffset={isHighRisk ? 80 : 30} className={isHighRisk ? 'text-amber-500' : 'text-emerald-600'} fill="transparent" strokeLinecap="round" />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-3xl font-black font-mono">
-                {isHighRisk ? '72' : '94'}
-              </span>
-              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">
-                / 100
-              </span>
+              <span className="text-3xl font-black font-mono">{isHighRisk ? '72' : '94'}</span>
+              <span className="text-[10px] uppercase tracking-wider font-bold text-on-surface-variant">/ 100</span>
             </div>
           </div>
-
           <div>
-            <Badge variant={isHighRisk ? 'warning' : 'success'} className="px-3 py-1 font-bold">
-              {isHighRisk ? 'Moderate Risk Detected' : 'Safe Trip Completed'}
-            </Badge>
-            <p className="text-xs text-on-surface-variant mt-2">
-              {summaryData.routeName} ({summaryData.saccoName})
-            </p>
+            <Badge variant={isHighRisk ? 'warning' : 'success'} className="px-3 py-1 font-bold">{isHighRisk ? 'Moderate Risk Detected' : 'Safe Trip Completed'}</Badge>
+            <p className="text-xs text-on-surface-variant mt-2">{summaryData.routeName} ({summaryData.saccoName})</p>
           </div>
         </Card>
 
-        {/* Stat Grid */}
         <div className="grid grid-cols-2 gap-3">
-          <Card className="p-4 space-y-1">
-            <span className="text-xs text-on-surface-variant">Total Duration</span>
-            <div className="text-xl font-black font-mono">
-              {formatDuration(summaryData.durationSeconds || 1122)}
-            </div>
-          </Card>
-
-          <Card className="p-4 space-y-1">
-            <span className="text-xs text-on-surface-variant">Max Speed</span>
-            <div
-              className={`text-xl font-black font-mono ${
-                summaryData.maxSpeedKmH > 90 ? 'text-error' : 'text-on-surface'
-              }`}
-            >
-              {summaryData.maxSpeedKmH || 78} km/h
-            </div>
-          </Card>
-
-          <Card className="p-4 space-y-1">
-            <span className="text-xs text-on-surface-variant">Average Speed</span>
-            <div className="text-xl font-black font-mono">54 km/h</div>
-          </Card>
-
-          <Card className="p-4 space-y-1">
-            <span className="text-xs text-on-surface-variant">Overspeed Events</span>
-            <div
-              className={`text-xl font-black font-mono ${
-                (summaryData.overspeedEventsCount ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-700'
-              }`}
-            >
-              {summaryData.overspeedEventsCount ?? 0}
-            </div>
-          </Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Total Duration</span><div className="text-xl font-black font-mono">{formatDuration(summaryData.durationSeconds || 1122)}</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Max Speed</span><div className={`text-xl font-black font-mono ${summaryData.maxSpeedKmH > 90 ? 'text-error' : 'text-on-surface'}`}>{summaryData.maxSpeedKmH || 78} km/h</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Average Speed</span><div className="text-xl font-black font-mono">54 km/h</div></Card>
+          <Card className="p-4 space-y-1"><span className="text-xs text-on-surface-variant">Overspeed Events</span><div className={`text-xl font-black font-mono ${(summaryData.overspeedEventsCount ?? 0) > 0 ? 'text-amber-600' : 'text-emerald-700'}`}>{summaryData.overspeedEventsCount ?? 0}</div></Card>
         </div>
 
-        {/* Route Map Card */}
         <Card className="p-4 space-y-3">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-on-surface">Route GPS Track</span>
-            <span className="font-mono text-emerald-700">Verified</span>
-          </div>
+          <div className="flex items-center justify-between text-xs"><span className="font-bold text-on-surface">Route GPS Track</span><span className="font-mono text-emerald-700">Verified</span></div>
           <div className="h-28 bg-surface-container-high rounded-xl flex items-center justify-center relative overflow-hidden border border-outline-variant/30">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-900/10 to-teal-900/10" />
-            <div className="flex items-center gap-2 text-xs font-mono font-semibold text-on-surface-variant z-10">
-              <span className="material-symbols-outlined text-primary text-base">near_me</span>
-              {summaryData.plateNumber} · Thika Road Corridor
-            </div>
+            <div className="flex items-center gap-2 text-xs font-mono font-semibold text-on-surface-variant z-10"><span className="material-symbols-outlined text-primary text-base">near_me</span>{summaryData.plateNumber} · Thika Road Corridor</div>
           </div>
         </Card>
 
-        {/* Action Buttons */}
         <div className="space-y-2 pt-2">
-          <Button
-            variant="outline"
-            className="w-full text-xs font-bold text-amber-700 border-amber-500/40 hover:bg-amber-500/10"
-            onClick={() => navigate('/passenger/report-blackspot')}
-          >
-            <span className="material-symbols-outlined text-base mr-1">flag</span>
-            Report Reckless Driver / Road Hazard
-          </Button>
-
-          <Button
-            className="w-full h-11 text-sm font-bold"
-            onClick={() => {
-              setSummaryData(null);
-              navigate('/passenger');
-            }}
-          >
-            Finish & Return to Dashboard
-          </Button>
+          <Button variant="outline" className="w-full text-xs font-bold text-amber-700 border-amber-500/40 hover:bg-amber-500/10" onClick={() => navigate('/passenger/report-blackspot')}><span className="material-symbols-outlined text-base mr-1">flag</span>Report Reckless Driver / Road Hazard</Button>
+          <Button className="w-full h-11 text-sm font-bold" onClick={() => { setSummaryData(null); navigate('/passenger'); }}>Finish & Return to Dashboard</Button>
         </div>
       </div>
     );
   }
 
-  // CORE LIVE TRACKING IMMERSIVE SCREEN (Trip Dark Theme #1A2E1A)
   return (
     <div className="min-h-screen bg-[#112214] text-white p-4 sm:p-6 max-w-lg mx-auto flex flex-col justify-between relative overflow-hidden select-none">
-      {/* Background Dot Texture */}
       <div className="absolute inset-0 bg-[radial-gradient(#2a4d31_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
 
-      {/* Top Header Bar */}
       <div className="relative z-10 flex items-center justify-between border-b border-emerald-900/50 pb-3">
-        <button
-          onClick={() => navigate('/passenger')}
-          className="p-2 rounded-full hover:bg-emerald-900/40 text-emerald-200 transition-colors"
-          aria-label="Minimize"
-        >
-          <span className="material-symbols-outlined text-2xl">expand_more</span>
-        </button>
-
-        <div className="text-center">
-          <div className="text-sm font-black font-mono tracking-widest text-emerald-100 uppercase">
-            {activeTrip?.plateNumber || setupPlate}
-          </div>
-          <p className="text-[11px] text-emerald-300/80 font-medium">
-            {activeTrip?.saccoName || setupSacco} · {activeTrip?.routeName || setupRoute}
-          </p>
-        </div>
-
-        <button
-          onClick={() => setShowEndModal(true)}
-          className="text-xs font-bold px-3 py-1.5 rounded-lg bg-error/20 text-red-300 hover:bg-error/30 transition-colors border border-error/30"
-        >
-          End Trip
-        </button>
+        <button onClick={() => navigate('/passenger')} className="p-2 rounded-full hover:bg-emerald-900/40 text-emerald-200 transition-colors" aria-label="Minimize"><span className="material-symbols-outlined text-2xl">expand_more</span></button>
+        <div className="text-center"><div className="text-sm font-black font-mono tracking-widest text-emerald-100 uppercase">{activeTrip?.plateNumber || setupPlate}</div><p className="text-[11px] text-emerald-300/80 font-medium">{activeTrip?.saccoName || setupSacco} · {activeTrip?.routeName || setupRoute}</p></div>
+        <button onClick={() => setShowEndModal(true)} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-error/20 text-red-300 hover:bg-error/30 transition-colors border border-error/30">End Trip</button>
       </div>
 
-      {/* GPS Recovery Banner */}
       {gpsSignalLost && (
         <div className="relative z-20 mt-3 rounded-xl border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-xs text-amber-100 shadow-lg">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-400 text-base">location_off</span>
-            <div className="min-w-0 flex-1">
-              <div className="font-bold text-white">GPS signal lost</div>
-              <div className="text-[11px] text-amber-200/90">
-                Reconnecting… trip will be marked incomplete in {gpsRecoverySeconds}s if GPS does not return.
-              </div>
-            </div>
-            <span className="font-mono font-black text-amber-300">{gpsRecoverySeconds}s</span>
-          </div>
+          <div className="flex items-center gap-2"><span className="material-symbols-outlined text-amber-400 text-base">location_off</span><div className="min-w-0 flex-1"><div className="font-bold text-white">GPS signal lost</div><div className="text-[11px] text-amber-200/90">Reconnecting… trip will be marked incomplete in {gpsRecoverySeconds}s if GPS does not return.</div></div><span className="font-mono font-black text-amber-300">{gpsRecoverySeconds}s</span></div>
         </div>
       )}
 
-      {/* Speedometer Gauge Canvas */}
       <div className="relative z-10 my-auto py-6 text-center space-y-6">
-        {/* Main Speed Gauge */}
         <div className="relative w-64 h-64 mx-auto flex items-center justify-center">
-          {/* Circular Speed Ring SVG */}
           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-            {/* Background Track */}
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              stroke="#1b3620"
-              strokeWidth="6"
-              fill="transparent"
-            />
-            {/* Active Speed Arc */}
-            <circle
-              cx="50"
-              cy="50"
-              r="42"
-              stroke={currentSpeed > 90 ? '#ef4444' : currentSpeed > 80 ? '#f59e0b' : '#10b981'}
-              strokeWidth="8"
-              strokeDasharray={264}
-              strokeDashoffset={264 - (264 * Math.min(currentSpeed, 120)) / 120}
-              fill="transparent"
-              strokeLinecap="round"
-              className="transition-all duration-500 ease-out"
-            />
+            <circle cx="50" cy="50" r="42" stroke="#1b3620" strokeWidth="6" fill="transparent" />
+            <circle cx="50" cy="50" r="42" stroke={currentSpeed > 90 ? '#ef4444' : currentSpeed > 80 ? '#f59e0b' : '#10b981'} strokeWidth="8" strokeDasharray={264} strokeDashoffset={264 - (264 * Math.min(currentSpeed, 120)) / 120} fill="transparent" strokeLinecap="round" className="transition-all duration-500 ease-out" />
           </svg>
-
-          {/* Centered Readout */}
           <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1">
-            <span
-              className={`text-6xl font-black font-mono tracking-tight transition-colors duration-300 ${
-                currentSpeed > 90
-                  ? 'text-red-500 animate-pulse'
-                  : currentSpeed > 80
-                  ? 'text-amber-400'
-                  : 'text-emerald-300'
-              }`}
-            >
-              {currentSpeed}
-            </span>
-            <span className="text-xs font-bold font-mono tracking-widest text-emerald-400/80 uppercase">
-              KM / H
-            </span>
-            {isPaused && (
-              <Badge variant="warning" className="text-[10px] mt-1">
-                PAUSED
-              </Badge>
-            )}
+            <span className={`text-6xl font-black font-mono tracking-tight transition-colors duration-300 ${currentSpeed > 90 ? 'text-red-500 animate-pulse' : currentSpeed > 80 ? 'text-amber-400' : 'text-emerald-300'}`}>{currentSpeed}</span>
+            <span className="text-xs font-bold font-mono tracking-widest text-emerald-400/80 uppercase">KM / H</span>
+            {isPaused && <Badge variant="warning" className="text-[10px] mt-1">PAUSED</Badge>}
           </div>
         </div>
 
-        {/* Live Telemetry Stat Chips */}
-        <div className="flex items-center justify-center gap-4 text-xs font-mono">
-          <div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">
-            Max Speed: <span className="font-bold text-white">{maxSpeed} km/h</span>
-          </div>
-          <div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">
-            Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span>
-          </div>
-        </div>
+        <div className="flex items-center justify-center gap-4 text-xs font-mono"><div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">Max Speed: <span className="font-bold text-white">{maxSpeed} km/h</span></div><div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span></div></div>
 
-        {/* Alert Cards Feed */}
         <div className="space-y-2 max-w-sm mx-auto text-left">
           {currentSpeed > 90 ? (
-            <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl flex items-center gap-3 text-red-200 text-xs animate-bounce">
-              <span className="material-symbols-outlined text-red-400 text-xl">warning</span>
-              <div>
-                <div className="font-bold text-white">Overspeed Violation Detected!</div>
-                <div className="text-[11px] text-red-300/90">
-                  Vehicle traveling over 90 km/h threshold on Thika Road.
-                </div>
-              </div>
-            </div>
+            <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl flex items-center gap-3 text-red-200 text-xs animate-bounce"><span className="material-symbols-outlined text-red-400 text-xl">warning</span><div><div className="font-bold text-white">Overspeed Violation Detected!</div><div className="text-[11px] text-red-300/90">Vehicle traveling over 90 km/h threshold on Thika Road.</div></div></div>
           ) : currentSpeed > 80 ? (
-            <div className="bg-amber-950/80 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3 text-amber-200 text-xs">
-              <span className="material-symbols-outlined text-amber-400 text-xl">speed</span>
-              <div>
-                <div className="font-bold text-white">Approaching Speed Limit</div>
-                <div className="text-[11px] text-amber-300/90">
-                  Speed is 81–90 km/h. Drive cautiously.
-                </div>
-              </div>
-            </div>
+            <div className="bg-amber-950/80 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3 text-amber-200 text-xs"><span className="material-symbols-outlined text-amber-400 text-xl">speed</span><div><div className="font-bold text-white">Approaching Speed Limit</div><div className="text-[11px] text-amber-300/90">Speed is 81–90 km/h. Drive cautiously.</div></div></div>
           ) : (
-            <div className="bg-emerald-950/60 border border-emerald-800/50 p-3 rounded-xl flex items-center gap-3 text-emerald-200 text-xs">
-              <span className="material-symbols-outlined text-emerald-400 text-xl">verified</span>
-              <div>
-                <div className="font-bold text-white">Route Normal & Safe</div>
-                <div className="text-[11px] text-emerald-300/80">
-                  Speed within legal safety limit. Co-riders online: 4
-                </div>
-              </div>
-            </div>
+            <div className="bg-emerald-950/60 border border-emerald-800/50 p-3 rounded-xl flex items-center gap-3 text-emerald-200 text-xs"><span className="material-symbols-outlined text-emerald-400 text-xl">verified</span><div><div className="font-bold text-white">Route Normal & Safe</div><div className="text-[11px] text-emerald-300/80">Speed within legal safety limit. Co-riders online: 4</div></div></div>
           )}
         </div>
       </div>
 
-      {/* Bottom Controls Bar & Emergency Floating Button */}
       <div className="relative z-10 flex items-center justify-between border-t border-emerald-900/50 pt-3">
-        {/* Pause / Resume Button */}
-        {isPaused ? (
-          <Button
-            onClick={resumeTrip}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 h-10 rounded-xl"
-          >
-            <span className="material-symbols-outlined text-base mr-1">play_arrow</span>
-            Resume
-          </Button>
-        ) : (
-          <Button
-            onClick={pauseTrip}
-            variant="outline"
-            className="border-emerald-700 text-emerald-200 hover:bg-emerald-900/40 text-xs font-bold px-4 h-10 rounded-xl"
-          >
-            <span className="material-symbols-outlined text-base mr-1">pause</span>
-            Pause
-          </Button>
-        )}
-
-        {/* Emergency SOS Button */}
-        <button
-          onClick={() => navigate('/passenger/sos')}
-          className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center font-black shadow-lg shadow-red-900/50 transition-all transform active:scale-95 border-2 border-red-400"
-          aria-label="Emergency SOS"
-        >
-          <span className="text-sm tracking-wider font-mono">SOS</span>
-        </button>
+        {isPaused ? <Button onClick={resumeTrip} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 h-10 rounded-xl"><span className="material-symbols-outlined text-base mr-1">play_arrow</span>Resume</Button> : <Button onClick={pauseTrip} variant="outline" className="border-emerald-700 text-emerald-200 hover:bg-emerald-900/40 text-xs font-bold px-4 h-10 rounded-xl"><span className="material-symbols-outlined text-base mr-1">pause</span>Pause</Button>}
+        <button onClick={() => navigate('/passenger/sos')} className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center font-black shadow-lg shadow-red-900/50 transition-all transform active:scale-95 border-2 border-red-400" aria-label="Emergency SOS"><span className="text-sm tracking-wider font-mono">SOS</span></button>
       </div>
 
-      {/* End Trip Confirmation Modal */}
-      <Dialog
-        isOpen={showEndModal}
-        onClose={() => setShowEndModal(false)}
-        title="End Live Trip Tracking?"
-      >
+      <Dialog isOpen={showEndModal} onClose={() => setShowEndModal(false)} title="End Live Trip Tracking?">
         <div className="space-y-4 text-xs text-on-surface text-left">
-          <p className="text-on-surface-variant">
-            Ending this trip will stop real-time GPS telemetry logging and calculate your safety summary.
-          </p>
-
-          <div className="bg-surface-container-low p-3 rounded-xl space-y-1 font-mono text-xs">
-            <div>Plate: {activeTrip?.plateNumber || setupPlate}</div>
-            <div>Duration: {formatDuration(durationSeconds)}</div>
-            <div>Max Speed: {maxSpeed} km/h</div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={() => setShowEndModal(false)}
-            >
-              Keep Tracking
-            </Button>
-            <Button
-              className="flex-1 bg-error hover:bg-error/90 text-on-error text-xs font-bold"
-              onClick={() => {
-                tripCompletionInProgressRef.current = true;
-                void handleConfirmEndTrip();
-              }}
-            >
-              End Trip Now
-            </Button>
-          </div>
+          <p className="text-on-surface-variant">Ending this trip will stop real-time GPS telemetry logging and calculate your safety summary.</p>
+          <div className="bg-surface-container-low p-3 rounded-xl space-y-1 font-mono text-xs"><div>Plate: {activeTrip?.plateNumber || setupPlate}</div><div>Duration: {formatDuration(durationSeconds)}</div><div>Max Speed: {maxSpeed} km/h</div></div>
+          <div className="flex gap-2 pt-2"><Button variant="outline" className="flex-1 text-xs" onClick={() => setShowEndModal(false)}>Keep Tracking</Button><Button className="flex-1 bg-error hover:bg-error/90 text-on-error text-xs font-bold" onClick={() => { tripCompletionInProgressRef.current = true; void handleConfirmEndTrip(); }}>End Trip Now</Button></div>
         </div>
       </Dialog>
     </div>
