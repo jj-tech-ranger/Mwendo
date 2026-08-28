@@ -17,7 +17,7 @@ const AlertListSkeleton: React.FC = () => (
       <Card key={item} className="p-4 space-y-3 border border-outline-variant/30">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 flex-1">
-            <Skeleton variant="circle" className="w-9 h-9 shrink-0" />
+            <Skeleton rounded="full" className="w-9 h-9 shrink-0" />
             <Skeleton className="h-4 w-36" />
           </div>
           <Skeleton className="h-3 w-14" />
