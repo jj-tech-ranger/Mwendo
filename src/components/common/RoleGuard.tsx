@@ -7,6 +7,20 @@ interface RoleGuardProps {
   allowedRoles?: UserRole[];
 }
 
+const AuthLoadingState: React.FC = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background" aria-live="polite" aria-busy="true">
+    <div className="flex flex-col items-center gap-md">
+      <span
+        className="block h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary"
+        aria-hidden="true"
+      />
+      <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
+        Authenticating session...
+      </span>
+    </div>
+  </div>
+);
+
 export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
   const user = useAuthStore((s) => s.user);
   const claims = useAuthStore((s) => s.claims);
@@ -15,18 +29,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
   const location = useLocation();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-md">
-          <span className="material-symbols-outlined text-primary text-4xl animate-spin">
-            sync
-          </span>
-          <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-            Authenticating session...
-          </span>
-        </div>
-      </div>
-    );
+    return <AuthLoadingState />;
   }
 
   if (!isAuthenticated || !user) {
@@ -48,18 +51,7 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
     (user.claims?.activeRole as UserRole | undefined);
 
   if (!effectiveRole) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-md">
-          <span className="material-symbols-outlined text-primary text-4xl animate-spin">
-            sync
-          </span>
-          <span className="font-label-mono text-xs text-on-surface-variant uppercase tracking-wider">
-            Authenticating session...
-          </span>
-        </div>
-      </div>
-    );
+    return <AuthLoadingState />;
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(effectiveRole)) {
