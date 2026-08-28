@@ -1,5 +1,12 @@
 import React from 'react';
 
+/**
+ * Official Mwendo Salama brand assets.
+ *
+ * Keep application branding behind this module so screens and shells do not
+ * recreate the logo/mark with inline SVGs or text. The source artwork lives
+ * in public/brand and should be treated as the canonical visual identity.
+ */
 export const BRAND_ASSETS = {
   lightLogo: '/brand/logo-light.png',
   darkLogo: '/brand/logo-dark.png',
@@ -10,6 +17,8 @@ export const BRAND_ASSETS = {
   brandMark: '/brand/favicon-light.png',
   appIcon: '/brand/favicon-dark.png',
   favicon: '/brand/favicon-light.png',
+  // These legacy illustration keys are retained for compatibility with
+  // existing screens, but deliberately resolve to official brand artwork.
   speedometerIllustration: '/brand/favicon-light.png',
   mapIllustration: '/brand/favicon-dark.png',
   aiNetworkIllustration: '/brand/logo-light.png',
@@ -29,6 +38,7 @@ const logoSrc = (isDark: boolean) =>
 const iconSrc = (isDark: boolean) =>
   isDark ? BRAND_ASSETS.darkIcon : BRAND_ASSETS.lightIcon;
 
+/** Full official Mwendo Salama logo. */
 export const MwendoSalamaFullLogo: React.FC<BrandProps> = ({
   className = 'h-24 w-auto',
   isDark = false,
@@ -40,6 +50,7 @@ export const MwendoSalamaFullLogo: React.FC<BrandProps> = ({
   />
 );
 
+/** Primary logo used on light surfaces. */
 export const PrimaryLogo: React.FC<BrandProps> = ({
   className = 'h-16 w-auto',
   isDark = false,
@@ -47,10 +58,12 @@ export const PrimaryLogo: React.FC<BrandProps> = ({
   <MwendoSalamaFullLogo className={className} isDark={isDark} />
 );
 
+/** Official logo variant intended for dark surfaces. */
 export const SecondaryLogo: React.FC<Omit<BrandProps, 'isDark'>> = ({
   className = 'h-16 w-auto',
 }) => <MwendoSalamaFullLogo className={className} isDark />;
 
+/** Official Mwendo Salama brand mark/favicon artwork. */
 export const ShieldSpeedometerMark: React.FC<BrandProps & {
   color?: string;
   bgColor?: string;
@@ -85,19 +98,12 @@ export const AppIcon: React.FC<BrandProps> = ({
   />
 );
 
+/**
+ * Backwards-compatible horizontal logo API.
+ * It now renders the official full logo instead of reconstructing the
+ * branding from a mark + separately typeset text.
+ */
 export const HorizontalLogo: React.FC<BrandProps> = ({
   className = 'h-10 w-auto',
   isDark = false,
-}) => (
-  <div className={`flex items-center gap-2.5 ${className}`}>
-    <BrandMark className="h-9 w-9 shrink-0" isDark={isDark} />
-    <div className="flex flex-col leading-none">
-      <span className={`font-black text-lg tracking-tight ${isDark ? 'text-white' : 'text-on-surface'}`}>
-        Mwendo Salama
-      </span>
-      <span className={`mt-1 text-[9px] font-semibold uppercase tracking-[0.16em] ${isDark ? 'text-white/70' : 'text-on-surface-variant/80'}`}>
-        Safe Journeys
-      </span>
-    </div>
-  </div>
-);
+}) => <MwendoSalamaFullLogo className={className} isDark={isDark} />;
