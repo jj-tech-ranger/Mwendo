@@ -170,6 +170,7 @@
   --color-on-secondary: var(--color-on-secondary);
   --color-secondary-container: var(--color-secondary-container);
   --color-on-secondary-container: var(--color-on-secondary-container);
+  --color-on-secondary-container: var(--color-on-secondary-container);
   --color-tertiary: var(--color-tertiary);
   --color-on-tertiary: var(--color-on-tertiary);
   --color-tertiary-container: var(--color-tertiary-container);
@@ -184,7 +185,7 @@
   --color-on-primary-fixed-variant: var(--color-on-primary-fixed-variant);
   --color-secondary-fixed: var(--color-secondary-fixed);
   --color-secondary-fixed-dim: var(--color-secondary-fixed-dim);
-  --color-on-secondary-fixed: var(--color-on-secondary-fixed);
+  --color-on-secondary-fixed: var(--color-secondary-fixed);
   --color-on-secondary-fixed-variant: var(--color-on-secondary-fixed-variant);
   --color-tertiary-fixed: var(--color-tertiary-fixed);
   --color-tertiary-fixed-dim: var(--color-tertiary-fixed-dim);
@@ -214,6 +215,11 @@
 
 .safe-area-top {
   padding-top: env(safe-area-inset-top, 16px);
+}
+
+@keyframes loading-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
