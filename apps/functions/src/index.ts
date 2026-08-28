@@ -9,6 +9,7 @@ if (!getApps().length) {
 }
 
 export { suspendUser, reactivateUser } from './admin/suspendUser';
+export { healthCheck } from './admin/healthCheck';
 export { verifyTotpChallenge } from './auth/verifyTotpChallenge';
 export { computeVehicleRisk } from './risk/computeVehicleRisk';
 export { rebuildSaccoAnalytics } from './analytics/rebuildSaccoAnalytics';
