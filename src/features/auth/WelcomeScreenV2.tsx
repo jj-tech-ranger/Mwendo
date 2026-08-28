@@ -6,6 +6,18 @@ import { Button } from '../../components/ui/Button';
 import { LanguageToggle } from '../../components/common/LanguageToggle';
 import { useThemeStore } from '../../store/useThemeStore';
 
+const trustItems: Array<[icon: string, key: string]> = [
+  ['check_circle', 'welcome.hero.trustTripSafety'],
+  ['speed', 'welcome.hero.trustSpeedAwareness'],
+  ['report', 'welcome.hero.trustHazardReporting'],
+];
+
+const howItWorksItems: Array<[number: string, icon: string, title: string, desc: string]> = [
+  ['01', 'location_on', 'welcome.howItWorks.step1Title', 'welcome.howItWorks.step1Desc'],
+  ['02', 'speed', 'welcome.howItWorks.step2Title', 'welcome.howItWorks.step2Desc'],
+  ['03', 'shield', 'welcome.howItWorks.step3Title', 'welcome.howItWorks.step3Desc'],
+];
+
 const RouteIllustration: React.FC = () => (
   <div className="relative h-[430px] overflow-hidden rounded-[32px] bg-primary text-on-primary shadow-2xl sm:h-[500px]">
     <style>{`
@@ -34,14 +46,16 @@ const RouteIllustration: React.FC = () => (
       </defs>
       <path d="M55 438 C150 390 112 310 220 278 S350 238 375 158 S470 110 565 72" stroke="rgba(255,255,255,.08)" strokeWidth="58" strokeLinecap="round" />
       <path d="M55 438 C150 390 112 310 220 278 S350 238 375 158 S470 110 565 72" stroke="url(#mw-route-gradient)" strokeWidth="4" strokeLinecap="round" strokeDasharray="12 18" className="mw-landing-route" />
-      <circle cx="55" cy="438" r="11" fill="white" /><circle cx="565" cy="72" r="11" fill="white" />
+      <circle cx="55" cy="438" r="11" fill="white" />
+      <circle cx="565" cy="72" r="11" fill="white" />
       <circle cx="55" cy="438" r="28" stroke="rgba(255,255,255,.16)" className="mw-landing-pulse" />
       <circle cx="565" cy="72" r="28" stroke="rgba(255,255,255,.16)" className="mw-landing-pulse" style={{ animationDelay: '1.1s' }} />
       <g transform="translate(308 254)">
         <circle r="82" fill="rgba(255,255,255,.055)" className="mw-landing-pulse" />
         <circle r="48" stroke="rgba(255,255,255,.14)" strokeDasharray="3 9" />
         <g className="mw-landing-orbit"><circle r="5" fill="#a7f3b0" /></g>
-        <circle r="35" fill="white" /><circle r="14" fill="#1A5C2E" />
+        <circle r="35" fill="white" />
+        <circle r="14" fill="#1A5C2E" />
       </g>
       <g transform="translate(78 112)" className="mw-landing-float">
         <rect width="174" height="62" rx="19" fill="rgba(255,255,255,.105)" stroke="rgba(255,255,255,.08)" />
@@ -119,7 +133,7 @@ export const WelcomeScreenV2: React.FC = () => {
                 <Button variant="outline" size="lg" onClick={() => navigate('/safety-map')} className="rounded-2xl px-6"><span className="material-symbols-outlined mr-1 text-lg text-primary">map</span>{t('welcome.hero.exploreSafetyMap')}</Button>
               </div>
               <div className="mt-9 grid max-w-xl grid-cols-1 gap-3 border-t border-outline-variant/25 pt-6 sm:grid-cols-3">
-                {[['check_circle','welcome.hero.trustTripSafety'],['speed','welcome.hero.trustSpeedAwareness'],['report','welcome.hero.trustHazardReporting']].map(([icon,key]) => <div key={key} className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><span className="material-symbols-outlined text-base text-primary">{icon}</span>{t(key)}</div>)}
+                {trustItems.map(([icon, key]) => <div key={key} className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><span className="material-symbols-outlined text-base text-primary">{icon}</span>{t(key)}</div>)}
               </div>
             </div>
             <RouteIllustration />
@@ -130,7 +144,7 @@ export const WelcomeScreenV2: React.FC = () => {
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center"><p className="text-[11px] font-bold uppercase tracking-[.2em] text-primary">{t('welcome.howItWorks.tag')}</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{t('welcome.howItWorks.title')}</h2><p className="mt-4 text-sm leading-6 text-on-surface-variant sm:text-base">{t('welcome.howItWorks.subtitle')}</p></div>
             <div className="mt-12 grid gap-5 md:grid-cols-3">
-              {[['01','location_on','welcome.howItWorks.step1Title','welcome.howItWorks.step1Desc'],['02','speed','welcome.howItWorks.step2Title','welcome.howItWorks.step2Desc'],['03','shield','welcome.howItWorks.step3Title','welcome.howItWorks.step3Desc']].map(([number,icon,title,desc]) => <article key={number} className="group rounded-[28px] border border-outline-variant/25 bg-surface p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl"><div className="flex items-center justify-between"><span className="text-xs font-bold tracking-[.18em] text-primary">{number}</span><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:scale-105"><span className="material-symbols-outlined text-2xl">{icon}</span></span></div><h3 className="mt-8 text-lg font-bold">{t(title)}</h3><p className="mt-3 text-sm leading-6 text-on-surface-variant">{t(desc)}</p></article>)}
+              {howItWorksItems.map(([number, icon, title, desc]) => <article key={number} className="group rounded-[28px] border border-outline-variant/25 bg-surface p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl"><div className="flex items-center justify-between"><span className="text-xs font-bold tracking-[.18em] text-primary">{number}</span><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:scale-105"><span className="material-symbols-outlined text-2xl">{icon}</span></span></div><h3 className="mt-8 text-lg font-bold">{t(title)}</h3><p className="mt-3 text-sm leading-6 text-on-surface-variant">{t(desc)}</p></article>)}
             </div>
           </div>
         </section>
