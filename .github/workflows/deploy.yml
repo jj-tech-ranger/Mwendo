@@ -42,7 +42,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Setup Java for Firebase Emulator Suite
         uses: actions/setup-java@v4
@@ -88,32 +90,32 @@ jobs:
             exit 1
           }
 
-      - name: Install root dependencies
-        run: npm install
+      - name: Install root dependencies from bun.lock
+        run: bun install --frozen-lockfile
 
       - name: Install Functions dependencies
         run: cd apps/functions && npm ci
 
       - name: Root Linter & Typecheck
-        run: npm run lint
+        run: bun run lint
 
       - name: Functions Linter & Typecheck
         run: cd apps/functions && npm run lint
 
       - name: Build frontend & Bundle Security Audit
         run: |
-          npm run build
-          npm run check:bundle-security
+          bun run build
+          bun run check:bundle-security
 
       - name: Build Functions
         working-directory: apps/functions
         run: npm run build
 
       - name: Run Vitest tests
-        run: npm test
+        run: bun run test
 
       - name: Run Firebase Security Rules tests
-        run: npm run test:rules
+        run: bun run test:rules
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
@@ -148,7 +150,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Verify deployment configuration
         env:
@@ -173,7 +177,7 @@ jobs:
             exit 1
           }
           test "${GCP_SERVICE_ACCOUNT}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}" || {
-            echo "ERROR: GCP_SERVICE_ACCOUNT is not the approved Mwendo production deployer identity."
+            echo "ERROR: GCP_SERVICE_ACCOUNT is not the approved production deployer service account."
             exit 1
           }
           case "${GCP_WORKLOAD_IDENTITY_PROVIDER}" in
@@ -195,10 +199,11 @@ jobs:
             fi
           done
 
-      - name: Install dependencies
-        run: |
-          npm install
-          cd apps/functions && npm ci
+      - name: Install root dependencies from bun.lock
+        run: bun install --frozen-lockfile
+
+      - name: Install Functions dependencies
+        run: cd apps/functions && npm ci
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v4
@@ -228,9 +233,10 @@ jobs:
           set -euo pipefail
           echo "Node: $(node --version)"
           echo "npm: $(npm --version)"
-          echo "Firebase CLI: $(npx firebase-tools --version)"
+          echo "Bun: $(bun --version)"
+          echo "Firebase CLI: $(bunx firebase-tools --version)"
           echo "Firebase Tools package:"
-          npm ls firebase-tools --depth=0 || true
+          bun pm ls firebase-tools || true
 
       - name: Verify authenticated Google identity
         run: |
@@ -245,11 +251,11 @@ jobs:
       - name: Provision production demo accounts
         run: |
           set -euo pipefail
-          npm run provision:demo-accounts
+          bun run provision:demo-accounts
 
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: |
-          npx firebase-tools deploy \
+          bunx firebase-tools deploy \
             --only hosting,functions,firestore,storage \
             --project "${FIREBASE_PROJECT_ID}" \
             --non-interactive \
