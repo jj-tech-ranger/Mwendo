@@ -12,7 +12,7 @@
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-rules \"vitest run tests/rules --environment node\"",
+    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-mwendo-salama-rules \"vitest run --config vitest.rules.config.ts\"",
     "typecheck": "tsc --noEmit",
     "typecheck:functions": "npm run --prefix apps/functions lint",
     "lint:functions": "npm run --prefix apps/functions lint",
