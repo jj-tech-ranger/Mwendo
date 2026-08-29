@@ -117,6 +117,9 @@ const router = createBrowserRouter([
   { path: '/location-permission', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<PermissionsWizardScreen />) },
   { path: '/permissions-wizard', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<PermissionsWizardScreen />) },
 
+  // Public, read-only safety explorer. This route intentionally sits outside RoleGuard.
+  { path: '/safety-map', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SafetyMapScreen />) },
+
   // Auth Layouts
   { path: '/auth/login', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<LoginScreen />) },
   { path: '/auth/register', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<RegisterScreen />) },
