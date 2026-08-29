@@ -24,8 +24,17 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
             }
             return { exists: false, data: () => ({}) };
           },
+          create: async (data: any) => {
+            const key = `${col}/${id}`;
+            if (savedDocs[key]) throw new Error('ALREADY_EXISTS');
+            savedDocs[key] = data;
+          },
           set: async (data: any) => {
             savedDocs[`${col}/${id}`] = data;
+          },
+          update: async (data: any) => {
+            const key = `${col}/${id}`;
+            savedDocs[key] = { ...(savedDocs[key] || {}), ...data };
           },
         }),
       }),
@@ -55,36 +64,17 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
     expect(result.contactsNotifiedCount).toBe(2);
     expect(result.fcmDispatchedCount).toBe(2);
     expect(result.dlqCount).toBe(0);
-
-    // Verify SMS calls
     expect(mockSms.sendSms).toHaveBeenCalledTimes(2);
     expect(mockSms.sendSms).toHaveBeenCalledWith('+254711111111', expect.stringContaining('Wangari Maathai'));
     expect(mockSms.sendSms).toHaveBeenCalledWith('+254722222222', expect.stringContaining('KDA 123B'));
+    expect(mockMessaging.sendToTopic).toHaveBeenCalledWith('sacco_sacco_metro_trans', expect.objectContaining({ notification: expect.objectContaining({ title: expect.stringContaining('KDA 123B') }) }));
+    expect(mockMessaging.sendToTopic).toHaveBeenCalledWith('authority_alerts', expect.objectContaining({ notification: expect.objectContaining({ title: expect.stringContaining('KDA 123B') }) }));
 
-    // Verify FCM push to SACCO and Authority channels
-    expect(mockMessaging.sendToTopic).toHaveBeenCalledWith(
-      'sacco_sacco_metro_trans',
-      expect.objectContaining({
-        notification: expect.objectContaining({
-          title: expect.stringContaining('KDA 123B'),
-        }),
-      })
-    );
-    expect(mockMessaging.sendToTopic).toHaveBeenCalledWith(
-      'authority_alerts',
-      expect.objectContaining({
-        notification: expect.objectContaining({
-          title: expect.stringContaining('KDA 123B'),
-        }),
-      })
-    );
-
-    // Verify safety_alerts doc does not leak raw contact phone numbers (PII protection)
     const alertDoc = savedDocs['safety_alerts/sos_alert_100'];
     expect(alertDoc).toBeDefined();
     expect(alertDoc.smsDispatchedCount).toBe(2);
     expect(alertDoc.emergencyContactsCount).toBe(2);
-    expect(alertDoc.emergencyContacts).toBeUndefined(); // PII guarded
+    expect(alertDoc.emergencyContacts).toBeUndefined();
   });
 
   it('routes failed SMS dispatches to Dead Letter Queue (dlq_notifications)', async () => {
@@ -108,8 +98,17 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
             }
             return { exists: false, data: () => ({}) };
           },
+          create: async (data: any) => {
+            const key = `${col}/${id}`;
+            if (savedDocs[key]) throw new Error('ALREADY_EXISTS');
+            savedDocs[key] = data;
+          },
           set: async (data: any) => {
             savedDocs[`${col}/${id}`] = data;
+          },
+          update: async (data: any) => {
+            const key = `${col}/${id}`;
+            savedDocs[key] = { ...(savedDocs[key] || {}), ...data };
           },
         }),
       }),
@@ -139,11 +138,8 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
     expect(result.success).toBe(true);
     expect(result.contactsNotifiedCount).toBe(1);
     expect(result.dlqCount).toBe(1);
-
-    // Verify DLQ entry exists
     const dlqKeys = Object.keys(savedDocs).filter((k) => k.startsWith('dlq_notifications/'));
     expect(dlqKeys.length).toBe(1);
-
     const firstKey = dlqKeys[0]!;
     const dlqEntry = savedDocs[firstKey];
     expect(dlqEntry.topic).toBe('safety-alerts');
