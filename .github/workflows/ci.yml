@@ -29,31 +29,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
 
-      - name: 1. Install root dependencies
-        run: npm ci
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: 1. Install root dependencies from bun.lock
+        run: bun install --frozen-lockfile
 
       - name: 2. Install Functions dependencies
         run: cd apps/functions && npm ci
 
       - name: 3. Root Linter & Typecheck
-        run: npm run lint
+        run: bun run lint
 
       - name: 4. Functions Linter & Typecheck
         run: cd apps/functions && npm run lint
 
       - name: 5. Build Frontend & Bundle Security Audit
         run: |
-          npm run build
-          npm run check:bundle-security
+          bun run build
+          bun run check:bundle-security
 
       - name: 6. Build Functions
         run: cd apps/functions && npm run build
 
       - name: 7. Run Vitest tests
-        run: npm test
+        run: bun test
 
-      - name: 7b. Generate Test Coverage Report (non-blocking)
-        continue-on-error: true
-        run: npm run test:coverage || true
+      - name: 7b. Generate Test Coverage Report
+        run: bun run test:coverage
