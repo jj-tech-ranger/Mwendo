@@ -3,7 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} { allow read, write: if false; }
-
     function isNotSuspended() { return request.auth.token.get('isSuspended', false) != true; }
     function isSignedIn() { return request.auth != null && isNotSuspended(); }
     function isRegisteredUser() { return isSignedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
@@ -12,133 +11,45 @@ service cloud.firestore {
     function hasActiveRole(role) { return getActiveRole() == role; }
     function isAdmin() { return getActiveRole() == 'admin'; }
     function isAuthority() { return hasActiveRole('authority') || isAdmin(); }
-    function isSaccoManager(saccoId) {
-      return isAdmin() || (hasActiveRole('sacco_manager') && saccoId != null && request.auth.token.saccoId == saccoId);
-    }
-    function keepsSaccoId() {
-      return !('saccoId' in resource.data) || (!('saccoId' in request.resource.data) || request.resource.data.saccoId == resource.data.saccoId);
-    }
-    function isWithinKenyaBounds(lat, lon) {
-      return (lat is int || lat is float || lat is number) && (lon is int || lon is float || lon is number) &&
-        lat >= -5.5 && lat <= 6.0 && lon >= 33.0 && lon <= 43.5;
-    }
-    function isPlausibleSpeed(speed) {
-      return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180;
-    }
-    function isPlausibleTimestamp(ts) {
-      return ts is timestamp && ts <= request.time + duration.value(5, 'm') && ts >= request.time - duration.value(24, 'h');
-    }
+    function isSaccoManager(saccoId) { return isAdmin() || (hasActiveRole('sacco_manager') && saccoId != null && request.auth.token.saccoId == saccoId); }
+    function isWithinKenyaBounds(lat, lon) { return (lat is int || lat is float || lat is number) && (lon is int || lon is float || lon is number) && lat >= -5.5 && lat <= 6.0 && lon >= 33.0 && lon <= 43.5; }
+    function isPlausibleSpeed(speed) { return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180; }
     function isValidTripData(data) {
       return ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
         (!('startLocation' in data) || data.startLocation == null || (('latitude' in data.startLocation) && ('longitude' in data.startLocation) && isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude))) &&
         (!('endLocation' in data) || data.endLocation == null || (('latitude' in data.endLocation) && ('longitude' in data.endLocation) && isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude))) &&
-        (!('lastGpsUpdate' in data) || data.lastGpsUpdate == null || (('latitude' in data.lastGpsUpdate) && ('longitude' in data.lastGpsUpdate) && isWithinKenyaBounds(data.lastGpsUpdate.latitude, data.lastGpsUpdate.longitude) && (!('speedKmH' in data.lastGpsUpdate) || isPlausibleSpeed(data.lastGpsUpdate.speedKmH)))) &&
         (!('currentSpeedKmH' in data) || isPlausibleSpeed(data.currentSpeedKmH)) && (!('maxSpeedKmH' in data) || isPlausibleSpeed(data.maxSpeedKmH)) && (!('avgSpeedKmH' in data) || isPlausibleSpeed(data.avgSpeedKmH));
     }
-    function isValidBlackSpotData(data) {
-      return ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
-        (!('location' in data) || data.location == null || (('lat' in data.location) && ('lng' in data.location) && isWithinKenyaBounds(data.location.lat, data.location.lng)));
-    }
+    function isValidBlackSpotData(data) { return ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) && (!('location' in data) || data.location == null || (('lat' in data.location) && ('lng' in data.location) && isWithinKenyaBounds(data.location.lat, data.location.lng))); }
 
-    match /analytics/{document=**} {
-      allow read: if isAdmin() || hasActiveRole('authority') || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId);
-      allow write: if false;
-    }
+    match /analytics/{document=**} { allow read: if isAdmin() || hasActiveRole('authority') || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId); allow write: if false; }
 
     match /users/{userId} {
       allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId));
       allow create: if isSignedIn() && isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'passenger') && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'] && !('saccoId' in request.resource.data) && !('authorityId' in request.resource.data) && !('authorityScope' in request.resource.data) && !('badgeNumber' in request.resource.data) && (!('isActive' in request.resource.data) || request.resource.data.isActive == true);
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','notificationPreferences','theme','language','photoURL','emergencyContacts','updatedAt','analyticsConsent','analyticsConsentAt']));
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','notificationPreferences','theme','language','photoURL','emergencyContacts','updatedAt','analyticsConsent','analyticsConsentAt','role','activeRole','roles']) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','activeRole','roles']) || (request.resource.data.role == 'passenger' && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'])));
       allow delete: if isAdmin();
     }
 
-    match /trips/{tripId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority());
-      allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data);
-      allow update: if isAuthority() && isValidTripData(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    match /vehicles/{vehicleId} {
-      allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
-      allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
-      allow update: if (isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId)) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore','riskTier']);
-      allow delete: if isAdmin();
-    }
-
-    match /saccos/{saccoId} {
-      allow read: if isSignedIn();
-      allow create: if isAuthority();
-      allow update: if isAuthority() || (isSaccoManager(saccoId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactEmail','contactPhone','settings','updatedAt']));
-      allow delete: if isAdmin();
-    }
+    match /trips/{tripId} { allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()); allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data); allow update: if isAuthority() && isValidTripData(request.resource.data); allow delete: if isAdmin(); }
+    match /vehicles/{vehicleId} { allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId)); allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId); allow update: if (isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId)) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore','riskTier']); allow delete: if isAdmin(); }
+    match /saccos/{saccoId} { allow read: if isSignedIn(); allow create: if isAuthority(); allow update: if isAuthority() || (isSaccoManager(saccoId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactEmail','contactPhone','settings','updatedAt'])); allow delete: if isAdmin(); }
     match /authorities/{authorityId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-
-    // Reports are created through the callable so rate limiting and validation cannot be bypassed.
-    match /black_spots/{spotId} {
-      allow read: if isRegisteredUser();
-      allow create: if false;
-      allow update: if (isAuthority() || isAdmin()) && isValidBlackSpotData(request.resource.data);
-      allow delete: if isAuthority() || isAdmin();
-    }
-
-    // SOS alerts are server-authoritative. Client-side creation would bypass App Check/rate limiting.
-    match /safety_alerts/{alertId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority());
-      allow create: if false;
-      allow update: if isAuthority() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','acknowledgedBySacco','acknowledgedByAuthority','acknowledgedAt','resolvedAt','updatedAt','responseNotes']);
-      allow delete: if isAdmin();
-    }
-
-    // Violations are derived from trusted telemetry/server logic, not user-submitted facts.
-    match /violations/{violationId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority());
-      allow create: if false;
-      allow update: if isAuthority() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewNotes','disputedAt','updatedAt']));
-      allow delete: if isAdmin();
-    }
-
-    match /complaints/{complaintId} {
-      allow read: if isSignedIn() && ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority() || resource.data.reportedByUid == request.auth.uid);
-      allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid;
-      allow update: if isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','response','resolution','updatedAt']));
-      allow delete: if isAdmin();
-    }
-
-    match /drivers/{driverId} {
-      allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId));
-      allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
-      allow update: if isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId);
-      allow delete: if isAdmin();
-    }
-
-    // Inspection mutations must go through createInspection for certificate and audit invariants.
+    match /black_spots/{spotId} { allow read: if isRegisteredUser(); allow create: if false; allow update: if (isAuthority() || isAdmin()) && isValidBlackSpotData(request.resource.data); allow delete: if isAuthority() || isAdmin(); }
+    match /safety_alerts/{alertId} { allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()); allow create: if false; allow update: if isAuthority() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','acknowledgedBySacco','acknowledgedByAuthority','acknowledgedAt','resolvedAt','updatedAt','responseNotes']); allow delete: if isAdmin(); }
+    match /violations/{violationId} { allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()); allow create: if false; allow update: if isAuthority() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','reviewNotes','disputedAt','updatedAt'])); allow delete: if isAdmin(); }
+    match /complaints/{complaintId} { allow read: if isSignedIn() && ((resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority() || resource.data.reportedByUid == request.auth.uid); allow create: if isRegisteredUser() && request.resource.data.reportedByUid == request.auth.uid; allow update: if isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','response','resolution','updatedAt'])); allow delete: if isAdmin(); }
+    match /drivers/{driverId} { allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId)); allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId); allow update: if isAuthority() || isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId); allow delete: if isAdmin(); }
     match /inspections/{inspectionId} { allow read: if isSignedIn(); allow write: if false; }
-
-    // Audit logs are immutable and server-generated.
     match /audit_logs/{logId} { allow read: if isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId); allow create, update, delete: if false; }
-
-    match /team_users/{teamUserId} {
-      allow read: if isSignedIn() && (isAdmin() || isSaccoManager(resource.data.saccoId));
-      allow create: if isSaccoManager(request.resource.data.saccoId);
-      allow update: if isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','status','updatedAt']));
-      allow delete: if isAdmin() || isSaccoManager(resource.data.saccoId);
-    }
-
+    match /team_users/{teamUserId} { allow read: if isSignedIn() && (isAdmin() || isSaccoManager(resource.data.saccoId)); allow create: if isSaccoManager(request.resource.data.saccoId); allow update: if isAdmin() || (isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','status','updatedAt'])); allow delete: if isAdmin() || isSaccoManager(resource.data.saccoId); }
     match /processedEvents/{eventId} { allow read: if isAdmin(); allow write: if false; }
     match /dlq_notifications/{dlqId} { allow read: if isAdmin() || isAuthority(); allow write: if false; }
     match /public_pins/{pinId} { allow read: if true; allow write: if isAuthority(); }
     match /feature_flags/{flagId} { allow read: if true; allow write: if isAdmin(); }
     match /system_config/{configId} { allow read: if true; allow write: if isAdmin(); }
-
-    match /saccoCounters/{counterId} {
-      allow read: if isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId);
-      allow create: if (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && request.resource.data.saccoId == request.auth.token.saccoId)) && request.resource.data.keys().hasOnly(['count','saccoId','metric','shardId','updatedAt']);
-      allow update: if (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId && request.resource.data.saccoId == request.auth.token.saccoId)) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count','saccoId','metric','shardId','updatedAt']);
-      allow delete: if isAdmin();
-    }
-
-    // Rate-limit state is a server-only security control.
+    match /saccoCounters/{counterId} { allow read: if isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId); allow create: if (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && request.resource.data.saccoId == request.auth.token.saccoId)) && request.resource.data.keys().hasOnly(['count','saccoId','metric','shardId','updatedAt']); allow update: if (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId && request.resource.data.saccoId == request.auth.token.saccoId)) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count','saccoId','metric','shardId','updatedAt']); allow delete: if isAdmin(); }
     match /rate_limits/{userId} { allow read, write: if false; }
+    match /sos_requests/{requestId} { allow read, write: if false; }
   }
 }
