@@ -13,6 +13,11 @@ class MockFirestore {
           exists: !!this.data[`${collName}/${docId}`],
           data: () => this.data[`${collName}/${docId}`],
         }),
+        create: async (docData: any) => {
+          const key = `${collName}/${docId}`;
+          if (this.data[key]) throw new Error('ALREADY_EXISTS');
+          this.data[key] = docData;
+        },
         set: async (docData: any, opts?: { merge?: boolean }) => {
           const key = `${collName}/${docId}`;
           if (opts?.merge) {
@@ -20,6 +25,10 @@ class MockFirestore {
           } else {
             this.data[key] = docData;
           }
+        },
+        update: async (docData: any) => {
+          const key = `${collName}/${docId}`;
+          this.data[key] = { ...(this.data[key] || {}), ...docData };
         },
       }),
     };
@@ -65,7 +74,6 @@ describe('MED-02: Cloud Functions Location Validation & Zero Coordinate Fallback
         processReportBlackSpotLogic(db, payload as any, 'user_test_123')
       ).rejects.toThrowError('A valid location is required.');
 
-      // Ensure no document was created in Firestore with defaulted coordinates
       expect(Object.keys(db.data).length).toBe(0);
     });
 
@@ -115,7 +123,6 @@ describe('MED-02: Cloud Functions Location Validation & Zero Coordinate Fallback
         processSendSosLogic(db, mockMessaging, mockSms, payload as any)
       ).rejects.toThrowError('A valid location is required.');
 
-      // Ensure no safety_alerts or audit_logs were created
       expect(Object.keys(db.data).length).toBe(0);
       expect(mockSms.sendSms).not.toHaveBeenCalled();
       expect(mockMessaging.sendToTopic).not.toHaveBeenCalled();
