@@ -1,3 +1,4 @@
+# [repair-bun-lock] temporary trigger; remove with the repair workflow after lockfile regeneration
 name: Continuous Integration
 
 on:
