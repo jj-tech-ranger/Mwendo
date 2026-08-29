@@ -44,6 +44,12 @@ jobs:
           node-version: "22"
           cache: npm
 
+      - name: Setup Java for Firebase Emulator Suite
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Verify required production frontend configuration
         run: |
           set -euo pipefail
