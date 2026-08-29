@@ -1,30 +1,31 @@
 # Firebase Security Rules Tests
 
-This directory is reserved for Firebase Emulator Suite tests for Firestore and Storage Security Rules.
+These tests exercise Firebase Security Rules against the Local Emulator Suite. They are intentionally separate from the React/jsdom application test suite.
 
 ## Scope
 
-The rules suite will verify the authorization contract independently of the React/jsdom test suite, including:
+The suite covers:
 
 - authentication requirements;
-- role-based access control;
+- custom-claim role authorization;
 - SACCO tenant isolation;
 - document ownership;
 - trip immutability;
-- Firestore data validation;
-- protected Storage reads and writes; and
-- cross-tenant evidence access.
+- Firestore data validation; and
+- protected Storage reads and writes.
 
-## Test environment
+## Safety boundary
 
-These tests must run against the Firebase Local Emulator Suite. They must never connect to the production Firebase project.
+The Rules suite must run only against emulator project `demo-mwendo-salama-rules`. It must never connect to the production Firebase project.
 
-The test runner should use the Firebase Rules Unit Testing SDK (`@firebase/rules-unit-testing`) and emulator-only environment variables/configuration.
+## Run
 
-## Implementation note
+```bash
+npm run test:rules
+```
 
-Do not mix these tests into the existing jsdom/Vitest application test suite. Rules tests exercise Firebase Security Rules themselves and therefore require emulator-backed clients with explicit Auth claims.
+The command starts Firestore and Storage emulators, loads the repository Rules files, runs the Rules tests with the Node environment, and shuts the emulators down when complete.
 
-## Current status
+## Policy note
 
-Scaffolding only. The dependency and runner integration will be added in the next step so that the lockfile remains authoritative and CI can use a reproducible install.
+Black-spot evidence is currently readable by any authenticated user because that is the current Storage Rules policy. The corresponding test deliberately documents that behaviour. If product policy changes to reporter-only, SACCO-scoped, authority-only, or another access model, update both the Rules and this test together.
