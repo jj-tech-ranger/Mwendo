@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import {
   assertFails,
   assertSucceeds,
-  cleanup,
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
@@ -18,6 +17,7 @@ let testEnv: RulesTestEnvironment;
 function claims(activeRole: string, saccoId?: string) {
   return {
     activeRole,
+    firebase: { sign_in_provider: 'custom' },
     ...(saccoId ? { saccoId } : {}),
   };
 }
@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await cleanup();
+  await testEnv.cleanup();
 });
 
 describe('Storage security rules', () => {
@@ -113,14 +113,6 @@ describe('Storage security rules', () => {
   });
 
   it('allows the black-spot reporter to upload evidence', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
-        contentType: 'image/jpeg',
-      });
-    });
-
-    await testEnv.clearStorage();
-
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
     });
