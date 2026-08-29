@@ -47,7 +47,7 @@ export async function processReportBlackSpotLogic(
   const lat = payload.location?.lat ?? payload.latitude;
   const lng = payload.location?.lng ?? payload.longitude;
   if (typeof lat !== 'number' || typeof lng !== 'number' || !validKenyaLocation(lat, lng)) {
-    throw new HttpsError('invalid-argument', 'A valid Kenyan location is required.');
+    throw new HttpsError('invalid-argument', 'A valid location is required.');
   }
   if (payload.title !== undefined && !boundedText(payload.title, 120)) {
     throw new HttpsError('invalid-argument', 'Title must be 120 characters or fewer.');
