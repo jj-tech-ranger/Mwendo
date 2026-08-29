@@ -70,7 +70,7 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
 
   const rawLat = payload.location?.lat ?? (payload as { latitude?: number }).latitude;
   const rawLng = payload.location?.lng ?? (payload as { longitude?: number }).longitude;
-  if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !validLocation(rawLat, rawLng)) throw new HttpsError('invalid-argument', 'A valid Kenyan location is required.');
+  if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !validLocation(rawLat, rawLng)) throw new HttpsError('invalid-argument', 'A valid location is required.');
   const speedKmH = payload.speedKmH ?? 0;
   if (!validSpeed(speedKmH)) throw new HttpsError('invalid-argument', 'Speed must be between 0 and 180 km/h.');
   if (payload.message && payload.message.length > 1000) throw new HttpsError('invalid-argument', 'Message is too long.');
