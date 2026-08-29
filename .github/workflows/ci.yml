@@ -54,7 +54,7 @@ jobs:
         run: cd apps/functions && npm run build
 
       - name: 7. Run Vitest tests
-        run: bun test
+        run: bun run test
 
       - name: 7b. Generate Test Coverage Report
         run: bun run test:coverage
