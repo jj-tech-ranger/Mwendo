@@ -3,7 +3,6 @@ import { resolve } from 'node:path';
 import {
   assertFails,
   assertSucceeds,
-  cleanup,
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
@@ -17,6 +16,7 @@ let testEnv: RulesTestEnvironment;
 function claims(activeRole: string, saccoId?: string) {
   return {
     activeRole,
+    firebase: { sign_in_provider: 'custom' },
     ...(saccoId ? { saccoId } : {}),
   };
 }
@@ -47,7 +47,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  await cleanup();
+  await testEnv.cleanup();
 });
 
 describe('Firestore security rules', () => {
