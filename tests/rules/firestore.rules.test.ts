@@ -25,12 +25,18 @@ function authedDb(uid: string, activeRole: string, saccoId?: string) {
   return testEnv.authenticatedContext(uid, claims(activeRole, saccoId)).firestore();
 }
 
+function emulatorEndpoint(value: string, fallbackPort: number) {
+  const [host, port] = value.split(':');
+  return { host, port: Number(port ?? fallbackPort) };
+}
+
 beforeAll(async () => {
+  const firestore = emulatorEndpoint(FIRESTORE_EMULATOR_HOST, 8080);
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     firestore: {
-      host: FIRESTORE_EMULATOR_HOST.split(':')[0],
-      port: Number(FIRESTORE_EMULATOR_HOST.split(':')[1] ?? 8080),
+      host: firestore.host,
+      port: firestore.port,
       rules: readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8'),
     },
   });
@@ -53,11 +59,14 @@ describe('Firestore security rules', () => {
     await assertFails(setDoc(ref, { displayName: 'Attacker' }));
   });
 
-  it('allows a passenger to create their own user document when permitted by the rules', async () => {
+  it('allows a passenger to create their own valid user document', async () => {
     const db = authedDb('passenger-1', 'passenger');
+
     await assertSucceeds(setDoc(doc(db, 'users/passenger-1'), {
       displayName: 'Passenger',
       role: 'passenger',
+      activeRole: 'passenger',
+      roles: ['passenger'],
     }));
   });
 
@@ -67,6 +76,8 @@ describe('Firestore security rules', () => {
       await setDoc(doc(ctx.firestore(), 'users/passenger-2'), {
         displayName: 'Other Passenger',
         role: 'passenger',
+        activeRole: 'passenger',
+        roles: ['passenger'],
       });
     });
 
@@ -106,14 +117,33 @@ describe('Firestore security rules', () => {
       await setDoc(doc(ctx.firestore(), 'trips/trip-1'), {
         userId: 'passenger-1',
         status: 'completed',
-        maxSpeed: 70,
+        maxSpeedKmH: 70,
       });
     });
 
     await assertFails(setDoc(doc(db, 'trips/trip-1'), {
       userId: 'passenger-1',
       status: 'completed',
-      maxSpeed: 150,
+      maxSpeedKmH: 150,
+    }));
+  });
+
+  it('rejects a trip with impossible GPS coordinates', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await assertFails(setDoc(doc(db, 'trips/trip-invalid-gps'), {
+      userId: 'passenger-1',
+      latitude: 91,
+      longitude: 36,
+    }));
+  });
+
+  it('rejects a trip with an impossible speed', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await assertFails(setDoc(doc(db, 'trips/trip-invalid-speed'), {
+      userId: 'passenger-1',
+      currentSpeedKmH: 181,
     }));
   });
 });
