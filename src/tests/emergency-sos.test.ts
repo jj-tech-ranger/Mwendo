@@ -29,8 +29,9 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
             if (savedDocs[key]) throw new Error('ALREADY_EXISTS');
             savedDocs[key] = data;
           },
-          set: async (data: any) => {
-            savedDocs[`${col}/${id}`] = data;
+          set: async (data: any, opts?: { merge?: boolean }) => {
+            const key = `${col}/${id}`;
+            savedDocs[key] = opts?.merge ? { ...(savedDocs[key] || {}), ...data } : data;
           },
           update: async (data: any) => {
             const key = `${col}/${id}`;
@@ -38,6 +39,13 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
           },
         }),
       }),
+      runTransaction: async <T>(updateFunction: (transaction: any) => Promise<T>): Promise<T> => {
+        const transaction = {
+          get: async (docRef: any) => docRef.get(),
+          set: (docRef: any, data: any, opts?: { merge?: boolean }) => docRef.set(data, opts),
+        };
+        return updateFunction(transaction);
+      },
     };
 
     const mockMessaging: any = {
@@ -103,8 +111,9 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
             if (savedDocs[key]) throw new Error('ALREADY_EXISTS');
             savedDocs[key] = data;
           },
-          set: async (data: any) => {
-            savedDocs[`${col}/${id}`] = data;
+          set: async (data: any, opts?: { merge?: boolean }) => {
+            const key = `${col}/${id}`;
+            savedDocs[key] = opts?.merge ? { ...(savedDocs[key] || {}), ...data } : data;
           },
           update: async (data: any) => {
             const key = `${col}/${id}`;
@@ -112,6 +121,13 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
           },
         }),
       }),
+      runTransaction: async <T>(updateFunction: (transaction: any) => Promise<T>): Promise<T> => {
+        const transaction = {
+          get: async (docRef: any) => docRef.get(),
+          set: (docRef: any, data: any, opts?: { merge?: boolean }) => docRef.set(data, opts),
+        };
+        return updateFunction(transaction);
+      },
     };
 
     const mockMessaging: any = {
