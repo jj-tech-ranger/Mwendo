@@ -12,6 +12,7 @@ interface PersistedTripState {
   currentSpeed: number;
   maxSpeed: number;
   avgSpeed: number;
+  telemetrySampleCount: number;
   durationSeconds: number;
   overspeedCount: number;
   routeCoordinates: GPSPoint[];
@@ -38,6 +39,7 @@ const EMPTY_TRIP_STATE: PersistedTripState = {
   currentSpeed: 0,
   maxSpeed: 0,
   avgSpeed: 0,
+  telemetrySampleCount: 0,
   durationSeconds: 0,
   overspeedCount: 0,
   routeCoordinates: [],
@@ -58,6 +60,7 @@ function loadPersistedTrip(): PersistedTripState {
       ...EMPTY_TRIP_STATE,
       ...parsed,
       saccoId: parsed.saccoId,
+      telemetrySampleCount: Number.isFinite(parsed.telemetrySampleCount) ? parsed.telemetrySampleCount : 0,
       routeCoordinates: Array.isArray(parsed.routeCoordinates) ? parsed.routeCoordinates : [],
     };
   } catch {
@@ -78,6 +81,7 @@ function persistTrip(state: TripState) {
         currentSpeed: state.currentSpeed,
         maxSpeed: state.maxSpeed,
         avgSpeed: state.avgSpeed,
+        telemetrySampleCount: state.telemetrySampleCount,
         durationSeconds: state.durationSeconds,
         overspeedCount: state.overspeedCount,
         routeCoordinates: state.routeCoordinates,
@@ -180,6 +184,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       currentSpeed: 0,
       maxSpeed: 0,
       avgSpeed: 0,
+      telemetrySampleCount: 0,
       durationSeconds: 0,
       overspeedCount: 0,
       routeCoordinates: [],
@@ -214,15 +219,14 @@ export const useTripStore = create<TripState>((set, get) => ({
     const previousPoint = state.routeCoordinates.at(-1);
     const addedDistance = gps && previousPoint ? haversineDistanceMeters(previousPoint, gps) : 0;
     const nextDistanceMeters = (state.activeTrip?.distanceMeters ?? 0) + addedDistance;
-    const telemetrySampleCount = updatedCoords.length;
-    const nextAvgSpeed = telemetrySampleCount > 0
-      ? updatedCoords.reduce((total, point) => total + point.speedKmH, 0) / telemetrySampleCount
-      : safeSpeed;
+    const nextTelemetrySampleCount = state.telemetrySampleCount + 1;
+    const nextAvgSpeed = ((state.avgSpeed * state.telemetrySampleCount) + safeSpeed) / nextTelemetrySampleCount;
 
     set((s) => ({
       currentSpeed: safeSpeed,
       maxSpeed: newMaxSpeed,
       avgSpeed: nextAvgSpeed,
+      telemetrySampleCount: nextTelemetrySampleCount,
       routeCoordinates: updatedCoords,
       activeTrip: s.activeTrip
         ? {
