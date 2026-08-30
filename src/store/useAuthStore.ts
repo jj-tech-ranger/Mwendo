@@ -76,12 +76,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         ? {
             ...state.user,
             // Firebase custom claims are the authorization source of truth.
-            claimedActiveRole: claims?.activeRole ?? state.user.claimedActiveRole,
-            claimedSaccoId: claims?.saccoId ?? state.user.claimedSaccoId,
-            claimedAuthorityScope: claims?.authorityScope ?? state.user.claimedAuthorityScope,
-            claimedIsSuspended: claims?.isSuspended ?? state.user.claimedIsSuspended,
-            role: claims?.activeRole ?? state.user.role,
-            activeRole: claims?.activeRole ?? state.user.activeRole,
+            // Clear cached authorization fields when the token no longer supplies claims;
+            // retaining the previous role would allow stale client state to survive a token change.
+            claimedActiveRole: claims?.activeRole,
+            claimedSaccoId: claims?.saccoId,
+            claimedAuthorityScope: claims?.authorityScope,
+            claimedIsSuspended: claims?.isSuspended,
+            role: claims?.activeRole,
+            activeRole: claims?.activeRole,
             claims: claims || undefined,
             isActive: claims?.isSuspended === true ? false : state.user.isActive,
           }
