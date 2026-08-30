@@ -50,8 +50,8 @@ service firebase.storage {
       );
     }
 
-    // Black spot evidence: ownership is encoded in the path so Storage rules
-    // can enforce it without a cross-service Firestore lookup.
+    // Preferred black-spot evidence path: the uploader UID is encoded in the
+    // path, so Storage can prove ownership without a Firestore lookup.
     match /black_spots/{spotId}/{userId}/{filename} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
@@ -64,11 +64,20 @@ service firebase.storage {
       );
     }
 
-    // Legacy black-spot evidence remains readable for signed-in users, but no
-    // longer accepts client uploads because the old path cannot prove ownership.
+    // Legacy black-spot path: allow a reporter to upload only when the
+    // corresponding Firestore black-spot document proves ownership.
     match /black_spots/{spotId}/{filename} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && (
+      allow create: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)')
+                   && (
+                     request.auth.token.activeRole == 'admin' ||
+                     request.auth.token.activeRole == 'authority' ||
+                     (firestore.exists(/databases/(default)/documents/black_spots/$(spotId)) &&
+                      firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid)
+                   );
+      allow update, delete: if request.auth != null && (
         request.auth.token.activeRole == 'admin' ||
         request.auth.token.activeRole == 'authority'
       );
