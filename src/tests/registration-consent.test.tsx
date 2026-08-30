@@ -8,7 +8,6 @@ import { authService, CURRENT_PRIVACY_POLICY_VERSION } from '../services/authSer
 import { useAuthStore } from '../store/useAuthStore';
 import * as firestore from 'firebase/firestore';
 
-// Mock firebase/auth
 vi.mock('firebase/auth', async (importOriginal) => {
   const original = await importOriginal<Record<string, any>>();
   return {
@@ -22,7 +21,6 @@ vi.mock('firebase/auth', async (importOriginal) => {
   };
 });
 
-// Mock firebase/firestore
 vi.mock('firebase/firestore', async (importOriginal) => {
   const original = await importOriginal<typeof firestore>();
   return {
@@ -46,78 +44,48 @@ describe('SEC-002, SEC-003, SEC-004: Registration Consent Ledger & Age Confirmat
   });
 
   it('SEC-002 & SEC-003: initial registration form has unchecked terms and age confirmation checkboxes', () => {
-    render(
-      <MemoryRouter>
-        <RegisterScreen />
-      </MemoryRouter>
-    );
-
+    render(<MemoryRouter><RegisterScreen /></MemoryRouter>);
     const termsCheckbox = screen.getByRole('checkbox', { name: /Terms of Service/i }) as HTMLInputElement;
     const ageCheckbox = screen.getByRole('checkbox', { name: /18 years or older/i }) as HTMLInputElement;
-
     expect(termsCheckbox.checked).toBe(false);
     expect(ageCheckbox.checked).toBe(false);
   });
 
   it('SEC-002 & SEC-003: blocks submission with error messages when terms or age are not accepted', async () => {
-    render(
-      <MemoryRouter>
-        <RegisterScreen />
-      </MemoryRouter>
-    );
-
-    const nameInput = screen.getByLabelText(/Full Name/i);
-    const emailInput = screen.getByLabelText(/Email Address/i);
-    const passwordInput = screen.getByLabelText(/^Password/i);
-    const submitBtn = screen.getByRole('button', { name: /Create Account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Wanjiku Mwangi' } });
-    fireEvent.change(emailInput, { target: { value: 'wanjiku@mwendo.co.ke' } });
-    fireEvent.change(passwordInput, { target: { value: 'Pass12345!' } });
-
-    fireEvent.click(submitBtn);
-
+    render(<MemoryRouter><RegisterScreen /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Wanjiku Mwangi' } });
+    fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: 'wanjiku@mwendo.co.ke' } });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'Pass12345!' } });
+    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
     await waitFor(() => {
       expect(screen.getByText(/You must agree to the Terms and Privacy Policy/i)).toBeTruthy();
       expect(screen.getByText(/You must confirm you are 18 years or older/i)).toBeTruthy();
     });
   });
 
-  it('SEC-002 & SEC-003: submits successfully when both checkboxes are affirmatively checked', async () => {
+  it('SEC-002 & SEC-003: passes affirmative consent to the auth service', async () => {
     const registerSpy = vi.spyOn(authService, 'registerWithEmail').mockResolvedValue({} as any);
+    render(<MemoryRouter><RegisterScreen /></MemoryRouter>);
 
-    render(
-      <MemoryRouter>
-        <RegisterScreen />
-      </MemoryRouter>
-    );
-
-    const nameInput = screen.getByLabelText(/Full Name/i);
-    const emailInput = screen.getByLabelText(/Email Address/i);
-    const passwordInput = screen.getByLabelText(/^Password/i);
-    const termsCheckbox = screen.getByRole('checkbox', { name: /Terms of Service/i });
-    const ageCheckbox = screen.getByRole('checkbox', { name: /18 years or older/i });
-    const submitBtn = screen.getByRole('button', { name: /Create Account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Wanjiku Mwangi' } });
-    fireEvent.change(emailInput, { target: { value: 'wanjiku@mwendo.co.ke' } });
-    fireEvent.change(passwordInput, { target: { value: 'Pass12345!' } });
-    fireEvent.click(termsCheckbox);
-    fireEvent.click(ageCheckbox);
-
-    fireEvent.click(submitBtn);
+    fireEvent.change(screen.getByLabelText(/Full Name/i), { target: { value: 'Wanjiku Mwangi' } });
+    fireEvent.change(screen.getByLabelText(/Email Address/i), { target: { value: 'wanjiku@mwendo.co.ke' } });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'Pass12345!' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /Terms of Service/i }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /18 years or older/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Create Account/i }));
 
     await waitFor(() => {
       expect(registerSpy).toHaveBeenCalledWith(
         'wanjiku@mwendo.co.ke',
         'Pass12345!',
         'Wanjiku Mwangi',
-        'passenger'
+        'passenger',
+        { termsAccepted: true, ageConfirmed: true }
       );
     });
   });
 
-  it('SEC-004: fetchOrInitUserProfile records consent audit metadata upon new account creation', async () => {
+  it('SEC-004: fetchOrInitUserProfile records only supplied consent for new account creation', async () => {
     const mockFirebaseUser = {
       uid: 'user_consent_123',
       email: 'consent@mwendo.co.ke',
@@ -127,22 +95,19 @@ describe('SEC-002, SEC-003, SEC-004: Registration Consent Ledger & Age Confirmat
       getIdTokenResult: vi.fn().mockResolvedValue({ claims: { activeRole: 'passenger' } }),
     };
 
-    const profile = await authService.fetchOrInitUserProfile(mockFirebaseUser as any);
+    const profile = await authService.fetchOrInitUserProfile(mockFirebaseUser as any, 'passenger', undefined, {
+      termsAccepted: true,
+      ageConfirmed: true,
+    });
 
     expect(profile.termsAccepted).toBe(true);
     expect(profile.privacyPolicyVersion).toBe(CURRENT_PRIVACY_POLICY_VERSION);
     expect(typeof profile.termsAcceptedAt).toBe('string');
     expect(profile.ageConfirmed).toBe(true);
     expect(typeof profile.ageConfirmedAt).toBe('string');
-
-    // Verify setDoc was invoked with consent ledger fields
     expect(firestore.setDoc).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({
-        termsAccepted: true,
-        privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION,
-        ageConfirmed: true,
-      })
+      expect.objectContaining({ termsAccepted: true, privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION, ageConfirmed: true })
     );
   });
 });
