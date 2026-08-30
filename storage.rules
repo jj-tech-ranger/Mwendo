@@ -62,7 +62,9 @@ service firebase.storage {
       allow read: if isSignedIn() && (
         request.auth.token.activeRole == 'admin' ||
         request.auth.token.activeRole == 'authority' ||
-        request.auth.uid == userId
+        (request.auth.uid == userId &&
+         firestore.exists(/databases/(default)/documents/black_spots/$(spotId)) &&
+         firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid)
       );
       allow create: if isSignedIn()
                    && request.auth.uid == userId
