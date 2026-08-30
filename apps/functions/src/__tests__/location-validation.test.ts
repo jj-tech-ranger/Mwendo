@@ -149,9 +149,24 @@ describe('MED-02: Cloud Functions Location Validation & Zero Coordinate Fallback
         location: { lat: -1.2921, lng: 36.8219 },
       };
 
+      // sendSOS deliberately resolves vehicle/SACCO routing from trusted server-side
+      // vehicle data. Seed the referenced vehicle so this test exercises the real
+      // dispatch path rather than bypassing that security boundary.
+      db.data['vehicles/KDA_777B'] = {
+        registrationNumber: 'KDA 777B',
+        saccoId: 'sacco_metro',
+      };
+
       const result = await processSendSosLogic(db, mockMessaging, mockSms, payload as any);
       expect(result.success).toBe(true);
       expect(result.alertId).toBe('sos_valid_1');
+      expect(result.saccoId).toBe('sacco_metro');
+      expect(mockMessaging.sendToTopic).toHaveBeenCalledWith(
+        'sacco_sacco_metro',
+        expect.objectContaining({
+          data: expect.objectContaining({ vehicleRegNumber: 'KDA 777B', saccoId: 'sacco_metro' }),
+        })
+      );
     });
   });
 });
