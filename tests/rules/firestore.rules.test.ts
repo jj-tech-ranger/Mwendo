@@ -112,11 +112,12 @@ describe('Firestore security rules', () => {
   });
 
   it('denies clients from modifying an existing trip', async () => {
-    const db = authedDb('passenger-1', 'passenger');
+    const db = authedDb('passenger-1', 'passenger', 'sacco-a');
     const tripRef = doc(db, 'trips/trip-1');
 
     await assertSucceeds(setDoc(tripRef, {
       userId: 'passenger-1',
+      saccoId: 'sacco-a',
       status: 'completed',
       maxSpeedKmH: 70,
     }));
