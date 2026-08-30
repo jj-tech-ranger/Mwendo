@@ -96,21 +96,29 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
     const userDisplayName = typeof userData.displayName === 'string' ? userData.displayName.slice(0, 120) : 'Passenger';
     const emergencyContacts: EmergencyContact[] = Array.isArray(userData.emergencyContacts) ? userData.emergencyContacts.filter((c): c is EmergencyContact => !!c && typeof c.phone === 'string' && c.phone.length <= 30).slice(0, 5) : [];
 
-    let vehicleRegNumber = payload.vehicleRegNumber || '';
-    let saccoId = payload.saccoId || '';
+    // Never trust client-supplied vehicle/SACCO identity for alert routing. Resolve it
+    // from an owned active trip, or from the referenced vehicle record when available.
+    let vehicleRegNumber = '';
+    let saccoId = '';
     if (payload.tripId) {
       const tripSnap = await db.collection('trips').doc(payload.tripId).get();
-      if (tripSnap.exists && tripSnap.data()?.userId === userId) {
-        const trip = tripSnap.data() || {};
-        vehicleRegNumber = vehicleRegNumber || trip.vehicleRegNumber || '';
-        saccoId = saccoId || trip.saccoId || '';
+      if (!tripSnap.exists || tripSnap.data()?.userId !== userId) {
+        throw new HttpsError('permission-denied', 'The referenced trip does not belong to the caller.');
       }
-    }
-    if (!saccoId && vehicleRegNumber) {
-      const vehicleSnap = await db.collection('vehicles').doc(vehicleRegNumber.replace(/\s+/g, '_')).get();
-      if (vehicleSnap.exists) saccoId = vehicleSnap.data()?.saccoId || '';
+      const trip = tripSnap.data() || {};
+      vehicleRegNumber = typeof trip.vehicleRegNumber === 'string' ? trip.vehicleRegNumber : '';
+      saccoId = typeof trip.saccoId === 'string' ? trip.saccoId : '';
+    } else if (payload.vehicleRegNumber) {
+      const vehicleRefId = payload.vehicleRegNumber.replace(/\s+/g, '_');
+      const vehicleSnap = await db.collection('vehicles').doc(vehicleRefId).get();
+      if (!vehicleSnap.exists) throw new HttpsError('not-found', 'The referenced vehicle was not found.');
+      const vehicle = vehicleSnap.data() || {};
+      vehicleRegNumber = typeof vehicle.registrationNumber === 'string' ? vehicle.registrationNumber : payload.vehicleRegNumber;
+      saccoId = typeof vehicle.saccoId === 'string' ? vehicle.saccoId : '';
     }
 
+    // A client-provided SACCO id is deliberately ignored. It must be derived from
+    // trusted trip/vehicle data so a caller cannot broadcast an SOS to another SACCO.
     const effectiveSaccoId = saccoId || 'unassigned';
     const effectiveVehicleReg = vehicleRegNumber || 'Vehicle In Transit';
     const timestamp = payload.timestamp || new Date().toISOString();
