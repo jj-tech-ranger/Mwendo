@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -22,14 +24,18 @@ function claims(activeRole: string, saccoId?: string) {
   };
 }
 
-// Seed the Firestore emulator through the same rules-test environment used by
-// Storage. Storage rules' firestore.exists()/firestore.get() calls can then see
-// the document in the shared emulator backend without requiring Admin SDK
-// credentials or accidentally reaching a non-emulated service in CI.
+// Storage Security Rules evaluate firestore.get()/exists() against the
+// Firestore emulator's shared backend. @firebase/rules-unit-testing's Firestore
+// context can be isolated from the Storage rules runtime for this cross-service
+// lookup, so seed these documents with the Admin SDK. FIRESTORE_EMULATOR_HOST is
+// set by `firebase emulators:exec`, keeping this strictly inside the emulator.
+function adminFirestore() {
+  const app = getApps()[0] ?? initializeApp({ projectId: PROJECT_ID });
+  return getFirestore(app);
+}
+
 async function seedFirestoreDocument(path: string, data: Record<string, unknown>) {
-  await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await ctx.firestore().doc(path).set(data);
-  });
+  await adminFirestore().doc(path).set(data);
 }
 
 beforeAll(async () => {
@@ -41,6 +47,8 @@ beforeAll(async () => {
       rules: readFileSync(resolve(process.cwd(), 'storage.rules'), 'utf8'),
     },
     firestore: {
+      host: (process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':')[0],
+      port: Number((process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':')[1] ?? 8080),
       rules: readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8'),
     },
   });
