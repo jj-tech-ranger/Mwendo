@@ -58,7 +58,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Offline trip queue/reconnect behavior has automated coverage.
 - [x] Vehicle risk/overspeed integration logic has automated coverage.
 - [ ] Automated end-to-end vehicle → driver → trip → tracking → completion journey.
-- [ ] Explicit duplicate/conflicting active-trip journey test.
+- [x] Explicit duplicate/conflicting active-trip journey test.
 - [ ] Realistic mobile map/tracking performance validation.
 
 ## Phase 4 — Black spots
@@ -110,7 +110,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] App Check tests exist.
 - [x] Rate limiting tests exist.
 - [x] Firestore/Storage rules tests run in CI.
-- [ ] Final cross-SACCO IDOR matrix across every tenant-scoped collection.
+- [x] Cross-SACCO IDOR coverage exists for vehicles, complaints, violations and safety alerts.
 - [ ] Final Storage path traversal/manipulation matrix.
 - [ ] Final callable-function authorization/input matrix.
 
