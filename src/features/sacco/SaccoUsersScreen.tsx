@@ -57,6 +57,7 @@ export const SaccoUsersScreen: React.FC = () => {
       await teamUserRepository.save(newUser);
       await loadTeamUsers();
     } catch (err) {
+      console.warn('Error inviting team user; retaining local fallback:', err);
       setTeamUsers([...teamUsers, newUser]);
     } finally {
       setShowInviteModal(false);
@@ -143,7 +144,6 @@ export const SaccoUsersScreen: React.FC = () => {
           </table>
         </Card>
       ) : (
-        /* ROLES PERMISSIONS MATRIX (§22) */
         <Card className="p-6 space-y-4">
           <h3 className="font-bold text-sm text-on-surface">Team Permissions Matrix</h3>
           <div className="overflow-x-auto">
@@ -178,7 +178,6 @@ export const SaccoUsersScreen: React.FC = () => {
         </Card>
       )}
 
-      {/* INVITE USER MODAL */}
       {showInviteModal && (
         <Dialog isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} title="Invite Team Member">
           <div className="space-y-4 text-xs">
