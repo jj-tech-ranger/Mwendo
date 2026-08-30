@@ -1,5 +1,4 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} { allow read, write: if false; }
@@ -15,23 +14,25 @@ service cloud.firestore {
     function isWithinKenyaBounds(lat, lon) { return (lat is int || lat is float || lat is number) && (lon is int || lon is float || lon is number) && lat >= -5.5 && lat <= 6.0 && lon >= 33.0 && lon <= 43.5; }
     function isPlausibleSpeed(speed) { return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180; }
     function isValidTripData(data) {
-      return ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
+      return data.userId == request.auth.uid && data.saccoId != null && data.saccoId != 'unassigned' &&
+        (!('vehicleId' in data) || (data.vehicleId is string && data.vehicleId != '')) &&
+        ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) &&
         (!('startLocation' in data) || data.startLocation == null || (('latitude' in data.startLocation) && ('longitude' in data.startLocation) && isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude))) &&
         (!('endLocation' in data) || data.endLocation == null || (('latitude' in data.endLocation) && ('longitude' in data.endLocation) && isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude))) &&
         (!('currentSpeedKmH' in data) || isPlausibleSpeed(data.currentSpeedKmH)) && (!('maxSpeedKmH' in data) || isPlausibleSpeed(data.maxSpeedKmH)) && (!('avgSpeedKmH' in data) || isPlausibleSpeed(data.avgSpeedKmH));
     }
+    function validVehicleReference(data) { return ('vehicleId' in data) && exists(/databases/$(database)/documents/vehicles/$(data.vehicleId)) && get(/databases/$(database)/documents/vehicles/$(data.vehicleId)).data.saccoId == data.saccoId && get(/databases/$(database)/documents/vehicles/$(data.vehicleId)).data.regNumber == data.vehicleRegNumber && get(/databases/$(database)/documents/vehicles/$(data.vehicleId)).data.status == 'active'; }
     function isValidBlackSpotData(data) { return ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) && (!('location' in data) || data.location == null || (('lat' in data.location) && ('lng' in data.location) && isWithinKenyaBounds(data.location.lat, data.location.lng))); }
     function managerVehicleUpdate() { return isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['regNumber','saccoName','capacity','status','insuranceExpiry','inspectionExpiry']) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['riskScore','riskTier']); }
     function managerDriverUpdate() { return isSaccoManager(resource.data.saccoId) && request.resource.data.saccoId == resource.data.saccoId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','licenseNumber','assignedVehicleReg','routeName','status','phone']); }
-
     match /analytics/{document=**} { allow read: if isAdmin() || hasActiveRole('authority') || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId); allow write: if false; }
-    match /users/{userId} {
-      allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId));
-      allow create: if isSignedIn() && isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'passenger') && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'] && !('saccoId' in request.resource.data) && !('authorityId' in request.resource.data) && !('authorityScope' in request.resource.data) && !('badgeNumber' in request.resource.data) && (!('isActive' in request.resource.data) || request.resource.data.isActive == true);
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','notificationPreferences','theme','language','photoURL','emergencyContacts','updatedAt','analyticsConsent','analyticsConsentAt','role','activeRole','roles']) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','activeRole','roles']) || (request.resource.data.role == 'passenger' && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'])));
+    match /users/{userId} { allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId)); allow create: if isSignedIn() && isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'passenger') && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'] && !('saccoId' in request.resource.data) && !('authorityId' in request.resource.data) && !('authorityScope' in request.resource.data) && !('badgeNumber' in request.resource.data) && (!('isActive' in request.resource.data) || request.resource.data.isActive == true); allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','notificationPreferences','theme','language','photoURL','emergencyContacts','updatedAt','analyticsConsent','analyticsConsentAt','role','activeRole','roles']) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','activeRole','roles']) || (request.resource.data.role == 'passenger' && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger']))); allow delete: if isAdmin(); }
+    match /trips/{tripId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority());
+      allow create: if isRegisteredUser() && isValidTripData(request.resource.data) && validVehicleReference(request.resource.data);
+      allow update: if isAuthority() && isValidTripData(request.resource.data);
       allow delete: if isAdmin();
     }
-    match /trips/{tripId} { allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()); allow create: if isRegisteredUser() && request.resource.data.userId == request.auth.uid && isValidTripData(request.resource.data); allow update: if isAuthority() && isValidTripData(request.resource.data); allow delete: if isAdmin(); }
     match /vehicles/{vehicleId} { allow read: if isSignedIn() && (isAdmin() || isAuthority() || isSaccoManager(resource.data.saccoId)); allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId); allow update: if (isAuthority() || isAdmin() || managerVehicleUpdate()); allow delete: if isAdmin(); }
     match /saccos/{saccoId} { allow read: if isSignedIn(); allow create: if isAuthority(); allow update: if isAuthority() || (isSaccoManager(saccoId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactEmail','contactPhone','settings','updatedAt'])); allow delete: if isAdmin(); }
     match /authorities/{authorityId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
