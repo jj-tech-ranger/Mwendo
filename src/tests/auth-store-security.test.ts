@@ -63,11 +63,12 @@ describe('auth store authorization boundary', () => {
 
     const state = useAuthStore.getState();
     expect(state.claims).toBeNull();
+    // Display/profile role may remain for UI continuity, but authorization claims must clear.
     expect(state.user?.claimedActiveRole).toBeUndefined();
     expect(state.user?.claimedSaccoId).toBeUndefined();
     expect(state.user?.claimedAuthorityScope).toBeUndefined();
     expect(state.user?.claimedIsSuspended).toBeUndefined();
-    expect(state.user?.role).toBeUndefined();
+    expect(state.user?.role).toBe('passenger');
     expect(state.user?.activeRole).toBeUndefined();
   });
 });
