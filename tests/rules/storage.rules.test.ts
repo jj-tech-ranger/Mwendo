@@ -1,7 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -24,21 +22,8 @@ function claims(activeRole: string, saccoId?: string) {
   };
 }
 
-// Storage Security Rules evaluate firestore.get()/exists() against the
-// Firestore emulator's shared backend. @firebase/rules-unit-testing's Firestore
-// context can be isolated from the Storage rules runtime for this cross-service
-// lookup, so seed these documents with the Admin SDK. FIRESTORE_EMULATOR_HOST is
-// set by `firebase emulators:exec`, keeping this strictly inside the emulator.
-function adminFirestore() {
-  const app = getApps()[0] ?? initializeApp({ projectId: PROJECT_ID });
-  return getFirestore(app);
-}
-
-async function seedFirestoreDocument(path: string, data: Record<string, unknown>) {
-  await adminFirestore().doc(path).set(data);
-}
-
 beforeAll(async () => {
+  const firestoreHost = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
     storage: {
@@ -47,8 +32,8 @@ beforeAll(async () => {
       rules: readFileSync(resolve(process.cwd(), 'storage.rules'), 'utf8'),
     },
     firestore: {
-      host: (process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':')[0],
-      port: Number((process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080').split(':')[1] ?? 8080),
+      host: firestoreHost.split(':')[0],
+      port: Number(firestoreHost.split(':')[1] ?? 8080),
       rules: readFileSync(resolve(process.cwd(), 'firestore.rules'), 'utf8'),
     },
   });
@@ -110,33 +95,31 @@ describe('Storage security rules', () => {
 
   it('denies unauthenticated black-spot evidence reads', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
+      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
     });
 
     const unauthenticated = testEnv.unauthenticatedContext();
-    await assertFails(getBytes(ref(unauthenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg')));
+    await assertFails(getBytes(ref(unauthenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 
   it('allows an authenticated user to read black-spot evidence under the current policy', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
+      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
     });
 
     const authenticated = testEnv.authenticatedContext('user-2', claims('passenger'));
-    await assertSucceeds(getBytes(ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg')));
+    await assertSucceeds(getBytes(ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 
   it('allows the black-spot reporter to upload evidence', async () => {
-    await seedFirestoreDocument('black_spots/spot-1', { reportedByUid: 'user-1' });
-
     const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
     await assertSucceeds(
       uploadBytes(
-        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'),
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'),
         new Uint8Array([1, 2, 3]),
         { contentType: 'image/jpeg' },
       ),
@@ -144,12 +127,10 @@ describe('Storage security rules', () => {
   });
 
   it('denies a different passenger from uploading black-spot evidence', async () => {
-    await seedFirestoreDocument('black_spots/spot-1', { reportedByUid: 'user-1' });
-
     const authenticated = testEnv.authenticatedContext('user-2', claims('passenger'));
     await assertFails(
       uploadBytes(
-        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'),
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'),
         new Uint8Array([1, 2, 3]),
         { contentType: 'image/jpeg' },
       ),
@@ -181,12 +162,12 @@ describe('Storage security rules', () => {
 
   it('does not allow an authenticated passenger to delete protected evidence', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
+      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
     });
 
     const passenger = testEnv.authenticatedContext('user-1', claims('passenger'));
-    await assertFails(deleteObject(ref(passenger.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/evidence.jpg')));
+    await assertFails(deleteObject(ref(passenger.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 });
