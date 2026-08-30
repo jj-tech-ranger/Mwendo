@@ -119,6 +119,17 @@ function validGps(gps: GPSPoint): boolean {
   );
 }
 
+function haversineDistanceMeters(a: GPSPoint, b: GPSPoint): number {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const dLat = toRadians(b.latitude - a.latitude);
+  const dLon = toRadians(b.longitude - a.longitude);
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(Math.min(1, h)));
+}
+
 const persistedTrip = loadPersistedTrip();
 let lastTelemetryPersistence = 0;
 
@@ -185,6 +196,8 @@ export const useTripStore = create<TripState>((set, get) => ({
     const state = get();
     if (!state.isTracking || state.isPaused) return;
 
+    if (!Number.isFinite(speed) || speed < 0 || speed > 180) return;
+
     if (gps) {
       if (!validGps(gps)) return;
       const last = state.routeCoordinates.at(-1);
@@ -195,19 +208,29 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
     }
 
-    const safeSpeed = Number.isFinite(speed) ? Math.max(0, Math.min(180, speed)) : state.currentSpeed;
+    const safeSpeed = speed;
     const newMaxSpeed = Math.max(state.maxSpeed, safeSpeed);
     const updatedCoords = gps ? [...state.routeCoordinates, gps] : state.routeCoordinates;
+    const previousPoint = state.routeCoordinates.at(-1);
+    const addedDistance = gps && previousPoint ? haversineDistanceMeters(previousPoint, gps) : 0;
+    const nextDistanceMeters = (state.activeTrip?.distanceMeters ?? 0) + addedDistance;
+    const telemetrySampleCount = updatedCoords.length;
+    const nextAvgSpeed = telemetrySampleCount > 0
+      ? updatedCoords.reduce((total, point) => total + point.speedKmH, 0) / telemetrySampleCount
+      : safeSpeed;
 
     set((s) => ({
       currentSpeed: safeSpeed,
       maxSpeed: newMaxSpeed,
+      avgSpeed: nextAvgSpeed,
       routeCoordinates: updatedCoords,
       activeTrip: s.activeTrip
         ? {
             ...s.activeTrip,
             currentSpeedKmH: safeSpeed,
             maxSpeedKmH: newMaxSpeed,
+            avgSpeedKmH: nextAvgSpeed,
+            distanceMeters: nextDistanceMeters,
             ...(gps ? { lastGpsUpdate: gps } : {}),
           }
         : null,
@@ -239,6 +262,8 @@ export const useTripStore = create<TripState>((set, get) => ({
       status,
       endTime: new Date().toISOString(),
       durationSeconds: state.durationSeconds,
+      avgSpeedKmH: state.avgSpeed,
+      distanceMeters: state.activeTrip.distanceMeters ?? 0,
       maxSpeedKmH: state.maxSpeed,
       overspeedEventsCount: state.overspeedCount,
     };
