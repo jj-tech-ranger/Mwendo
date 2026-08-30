@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -20,6 +22,18 @@ function claims(activeRole: string, saccoId?: string) {
     firebase: { sign_in_provider: 'custom' },
     ...(saccoId ? { saccoId } : {}),
   };
+}
+
+function adminFirestore() {
+  const app = getApps()[0] ?? initializeApp({ projectId: PROJECT_ID });
+  return getFirestore(app);
+}
+
+// Storage cross-service rules read Firestore through the emulator's shared backend.
+// Seed those documents with the Admin SDK rather than rules-unit-testing's isolated
+// Firestore context, which is not visible to firestore.get()/exists() from Storage rules.
+async function seedFirestoreDocument(path: string, data: Record<string, unknown>) {
+  await adminFirestore().doc(path).set(data);
 }
 
 beforeAll(async () => {
@@ -113,9 +127,7 @@ describe('Storage security rules', () => {
   });
 
   it('allows the black-spot reporter to upload evidence', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
-    });
+    await seedFirestoreDocument('black_spots/spot-1', { reportedByUid: 'user-1' });
 
     const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
     await assertSucceeds(
@@ -128,9 +140,7 @@ describe('Storage security rules', () => {
   });
 
   it('denies a different passenger from uploading black-spot evidence', async () => {
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
-    });
+    await seedFirestoreDocument('black_spots/spot-1', { reportedByUid: 'user-1' });
 
     const authenticated = testEnv.authenticatedContext('user-2', claims('passenger'));
     await assertFails(
