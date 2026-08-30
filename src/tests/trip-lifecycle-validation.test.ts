@@ -43,4 +43,28 @@ describe('Trip lifecycle validation', () => {
     useTripStore.getState().updateTelemetry(200, gps('2026-08-30T10:00:05.000Z', { speedKmH: 200 }));
     expect(useTripStore.getState().routeCoordinates).toHaveLength(0);
   });
+
+  it('rejects an out-of-range telemetry speed even when no GPS point is supplied', () => {
+    useTripStore.getState().startTrip({ vehicleId: 'vehicle-1', plateNumber: 'KDA 123A', saccoId: 'sacco-1' });
+    useTripStore.getState().updateTelemetry(200);
+    useTripStore.getState().updateTelemetry(-1);
+    expect(useTripStore.getState().currentSpeed).toBe(0);
+    expect(useTripStore.getState().maxSpeed).toBe(0);
+  });
+
+  it('maintains average speed and distance from accepted GPS samples', () => {
+    useTripStore.getState().startTrip({ vehicleId: 'vehicle-1', plateNumber: 'KDA 123A', saccoId: 'sacco-1' });
+    useTripStore.getState().updateTelemetry(40, gps('2026-08-30T10:00:00.000Z'));
+    useTripStore.getState().updateTelemetry(60, gps('2026-08-30T10:00:05.000Z', { longitude: 36.821 }));
+
+    const state = useTripStore.getState();
+    expect(state.avgSpeed).toBe(50);
+    expect(state.activeTrip?.avgSpeedKmH).toBe(50);
+    expect(state.activeTrip?.distanceMeters).toBeGreaterThan(0);
+    expect(state.activeTrip?.distanceMeters).toBeLessThan(150);
+
+    const completed = state.endTrip();
+    expect(completed?.avgSpeedKmH).toBe(50);
+    expect(completed?.distanceMeters).toBe(state.activeTrip?.distanceMeters ?? 0);
+  });
 });
