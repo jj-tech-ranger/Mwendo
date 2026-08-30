@@ -31,6 +31,7 @@ export const ActiveTripScreen: React.FC = () => {
     pauseTrip,
     resumeTrip,
     endTrip,
+    clearActiveTripPersistence,
   } = useTripStore();
 
   const [setupPlate, setSetupPlate] = useState('');
@@ -314,9 +315,12 @@ export const ActiveTripScreen: React.FC = () => {
       saveSucceeded = true;
     }
 
-    // Only discard the durable active-trip telemetry once the completed trip is safely queued.
-    if (saveSucceeded && activeTripId) {
-      await telemetryPersistenceService.clear(activeTripId);
+    // Only discard the durable active-trip telemetry and recovery record once the completed trip is safely queued.
+    if (saveSucceeded) {
+      if (activeTripId) {
+        await telemetryPersistenceService.clear(activeTripId);
+      }
+      clearActiveTripPersistence();
     }
   };
 
