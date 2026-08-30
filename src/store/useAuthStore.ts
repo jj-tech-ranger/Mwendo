@@ -84,8 +84,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         claimedSaccoId: claims?.saccoId,
         claimedAuthorityScope: claims?.authorityScope,
         claimedIsSuspended: claims?.isSuspended,
-        role: activeRole ?? state.user.role,
-        activeRole,
+        // Keep the persisted profile role as the non-authorizing baseline. Claims
+        // may clear activeRole, but that must never make the required role field
+        // undefined or accidentally re-authorize the previous active role.
+        role: activeRole ?? state.user.role ?? 'passenger',
+        activeRole: activeRole,
         claims: claims || undefined,
         isActive: claims?.isSuspended === true ? false : state.user.isActive,
       };
