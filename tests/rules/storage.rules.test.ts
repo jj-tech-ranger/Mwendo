@@ -93,6 +93,28 @@ describe('Storage security rules', () => {
     );
   });
 
+  it('denies avatar uploads with a non-image content type', async () => {
+    const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
+    await assertFails(
+      uploadBytes(
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'avatars/user-1/avatar.txt'),
+        new Uint8Array([1, 2, 3]),
+        { contentType: 'text/plain' },
+      ),
+    );
+  });
+
+  it('denies avatar uploads at the 2MB size boundary', async () => {
+    const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
+    await assertFails(
+      uploadBytes(
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'avatars/user-1/avatar.jpg'),
+        new Uint8Array(2 * 1024 * 1024),
+        { contentType: 'image/jpeg' },
+      ),
+    );
+  });
+
   it('denies unauthenticated black-spot evidence reads', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
@@ -166,6 +188,36 @@ describe('Storage security rules', () => {
       uploadBytes(
         ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'),
         new Uint8Array([1, 2, 3]),
+        { contentType: 'image/jpeg' },
+      ),
+    );
+  });
+
+  it('denies black-spot evidence uploads with a non-image content type', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+    });
+
+    const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
+    await assertFails(
+      uploadBytes(
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.txt'),
+        new Uint8Array([1, 2, 3]),
+        { contentType: 'text/plain' },
+      ),
+    );
+  });
+
+  it('denies black-spot evidence uploads at the 5MB size boundary', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+    });
+
+    const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
+    await assertFails(
+      uploadBytes(
+        ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'),
+        new Uint8Array(5 * 1024 * 1024),
         { contentType: 'image/jpeg' },
       ),
     );
