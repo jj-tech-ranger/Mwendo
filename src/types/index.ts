@@ -23,7 +23,6 @@ export interface UserProfile {
   phoneNumber?: string | undefined;
   role: UserRole;
   activeRole?: UserRole | undefined;
-  // AUTH-004: ID Token Custom Claims (Authoritative Route & Backend Authorization)
   claimedActiveRole?: UserRole | undefined;
   claimedSaccoId?: string | undefined;
   claimedAuthorityScope?: ('national' | 'county') | undefined;
@@ -40,23 +39,17 @@ export interface UserProfile {
   isMfaVerified?: boolean | undefined;
   isAnonymous?: boolean | undefined;
   trustScore?: number | undefined;
-  // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
   termsAccepted?: boolean | undefined;
   privacyPolicyVersion?: string | undefined;
   termsAcceptedAt?: string | undefined;
   ageConfirmed?: boolean | undefined;
   ageConfirmedAt?: string | undefined;
-  // SEC-006, SEC-007: Kenya DPA 2019 Analytics Consent
   analyticsConsent?: boolean | undefined;
   analyticsConsentAt?: string | undefined;
   emergencyContacts?: Array<{ name: string; phone: string; relationship: string }> | undefined;
   language?: 'en' | 'sw' | undefined;
   theme?: 'light' | 'dark' | 'system' | undefined;
-  notificationPreferences?: {
-    overspeedAlerts: boolean;
-    blackspotWarnings: boolean;
-    weeklyDigest: boolean;
-  } | undefined;
+  notificationPreferences?: { overspeedAlerts: boolean; blackspotWarnings: boolean; weeklyDigest: boolean } | undefined;
   createdAt: string;
   updatedAt: string;
 }
@@ -77,6 +70,7 @@ export interface GPSPoint {
 export interface Trip {
   id: string;
   tripId?: string | undefined;
+  vehicleId: string;
   vehicleRegNumber: string;
   plateNumber?: string | undefined;
   saccoId: string;
@@ -109,7 +103,7 @@ export interface Trip {
 
 export interface Vehicle {
   id: string;
-  regNumber: string; // License Plate e.g. KCE 450Z
+  regNumber: string;
   saccoId: string;
   saccoName: string;
   capacity: number;
@@ -135,174 +129,22 @@ export type SeverityLevel = 'low' | 'medium' | 'high' | 'critical';
 export type HazardType = 'accident_prone' | 'pothole' | 'carjacking_risk' | 'poor_lighting' | 'unmarked_bump' | 'police_checkpoint' | 'flash_flooding';
 
 export interface BlackSpot {
-  id: string;
-  spotId?: string;
-  name: string;
-  title?: string;
-  routeName: string;
-  county?: string;
-  latitude: number;
-  longitude: number;
-  radiusMeters?: number;
-  severity: SeverityLevel;
-  hazardType?: HazardType;
-  accidentCount12M?: number;
-  hazardDescription: string;
-  description?: string;
-  reportedByUid: string;
-  verifiedByAuthority?: boolean;
-  corroborationCount?: number;
-  confidenceScore?: number;
-  evidencePhotoUrls?: string[];
-  status?: 'pending' | 'published' | 'under_review' | 'rejected';
-  createdAt: string;
-  updatedAt?: string;
+  id: string; spotId?: string; name: string; title?: string; routeName: string; county?: string;
+  latitude: number; longitude: number; radiusMeters?: number; severity: SeverityLevel; hazardType?: HazardType;
+  accidentCount12M?: number; hazardDescription: string; description?: string; reportedByUid: string;
+  verifiedByAuthority?: boolean; corroborationCount?: number; confidenceScore?: number; evidencePhotoUrls?: string[];
+  status?: 'pending' | 'published' | 'under_review' | 'rejected'; createdAt: string; updatedAt?: string;
 }
 
 export type AlertType = 'overspeeding' | 'blackspot_approaching' | 'harsh_braking' | 'sos' | 'route_deviation';
-
-export interface SafetyAlert {
-  id: string;
-  tripId: string;
-  userId?: string;
-  vehicleRegNumber: string;
-  driverName?: string;
-  saccoId: string;
-  type: AlertType;
-  severity: SeverityLevel;
-  message: string;
-  latitude: number;
-  longitude: number;
-  speedKmH: number;
-  timestamp: string;
-  acknowledgedBySacco?: boolean;
-  acknowledgedByAuthority?: boolean;
-  status?: 'active' | 'resolved' | 'cancelled';
-}
-
-export interface PlatformAnalyticsDaily {
-  id: string;
-  docId?: string;
-  date: string; // YYYY-MM-DD
-  type: 'daily' | 'platform_daily';
-  totalTrips: number;
-  totalViolations: number;
-  activeAlerts: number;
-  riskDistribution: {
-    low: number;
-    medium: number;
-    high: number;
-    critical: number;
-  };
-  updatedAt: string;
-}
-
-export interface SaccoAnalyticsDaily {
-  id: string;
-  docId?: string;
-  saccoId: string;
-  type: 'sacco' | 'sacco_daily';
-  safetyScore: number;
-  fleetCount: number;
-  unresolvedComplaints: number;
-  updatedAt: string;
-}
-
+export interface SafetyAlert { id: string; tripId: string; userId?: string; vehicleRegNumber: string; driverName?: string; saccoId: string; type: AlertType; severity: SeverityLevel; message: string; latitude: number; longitude: number; speedKmH: number; timestamp: string; acknowledgedBySacco?: boolean; acknowledgedByAuthority?: boolean; status?: 'active' | 'resolved' | 'cancelled'; }
+export interface PlatformAnalyticsDaily { id: string; docId?: string; date: string; type: 'daily' | 'platform_daily'; totalTrips: number; totalViolations: number; activeAlerts: number; riskDistribution: { low: number; medium: number; high: number; critical: number }; updatedAt: string; }
+export interface SaccoAnalyticsDaily { id: string; docId?: string; saccoId: string; type: 'sacco' | 'sacco_daily'; safetyScore: number; fleetCount: number; unresolvedComplaints: number; updatedAt: string; }
 export type AnalyticsDocument = PlatformAnalyticsDaily | SaccoAnalyticsDaily;
-
-export interface Driver {
-  id: string;
-  name: string;
-  licenseNumber: string;
-  saccoId: string;
-  assignedVehicleReg?: string;
-  routeName?: string;
-  status: 'active' | 'on_leave' | 'suspended';
-  safetyScore: number;
-  phone?: string;
-  totalTrips?: number;
-  totalViolations?: number;
-  createdAt?: string;
-}
-
-export interface Violation {
-  id: string;
-  violationId?: string;
-  saccoId: string;
-  userId?: string;
-  vehicleRegNumber: string;
-  driverName?: string;
-  routeName?: string;
-  recordedSpeedKmH: number;
-  speedLimitKmH: number;
-  severity: SeverityLevel;
-  confidenceScore: number;
-  isCorroborated: boolean;
-  timestamp: Timestamp | string;
-  status: 'pending' | 'reviewed' | 'disputed' | 'dismissed';
-  locationName?: string;
-  latitude?: number;
-  longitude?: number;
-  createdAt?: Timestamp | string;
-  updatedAt?: Timestamp | string;
-}
-
-export interface Complaint {
-  id: string;
-  saccoId: string;
-  vehicleRegNumber?: string;
-  passengerName?: string;
-  reportedByUid?: string;
-  title: string;
-  description: string;
-  status: 'open' | 'investigating' | 'resolved';
-  createdAt: string;
-}
-
-export interface AuditLog {
-  id: string;
-  saccoId: string;
-  actorName: string;
-  actorRole: string;
-  action: string;
-  target: string;
-  timestamp: string;
-}
-
-export interface TeamUser {
-  id: string;
-  saccoId: string;
-  name: string;
-  email: string;
-  role: 'sacco_manager' | 'operations' | 'viewer';
-  status: 'active' | 'invited' | 'suspended';
-  lastActive?: string;
-}
-
-export interface InspectionReport {
-  id: string;
-  vehicleRegNumber: string;
-  saccoId: string;
-  saccoName?: string | undefined;
-  inspectorId: string;
-  inspectorName: string;
-  county: string;
-  inspectionDate: string;
-  speedGovernorStatus: 'valid' | 'tampered' | 'expired' | 'missing';
-  brakeStatus: 'pass' | 'fail';
-  tireStatus: 'pass' | 'fail';
-  overallResult: 'passed' | 'failed' | 'impounded' | 'suspended';
-  certificateNumber?: string | undefined;
-  expiryDate?: string | undefined;
-  notes?: string | undefined;
-  createdAt: string;
-}
-
-export interface UserRateLimitDoc {
-  id: string;
-  userId: string;
-  sosTimestamps?: number[];
-  blackSpotTimestamps?: number[];
-  updatedAt: string;
-}
-
+export interface Driver { id: string; name: string; licenseNumber: string; saccoId: string; assignedVehicleReg?: string; routeName?: string; status: 'active' | 'on_leave' | 'suspended'; safetyScore: number; phone?: string; totalTrips?: number; totalViolations?: number; createdAt?: string; }
+export interface Violation { id: string; violationId?: string; saccoId: string; userId?: string; vehicleRegNumber: string; driverName?: string; routeName?: string; recordedSpeedKmH: number; speedLimitKmH: number; severity: SeverityLevel; confidenceScore: number; isCorroborated: boolean; timestamp: Timestamp | string; status: 'pending' | 'reviewed' | 'disputed' | 'dismissed'; locationName?: string; latitude?: number; longitude?: number; createdAt?: Timestamp | string; updatedAt?: Timestamp | string; }
+export interface Complaint { id: string; saccoId: string; vehicleRegNumber?: string; passengerName?: string; reportedByUid?: string; title: string; description: string; status: 'open' | 'investigating' | 'resolved'; createdAt: string; }
+export interface AuditLog { id: string; saccoId: string; actorName: string; actorRole: string; action: string; target: string; timestamp: string; }
+export interface TeamUser { id: string; saccoId: string; name: string; email: string; role: 'sacco_manager' | 'operations' | 'viewer'; status: 'active' | 'invited' | 'suspended'; lastActive?: string; }
+export interface InspectionReport { id: string; vehicleRegNumber: string; saccoId: string; saccoName?: string; inspectorId: string; inspectorName: string; county: string; inspectionDate: string; speedGovernorStatus: 'valid' | 'tampered' | 'expired' | 'missing'; brakeStatus: 'pass' | 'fail'; tireStatus: 'pass' | 'fail'; overallResult: 'passed' | 'failed' | 'impounded' | 'suspended'; certificateNumber?: string; expiryDate?: string; notes?: string; createdAt: string; }
+export interface UserRateLimitDoc { id: string; userId: string; sosTimestamps?: number[]; blackSpotTimestamps?: number[]; updatedAt: string; }
