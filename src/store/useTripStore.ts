@@ -59,7 +59,7 @@ function loadPersistedTrip(): PersistedTripState {
     return {
       ...EMPTY_TRIP_STATE,
       ...parsed,
-      saccoId: parsed.saccoId,
+      saccoId: parsed.saccoId ?? EMPTY_TRIP_STATE.saccoId,
       telemetrySampleCount: Number.isFinite(parsed.telemetrySampleCount) ? parsed.telemetrySampleCount : 0,
       routeCoordinates: Array.isArray(parsed.routeCoordinates) ? parsed.routeCoordinates : [],
     };
