@@ -161,7 +161,29 @@ jobs:
           name: functions-dist
           path: apps/functions/lib
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to Google Cloud (attempt 1)
+        id: google-auth-1
+        continue-on-error: true
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Authenticate to Google Cloud (attempt 2)
+        id: google-auth-2
+        if: steps.google-auth-1.outcome == 'failure'
+        continue-on-error: true
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Authenticate to Google Cloud (attempt 3)
+        if: steps.google-auth-1.outcome == 'failure' && steps.google-auth-2.outcome == 'failure'
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
