@@ -113,15 +113,18 @@ describe('Firestore security rules', () => {
 
   it('denies clients from modifying an existing trip', async () => {
     const db = authedDb('passenger-1', 'passenger');
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(doc(ctx.firestore(), 'trips/trip-1'), {
-        userId: 'passenger-1',
-        status: 'completed',
-        maxSpeedKmH: 70,
-      });
-    });
+    const tripRef = doc(db, 'trips/trip-1');
 
-    await assertFails(setDoc(doc(db, 'trips/trip-1'), {
+    // Create the document through the same client context first. This guarantees
+    // the following write is evaluated as an update rather than accidentally
+    // exercising the create rule if emulator-backed setup data is isolated.
+    await assertSucceeds(setDoc(tripRef, {
+      userId: 'passenger-1',
+      status: 'completed',
+      maxSpeedKmH: 70,
+    }));
+
+    await assertFails(setDoc(tripRef, {
       userId: 'passenger-1',
       status: 'completed',
       maxSpeedKmH: 150,
