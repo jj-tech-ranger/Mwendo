@@ -70,25 +70,28 @@ export const useAuthStore = create<AuthState>((set) => ({
       isLoading: false,
     }),
   setClaims: (claims) =>
-    set((state) => ({
-      claims,
-      user: state.user
-        ? {
-            ...state.user,
-            // Firebase custom claims are the authorization source of truth.
-            // Clear cached authorization fields when the token no longer supplies claims;
-            // retaining the previous role would allow stale client state to survive a token change.
-            claimedActiveRole: claims?.activeRole,
-            claimedSaccoId: claims?.saccoId,
-            claimedAuthorityScope: claims?.authorityScope,
-            claimedIsSuspended: claims?.isSuspended,
-            role: claims?.activeRole,
-            activeRole: claims?.activeRole,
-            claims: claims || undefined,
-            isActive: claims?.isSuspended === true ? false : state.user.isActive,
-          }
-        : null,
-    })),
+    set((state) => {
+      if (!state.user) return { claims, user: null };
+
+      // Firebase custom claims are the authorization source of truth. Only update
+      // the role fields when the token actually contains a valid activeRole;
+      // otherwise preserve the required UserProfile.role rather than assigning
+      // undefined to a mandatory field.
+      const activeRole = claims?.activeRole;
+      const nextUser: UserProfile = {
+        ...state.user,
+        claimedActiveRole: activeRole,
+        claimedSaccoId: claims?.saccoId,
+        claimedAuthorityScope: claims?.authorityScope,
+        claimedIsSuspended: claims?.isSuspended,
+        role: activeRole ?? state.user.role,
+        activeRole: activeRole ?? state.user.activeRole,
+        claims: claims || undefined,
+        isActive: claims?.isSuspended === true ? false : state.user.isActive,
+      };
+
+      return { claims, user: nextUser };
+    }),
   // Retained for backwards compatibility. It cannot grant a role: the requested
   // role must already be present in the verified Firebase custom claims.
   setRole: (role) =>
