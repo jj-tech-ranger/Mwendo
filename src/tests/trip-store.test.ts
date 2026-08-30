@@ -24,7 +24,7 @@ describe('MED-01: Trip Store Dynamic saccoId & Zero Hardcoded SACCO Literals', (
     });
   });
 
-  it('MED-01: startTrip called with a plate resolving to a mocked saccoId: "sacco_x" results in activeTrip.saccoId === "sacco_x"', () => {
+  it('MED-01: startTrip called with an explicit saccoId preserves the resolved SACCO ownership', () => {
     useTripStore.getState().startTrip({
       plateNumber: 'KDA 123A',
       saccoId: 'sacco_x',
@@ -40,16 +40,15 @@ describe('MED-01: Trip Store Dynamic saccoId & Zero Hardcoded SACCO Literals', (
     expect(activeTrip?.vehicleRegNumber).toBe('KDA 123A');
   });
 
-  it('MED-01: startTrip without explicit saccoId resolves to "unassigned" instead of hardcoded literal', () => {
-    useTripStore.getState().startTrip({
-      plateNumber: 'KBZ 999Z',
-      routeName: 'Waiyaki Way',
-    });
+  it('MED-01: startTrip without a verified SACCO is rejected rather than creating an unassigned trip', () => {
+    expect(() =>
+      useTripStore.getState().startTrip({
+        plateNumber: 'KBZ 999Z',
+        routeName: 'Waiyaki Way',
+      }),
+    ).toThrow('TRIP002: A verified SACCO is required to start a trip.');
 
-    const activeTrip = useTripStore.getState().activeTrip;
-    expect(activeTrip).not.toBeNull();
-    expect(activeTrip?.saccoId).toBe('unassigned');
-    expect(activeTrip?.saccoName).toBe('Independent / Unassigned');
-    expect(activeTrip?.plateNumber).toBe('KBZ 999Z');
+    expect(useTripStore.getState().activeTrip).toBeNull();
+    expect(useTripStore.getState().isTracking).toBe(false);
   });
 });
