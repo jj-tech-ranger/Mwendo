@@ -129,6 +129,18 @@ describe('Storage security rules', () => {
     await assertFails(getBytes(ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 
+  it('denies a reporter from reading evidence through a spoofed UID path', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-2/evidence.jpg'), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      });
+    });
+
+    const user2 = testEnv.authenticatedContext('user-2', claims('passenger'));
+    await assertFails(getBytes(ref(user2.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-2/evidence.jpg')));
+  });
+
   it('allows the black-spot reporter to upload evidence', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
