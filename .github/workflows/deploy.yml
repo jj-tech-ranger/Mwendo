@@ -210,8 +210,22 @@ jobs:
         run: |
           set -euo pipefail
           base_url="https://mwendo-salama-prod.web.app"
+
           curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/" -o /tmp/mwendo-index.html
           grep -Fq '<title>Mwendo Salama | PSV Passenger Safety Platform</title>' /tmp/mwendo-index.html
+          grep -Fq '<script type="module" src="/src/main.tsx"></script>' /tmp/mwendo-index.html
+          if grep -Eiq 'demo-mwendo|demo-mwendo-salama-audit' /tmp/mwendo-index.html; then
+            echo "ERROR: Production hosting returned demo Firebase configuration markers."
+            exit 1
+          fi
+
           curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/manifest.json" -o /tmp/mwendo-manifest.json
-          grep -Fq '"name"' /tmp/mwendo-manifest.json
+          node -e 'const fs=require("fs"); const m=JSON.parse(fs.readFileSync("/tmp/mwendo-manifest.json","utf8")); if (!m.name || !m.start_url || !Array.isArray(m.icons) || m.icons.length < 2) process.exit(1);'
+
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/sw.js" -o /tmp/mwendo-sw.js
+          grep -Fq 'CACHE_NAME' /tmp/mwendo-sw.js
+
+          curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/passenger" -o /tmp/mwendo-route.html
+          grep -Fq '<div id="root"></div>' /tmp/mwendo-route.html
+
           echo "Production hosting smoke test passed: ${base_url}"
