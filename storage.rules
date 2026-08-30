@@ -62,8 +62,7 @@ service firebase.storage {
                    && (
                      request.auth.token.activeRole == 'admin' ||
                      request.auth.token.activeRole == 'authority' ||
-                     (firestore.exists(/databases/(default)/documents/black_spots/$(spotId)) &&
-                      firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid)
+                     firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid
                    );
       allow update, delete: if request.auth != null && (
         request.auth.token.activeRole == 'admin' ||
