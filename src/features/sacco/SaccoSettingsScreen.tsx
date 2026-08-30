@@ -53,7 +53,7 @@ export const SaccoSettingsScreen: React.FC = () => {
       }
     }
     loadLogs();
-  }, [saccoId]);
+  }, [saccoId, user?.displayName]);
 
   if (!saccoId) {
     return (
@@ -111,7 +111,6 @@ export const SaccoSettingsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* ORG PROFILE TAB (§23B) */}
       {activeTab === 'profile' && (
         <Card className="p-6 max-w-2xl space-y-4">
           <h3 className="font-bold text-sm text-on-surface">Organization Metadata</h3>
@@ -144,7 +143,6 @@ export const SaccoSettingsScreen: React.FC = () => {
         </Card>
       )}
 
-      {/* BILLING & PLAN TAB (§23C) */}
       {activeTab === 'billing' && (
         <Card className="p-6 max-w-2xl space-y-4">
           <div className="flex justify-between items-start">
@@ -170,7 +168,6 @@ export const SaccoSettingsScreen: React.FC = () => {
         </Card>
       )}
 
-      {/* AUDIT LOGS TAB (§24) */}
       {activeTab === 'audit' && (
         <Card className="p-0 overflow-hidden">
           <div className="p-4 border-b border-outline-variant/20 flex justify-between items-center text-xs font-bold">
@@ -201,7 +198,6 @@ export const SaccoSettingsScreen: React.FC = () => {
         </Card>
       )}
 
-      {/* HELP & SUPPORT TAB (§25) */}
       {activeTab === 'help' && (
         <Card className="p-6 max-w-2xl space-y-4">
           <h3 className="font-bold text-sm text-on-surface">SACCO Operations Support</h3>
