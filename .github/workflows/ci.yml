@@ -33,6 +33,15 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Setup Java for Firebase Emulator Suite
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Verify Java runtime
+        run: java -version
+
       - name: 1. Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
 
