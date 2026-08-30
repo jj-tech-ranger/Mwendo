@@ -47,7 +47,6 @@ export const AdminReportsScreen: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Selector */}
         <div className="flex items-center bg-surface-container border border-outline-variant/30 rounded-xl p-1 font-label-mono text-xs">
           <button
             onClick={() => setActiveTab('blackspots')}
@@ -74,7 +73,6 @@ export const AdminReportsScreen: React.FC = () => {
 
       {activeTab === 'blackspots' && (
         <div className="space-y-md">
-          {/* Search Row */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm flex items-center justify-between">
             <div className="relative w-full md:w-80">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">
@@ -95,61 +93,49 @@ export const AdminReportsScreen: React.FC = () => {
             </Button>
           </div>
 
-          {/* Table */}
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-body-sm">
-                <thead className="bg-surface-container-low font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/20">
-                  <tr>
-                    <th className="p-md">Hazard Location / Title</th>
-                    <th className="p-md">Route & County</th>
-                    <th className="p-md">Severity</th>
-                    <th className="p-md">Corroboration</th>
-                    <th className="p-md">Confidence Score</th>
-                    <th className="p-md">Verification</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-outline-variant/20">
-                  {filtered.map((r) => (
-                    <tr key={r.id} className="hover:bg-surface-container/50">
-                      <td className="p-md font-bold text-on-surface">
-                        <p>{r.name}</p>
-                        <p className="text-[11px] text-on-surface-variant line-clamp-1">
-                          {r.hazardDescription}
-                        </p>
-                      </td>
-
-                      <td className="p-md font-label-mono text-xs text-on-surface-variant">
-                        <p>{r.routeName}</p>
-                        <p className="text-[10px] text-outline">{r.county}</p>
-                      </td>
-
-                      <td className="p-md">
-                        <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'}>
-                          {r.severity}
-                        </Badge>
-                      </td>
-
-                      <td className="p-md font-label-mono font-bold text-xs">
-                        {r.corroborationCount ?? 1} Commuters
-                      </td>
-
-                      <td className="p-md font-label-mono font-bold text-primary">
-                        {r.confidenceScore ?? 80}%
-                      </td>
-
-                      <td className="p-md">
-                        {r.verifiedByAuthority ? (
-                          <Badge variant="success">Verified</Badge>
-                        ) : (
-                          <Badge variant="neutral">Pending Verification</Badge>
-                        )}
-                      </td>
+            {isLoading ? (
+              <div className="p-8 text-center text-xs text-on-surface-variant" role="status">
+                Loading blackspot reports…
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-body-sm">
+                  <thead className="bg-surface-container-low font-label-mono text-[10px] text-on-surface-variant uppercase tracking-wider border-b border-outline-variant/20">
+                    <tr>
+                      <th className="p-md">Hazard Location / Title</th>
+                      <th className="p-md">Route & County</th>
+                      <th className="p-md">Severity</th>
+                      <th className="p-md">Corroboration</th>
+                      <th className="p-md">Confidence Score</th>
+                      <th className="p-md">Verification</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-outline-variant/20">
+                    {filtered.map((r) => (
+                      <tr key={r.id} className="hover:bg-surface-container/50">
+                        <td className="p-md font-bold text-on-surface">
+                          <p>{r.name}</p>
+                          <p className="text-[11px] text-on-surface-variant line-clamp-1">{r.hazardDescription}</p>
+                        </td>
+                        <td className="p-md font-label-mono text-xs text-on-surface-variant">
+                          <p>{r.routeName}</p>
+                          <p className="text-[10px] text-outline">{r.county}</p>
+                        </td>
+                        <td className="p-md">
+                          <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'}>{r.severity}</Badge>
+                        </td>
+                        <td className="p-md font-label-mono font-bold text-xs">{r.corroborationCount ?? 1} Commuters</td>
+                        <td className="p-md font-label-mono font-bold text-primary">{r.confidenceScore ?? 80}%</td>
+                        <td className="p-md">
+                          {r.verifiedByAuthority ? <Badge variant="success">Verified</Badge> : <Badge variant="neutral">Pending Verification</Badge>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -159,49 +145,28 @@ export const AdminReportsScreen: React.FC = () => {
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-lg shadow-sm space-y-md flex flex-col justify-between">
             <div className="space-y-2">
               <span className="material-symbols-outlined text-3xl text-primary">analytics</span>
-              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">
-                Platform Monthly Growth & Safety Digest
-              </h3>
-              <p className="font-body-sm text-xs text-on-surface-variant">
-                Comprehensive 30-day analytics on registered vehicles, passenger trips, and overspeed mitigation metrics across all corridors.
-              </p>
+              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">Platform Monthly Growth & Safety Digest</h3>
+              <p className="font-body-sm text-xs text-on-surface-variant">Comprehensive 30-day analytics on registered vehicles, passenger trips, and overspeed mitigation metrics across all corridors.</p>
             </div>
-            <Button variant="primary" className="w-full justify-center gap-2">
-              <span className="material-symbols-outlined text-base">download</span>
-              Generate Executive PDF
-            </Button>
+            <Button variant="primary" className="w-full justify-center gap-2"><span className="material-symbols-outlined text-base">download</span>Generate Executive PDF</Button>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-lg shadow-sm space-y-md flex flex-col justify-between">
             <div className="space-y-2">
               <span className="material-symbols-outlined text-3xl text-amber-600">verified_user</span>
-              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">
-                NTSA Compliance & Inspection Audit
-              </h3>
-              <p className="font-body-sm text-xs text-on-surface-variant">
-                Roadside speed governor audit summaries, SACCO safety score leaderboards, and impound logs for NTSA directorate.
-              </p>
+              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">NTSA Compliance & Inspection Audit</h3>
+              <p className="font-body-sm text-xs text-on-surface-variant">Roadside speed governor audit summaries, SACCO safety score leaderboards, and impound logs for NTSA directorate.</p>
             </div>
-            <Button variant="secondary" className="w-full justify-center gap-2">
-              <span className="material-symbols-outlined text-base">download</span>
-              Download NTSA Report
-            </Button>
+            <Button variant="secondary" className="w-full justify-center gap-2"><span className="material-symbols-outlined text-base">download</span>Download NTSA Report</Button>
           </div>
 
           <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-lg shadow-sm space-y-md flex flex-col justify-between">
             <div className="space-y-2">
               <span className="material-symbols-outlined text-3xl text-emerald-600">nature_people</span>
-              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">
-                Grant & Global Road Safety Funder Impact
-              </h3>
-              <p className="font-body-sm text-xs text-on-surface-variant">
-                Quantified lives saved, blackspot hazard warning triggers, and commuter safety score shifts for donor reporting.
-              </p>
+              <h3 className="font-headline-lg-mobile text-base font-bold text-on-surface">Grant & Global Road Safety Funder Impact</h3>
+              <p className="font-body-sm text-xs text-on-surface-variant">Quantified lives saved, blackspot hazard warning triggers, and commuter safety score shifts for donor reporting.</p>
             </div>
-            <Button variant="outline" className="w-full justify-center gap-2">
-              <span className="material-symbols-outlined text-base">download</span>
-              Download Impact Report
-            </Button>
+            <Button variant="outline" className="w-full justify-center gap-2"><span className="material-symbols-outlined text-base">download</span>Download Impact Report</Button>
           </div>
         </div>
       )}
