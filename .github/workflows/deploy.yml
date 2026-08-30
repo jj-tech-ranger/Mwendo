@@ -47,7 +47,7 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Verify required production frontend configuration
+      - name: Verify required production configuration
         run: |
           set -euo pipefail
           required_vars=(VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_MESSAGING_SENDER_ID VITE_FIREBASE_APP_ID)
@@ -61,6 +61,8 @@ jobs:
           test "${VITE_FIREBASE_APP_ID}" = "1:1004280240722:web:e339c20b645e839b3c5d8b"
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
+      - name: Verify complete production dependency configuration
+        run: bun run check:production-config
       - name: Install Functions dependencies
         run: cd apps/functions && npm ci
       - name: Root Linter & Typecheck
