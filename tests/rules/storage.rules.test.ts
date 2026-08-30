@@ -1,7 +1,5 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import {
   assertFails,
   assertSucceeds,
@@ -24,16 +22,14 @@ function claims(activeRole: string, saccoId?: string) {
   };
 }
 
-function adminFirestore() {
-  const app = getApps()[0] ?? initializeApp({ projectId: PROJECT_ID });
-  return getFirestore(app);
-}
-
-// Storage cross-service rules read Firestore through the emulator's shared backend.
-// Seed those documents with the Admin SDK rather than rules-unit-testing's isolated
-// Firestore context, which is not visible to firestore.get()/exists() from Storage rules.
+// Seed the Firestore emulator through the same rules-test environment used by
+// Storage. Storage rules' firestore.exists()/firestore.get() calls can then see
+// the document in the shared emulator backend without requiring Admin SDK
+// credentials or accidentally reaching a non-emulated service in CI.
 async function seedFirestoreDocument(path: string, data: Record<string, unknown>) {
-  await adminFirestore().doc(path).set(data);
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc(path).set(data);
+  });
 }
 
 beforeAll(async () => {
