@@ -95,6 +95,7 @@ describe('Storage security rules', () => {
 
   it('denies unauthenticated black-spot evidence reads', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
       await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
@@ -104,18 +105,35 @@ describe('Storage security rules', () => {
     await assertFails(getBytes(ref(unauthenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 
-  it('allows an authenticated user to read black-spot evidence under the current policy', async () => {
+  it('allows the black-spot reporter to read their evidence', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+      await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
+        contentType: 'image/jpeg',
+      });
+    });
+
+    const reporter = testEnv.authenticatedContext('user-1', claims('passenger'));
+    await assertSucceeds(getBytes(ref(reporter.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
+  });
+
+  it('denies a different passenger from reading black-spot evidence', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
       await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
     });
 
     const authenticated = testEnv.authenticatedContext('user-2', claims('passenger'));
-    await assertSucceeds(getBytes(ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
+    await assertFails(getBytes(ref(authenticated.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg')));
   });
 
   it('allows the black-spot reporter to upload evidence', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+    });
+
     const authenticated = testEnv.authenticatedContext('user-1', claims('passenger'));
     await assertSucceeds(
       uploadBytes(
@@ -127,6 +145,10 @@ describe('Storage security rules', () => {
   });
 
   it('denies a different passenger from uploading black-spot evidence', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
+    });
+
     const authenticated = testEnv.authenticatedContext('user-2', claims('passenger'));
     await assertFails(
       uploadBytes(
@@ -162,6 +184,7 @@ describe('Storage security rules', () => {
 
   it('does not allow an authenticated passenger to delete protected evidence', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('black_spots/spot-1').set({ reportedByUid: 'user-1' });
       await uploadBytes(ref(ctx.storage(`gs://${STORAGE_BUCKET}`), 'black_spots/spot-1/user-1/evidence.jpg'), new Uint8Array([1, 2, 3]), {
         contentType: 'image/jpeg',
       });
