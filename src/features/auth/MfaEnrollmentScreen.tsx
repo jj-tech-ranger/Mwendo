@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { PrimaryLogo } from '../../components/assets/BrandAssets';
@@ -38,9 +38,7 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({ isModal = fa
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
 
-  useEffect(() => { void initTotp(); }, []);
-
-  async function initTotp() {
+  const initTotp = useCallback(async () => {
     setLoadingSecret(true);
     setErrorMsg(null);
     try {
@@ -56,7 +54,11 @@ export const MfaEnrollmentScreen: React.FC<MfaEnrollmentProps> = ({ isModal = fa
     } finally {
       setLoadingSecret(false);
     }
-  }
+  }, [isModal, navigate]);
+
+  useEffect(() => {
+    void initTotp();
+  }, [initTotp]);
 
   async function handleVerifyAndEnroll(e: React.FormEvent) {
     e.preventDefault();
