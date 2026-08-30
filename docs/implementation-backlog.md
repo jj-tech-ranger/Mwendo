@@ -27,7 +27,7 @@ This is the working backlog for the application audit and production-readiness p
 - [ ] Trip start → tracking → completion end-to-end.
 - [x] GPS coordinate/timestamp/speed validation has automated coverage.
 - [x] Reconnection/offline trip persistence and reconciliation has automated coverage.
-- [ ] Explicit duplicate/conflicting active-trip journey test.
+- [x] Duplicate/conflicting active-trip protection is covered by the trip-store lifecycle test.
 
 ### Black spots
 - [x] Passenger report creation and real-location behavior have automated coverage.
