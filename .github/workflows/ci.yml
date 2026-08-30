@@ -1,4 +1,3 @@
-# [repair-bun-lock] temporary trigger; remove with the repair workflow after lockfile regeneration
 name: Continuous Integration
 
 on:
@@ -57,5 +56,8 @@ jobs:
       - name: 7. Run Vitest tests
         run: bun run test
 
-      - name: 7b. Generate Test Coverage Report
+      - name: 7b. Run Firebase Firestore & Storage rules tests
+        run: bun run test:rules
+
+      - name: 8. Generate Test Coverage Report
         run: bun run test:coverage
