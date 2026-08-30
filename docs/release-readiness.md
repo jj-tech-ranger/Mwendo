@@ -1,6 +1,6 @@
 # Mwendo Salama Release Readiness
 
-Updated: 2026-08-30
+Updated: 2026-08-31
 
 This document is the final validation ledger for the production-readiness programme. A check is marked **verified** only when the repository contains an automated test, CI gate, or explicit production validation supporting it. Unverified items remain release blockers until tested.
 
@@ -36,7 +36,7 @@ This document is the final validation ledger for the production-readiness progra
 ### Still requiring explicit closure
 
 - [ ] Complete route-by-route manual/automated journey inventory.
-- [ ] Complete Cloud Function inventory with trigger, input, output, failure and idempotency evidence.
+- [x] Complete Cloud Function export inventory; trigger/security/failure/idempotency evidence remains attached per function in `docs/cloud-functions-inventory.md`.
 - [ ] Complete Firestore index/query inventory.
 - [ ] Complete production dependency inventory (Maps, reCAPTCHA, FCM/VAPID, authorized domains).
 
@@ -67,7 +67,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Report payloads avoid fabricated coordinates.
 - [x] Emergency/report failure states are covered.
 - [ ] Full passenger report → evidence → SACCO review → authority resolution journey.
-- [ ] Explicit malicious/oversized evidence upload matrix against Storage emulator.
+- [x] Storage emulator covers evidence ownership, spoofed UID paths, invalid content types, size boundaries, cross-SACCO reads and protected deletion.
 
 ## Phase 5 — Notifications and asynchronous work
 
@@ -75,7 +75,8 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Callable failure paths are covered.
 - [x] Rate-limit behavior is covered.
 - [x] Suspension/reactivation audit logging is covered.
-- [ ] Complete deployed-function inventory and idempotency matrix.
+- [x] Complete Cloud Function export inventory is documented in `docs/cloud-functions-inventory.md`.
+- [ ] Complete function-by-function idempotency evidence for all scheduled/analytics jobs.
 - [ ] FCM delivery/invalid-token lifecycle validation in an emulator-safe test harness.
 
 ## Phase 6 — Production Firebase
@@ -111,7 +112,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Rate limiting tests exist.
 - [x] Firestore/Storage rules tests run in CI.
 - [x] Cross-SACCO IDOR coverage exists for vehicles, complaints, violations and safety alerts.
-- [ ] Final Storage path traversal/manipulation matrix.
+- [x] Storage evidence path ownership and content/size boundary matrix is covered by rules tests.
 - [ ] Final callable-function authorization/input matrix.
 
 ## Phase 10 — Performance/mobile
@@ -155,7 +156,7 @@ The release is **not production-ready** until all P0 items and the critical P1/P
 ### Current release blockers
 
 1. Complete three critical role-based E2E journeys.
-2. Complete final cross-SACCO/Storage/callable adversarial matrix.
+2. Complete final callable-function authorization/input and idempotency matrix.
 3. Complete production dependency and smoke validation.
 4. Complete operational backup/recovery and observability verification.
 5. Complete realistic mobile/performance measurements.
