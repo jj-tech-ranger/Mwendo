@@ -1,5 +1,5 @@
 import { getDownloadURL, ref, uploadBytesResumable, UploadTask } from 'firebase/storage';
-import { storage } from '../lib/firebase';
+import { auth, storage } from '../lib/firebase';
 
 const waitForUpload = (uploadTask: UploadTask): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -25,9 +25,11 @@ export const storageService = {
     return waitForUpload(uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' }));
   },
 
-  /** Reporter UID is path-scoped so Storage Rules can enforce ownership without Firestore lookups. */
-  async uploadBlackSpotPhoto(file: File, spotId: string, userId: string): Promise<string> {
+  /** Reporter UID is taken from the signed-in Firebase user and path-scoped for Storage Rules ownership. */
+  async uploadBlackSpotPhoto(file: File, spotId: string): Promise<string> {
     if (file.size > 5 * 1024 * 1024) throw new Error('Photo evidence must be under 5MB');
+    const userId = auth.currentUser?.uid;
+    if (!userId) throw new Error('You must be signed in to upload black-spot evidence.');
     const ext = file.name.split('.').pop() || 'jpg';
     const storageRef = ref(storage, `black_spots/${spotId}/${userId}/photo_${Date.now()}.${ext}`);
     return waitForUpload(uploadBytesResumable(storageRef, file, { contentType: file.type || 'image/jpeg' }));
