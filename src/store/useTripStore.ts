@@ -60,7 +60,10 @@ function loadPersistedTrip(): PersistedTripState {
       ...EMPTY_TRIP_STATE,
       ...parsed,
       saccoId: parsed.saccoId ?? EMPTY_TRIP_STATE.saccoId,
-      telemetrySampleCount: Number.isFinite(parsed.telemetrySampleCount) ? parsed.telemetrySampleCount : 0,
+      telemetrySampleCount:
+        typeof parsed.telemetrySampleCount === 'number' && Number.isFinite(parsed.telemetrySampleCount)
+          ? parsed.telemetrySampleCount
+          : 0,
       routeCoordinates: Array.isArray(parsed.routeCoordinates) ? parsed.routeCoordinates : [],
     };
   } catch {
