@@ -57,4 +57,17 @@ describe('auth store authorization boundary', () => {
     expect(useAuthStore.getState().user?.isActive).toBe(false);
     expect(useAuthStore.getState().user?.claimedIsSuspended).toBe(true);
   });
+
+  it('clears stale authorization claims when Firebase returns no claims', () => {
+    useAuthStore.getState().setClaims(null);
+
+    const state = useAuthStore.getState();
+    expect(state.claims).toBeNull();
+    expect(state.user?.claimedActiveRole).toBeUndefined();
+    expect(state.user?.claimedSaccoId).toBeUndefined();
+    expect(state.user?.claimedAuthorityScope).toBeUndefined();
+    expect(state.user?.claimedIsSuspended).toBeUndefined();
+    expect(state.user?.role).toBeUndefined();
+    expect(state.user?.activeRole).toBeUndefined();
+  });
 });
