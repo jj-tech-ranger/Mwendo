@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check:bundle-security": "node scripts/check-bundle-security.js",
+    "check:production-config": "node scripts/check-production-config.js",
     "clean": "rm -rf dist server.js",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -45,9 +46,9 @@
     "react-dom": "^19.0.1",
     "react-hook-form": "^7.85.0",
     "react-i18next": "^17.0.12",
-    "react-router-dom": "^7.18.2",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.1.14",
     "vite": "^6.2.3",
     "zod": "^4.4.3",
     "zustand": "^5.0.15"
