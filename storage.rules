@@ -43,11 +43,12 @@ service firebase.storage {
       allow create: if isSignedIn()
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('(image/(jpeg|png|webp|jpg)|video/(mp4|webm|quicktime))')
+                   && firestore.exists(/databases/(default)/documents/complaints/$(complaintId))
+                   && firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.saccoId == saccoId
                    && (
                      request.auth.token.activeRole == 'admin' ||
                      request.auth.token.activeRole == 'authority' ||
-                     (firestore.exists(/databases/(default)/documents/complaints/$(complaintId)) &&
-                      firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid)
+                     firestore.get(/databases/(default)/documents/complaints/$(complaintId)).data.reportedByUid == request.auth.uid
                    );
       allow update, delete: if isSignedIn() && (
         request.auth.token.activeRole == 'admin' ||
@@ -56,11 +57,17 @@ service firebase.storage {
     }
 
     // Preferred black-spot evidence path: the uploader UID is encoded in the
-    // path, so Storage can prove ownership without a Firestore lookup.
+    // path, but ownership is still proved against the Firestore report.
     match /black_spots/{spotId}/{userId}/{filename} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        request.auth.token.activeRole == 'admin' ||
+        request.auth.token.activeRole == 'authority' ||
+        request.auth.uid == userId
+      );
       allow create: if isSignedIn()
                    && request.auth.uid == userId
+                   && firestore.exists(/databases/(default)/documents/black_spots/$(spotId))
+                   && firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)');
       allow update, delete: if isSignedIn() && (
@@ -72,7 +79,12 @@ service firebase.storage {
     // Legacy black-spot path: allow a reporter to upload only when the
     // corresponding Firestore black-spot document proves ownership.
     match /black_spots/{spotId}/{filename} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (
+        request.auth.token.activeRole == 'admin' ||
+        request.auth.token.activeRole == 'authority' ||
+        (firestore.exists(/databases/(default)/documents/black_spots/$(spotId)) &&
+         firestore.get(/databases/(default)/documents/black_spots/$(spotId)).data.reportedByUid == request.auth.uid)
+      );
       allow create: if isSignedIn()
                    && request.resource.size < 5 * 1024 * 1024
                    && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)')
