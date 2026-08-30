@@ -48,6 +48,12 @@ jobs:
       - name: Install Functions dependencies
         run: cd apps/functions && npm ci
 
+      - name: Dependency security audit
+        run: |
+          npm audit --audit-level=high
+          cd apps/functions
+          npm audit --audit-level=high
+
       - name: Root Linter & Typecheck
         run: bun run lint
 
