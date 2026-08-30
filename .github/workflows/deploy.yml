@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - chore/firebase-rules-emulator-tests
   pull_request:
     branches:
       - main
@@ -55,40 +54,15 @@ jobs:
       - name: Verify required production frontend configuration
         run: |
           set -euo pipefail
-          required_vars=(
-            VITE_FIREBASE_API_KEY
-            VITE_FIREBASE_AUTH_DOMAIN
-            VITE_FIREBASE_PROJECT_ID
-            VITE_FIREBASE_STORAGE_BUCKET
-            VITE_FIREBASE_MESSAGING_SENDER_ID
-            VITE_FIREBASE_APP_ID
-          )
+          required_vars=(VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID VITE_FIREBASE_STORAGE_BUCKET VITE_FIREBASE_MESSAGING_SENDER_ID VITE_FIREBASE_APP_ID)
           for var in "${required_vars[@]}"; do
-            if [ -z "${!var:-}" ]; then
-              echo "ERROR: Required production secret $var is missing."
-              exit 1
-            fi
+            if [ -z "${!var:-}" ]; then echo "ERROR: Required production secret $var is missing."; exit 1; fi
           done
-          test "${VITE_FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
-            echo "ERROR: VITE_FIREBASE_PROJECT_ID must be mwendo-salama-prod."
-            exit 1
-          }
-          test "${VITE_FIREBASE_AUTH_DOMAIN}" = "mwendo-salama-prod.firebaseapp.com" || {
-            echo "ERROR: VITE_FIREBASE_AUTH_DOMAIN does not match the production project."
-            exit 1
-          }
-          test "${VITE_FIREBASE_STORAGE_BUCKET}" = "mwendo-salama-prod.firebasestorage.app" || {
-            echo "ERROR: VITE_FIREBASE_STORAGE_BUCKET does not match the production bucket."
-            exit 1
-          }
-          test "${VITE_FIREBASE_MESSAGING_SENDER_ID}" = "1004280240722" || {
-            echo "ERROR: VITE_FIREBASE_MESSAGING_SENDER_ID does not match the production project."
-            exit 1
-          }
-          test "${VITE_FIREBASE_APP_ID}" = "1:1004280240722:web:e339c20b645e839b3c5d8b" || {
-            echo "ERROR: VITE_FIREBASE_APP_ID does not match the production Web App."
-            exit 1
-          }
+          test "${VITE_FIREBASE_PROJECT_ID}" = "mwendo-salama-prod"
+          test "${VITE_FIREBASE_AUTH_DOMAIN}" = "mwendo-salama-prod.firebaseapp.com"
+          test "${VITE_FIREBASE_STORAGE_BUCKET}" = "mwendo-salama-prod.firebasestorage.app"
+          test "${VITE_FIREBASE_MESSAGING_SENDER_ID}" = "1004280240722"
+          test "${VITE_FIREBASE_APP_ID}" = "1:1004280240722:web:e339c20b645e839b3c5d8b"
 
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
@@ -160,44 +134,12 @@ jobs:
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
         run: |
           set -euo pipefail
-          test -n "${FIREBASE_PROJECT_ID}" || {
-            echo "ERROR: FIREBASE_PROJECT_ID secret is required."
-            exit 1
-          }
-          test "${FIREBASE_PROJECT_ID}" = "mwendo-salama-prod" || {
-            echo "ERROR: FIREBASE_PROJECT_ID must be mwendo-salama-prod for production deployment."
-            exit 1
-          }
-          test -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}" || {
-            echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER secret is required."
-            exit 1
-          }
-          test -n "${GCP_SERVICE_ACCOUNT}" || {
-            echo "ERROR: GCP_SERVICE_ACCOUNT secret is required."
-            exit 1
-          }
-          test "${GCP_SERVICE_ACCOUNT}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}" || {
-            echo "ERROR: GCP_SERVICE_ACCOUNT is not the approved production deployer service account."
-            exit 1
-          }
-          case "${GCP_WORKLOAD_IDENTITY_PROVIDER}" in
-            projects/1004280240722/locations/global/workloadIdentityPools/mwendo-github-actions/providers/github-actions) ;;
-            *)
-              echo "ERROR: GCP_WORKLOAD_IDENTITY_PROVIDER does not match the approved Mwendo GitHub OIDC provider."
-              exit 1
-              ;;
-          esac
-          required_demo_secrets=(
-            MWENDO_DEMO_ADMIN_PASSWORD
-            MWENDO_DEMO_SACCO_PASSWORD
-            MWENDO_DEMO_AUTHORITY_PASSWORD
-          )
-          for var in "${required_demo_secrets[@]}"; do
-            if [ -z "${!var:-}" ]; then
-              echo "ERROR: Required demo account secret $var is missing."
-              exit 1
-            fi
-          done
+          test -n "${FIREBASE_PROJECT_ID}" && test "${FIREBASE_PROJECT_ID}" = "mwendo-salama-prod"
+          test -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}"
+          test -n "${GCP_SERVICE_ACCOUNT}" && test "${GCP_SERVICE_ACCOUNT}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}"
+          test "${GCP_WORKLOAD_IDENTITY_PROVIDER}" = "projects/1004280240722/locations/global/workloadIdentityPools/mwendo-github-actions/providers/github-actions"
+          required_demo_secrets=(MWENDO_DEMO_ADMIN_PASSWORD MWENDO_DEMO_SACCO_PASSWORD MWENDO_DEMO_AUTHORITY_PASSWORD)
+          for var in "${required_demo_secrets[@]}"; do test -n "${!var:-}"; done
 
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
@@ -228,35 +170,14 @@ jobs:
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Verify Firebase CLI
-        run: |
-          set -euo pipefail
-          echo "Node: $(node --version)"
-          echo "npm: $(npm --version)"
-          echo "Bun: $(bun --version)"
-          echo "Firebase CLI: $(bunx firebase-tools --version)"
-          echo "Firebase Tools package:"
-          bun pm ls firebase-tools || true
-
       - name: Verify authenticated Google identity
         run: |
           set -euo pipefail
           authenticated_account="$(gcloud auth list --format='value(account)' | head -n 1)"
-          if [ "${authenticated_account}" != "${EXPECTED_GCP_SERVICE_ACCOUNT}" ]; then
-            echo "ERROR: GitHub Actions authenticated as '${authenticated_account:-<none>}' instead of the approved production deployer service account."
-            exit 1
-          fi
-          echo "Authenticated Google identity verified: ${EXPECTED_GCP_SERVICE_ACCOUNT}"
+          test "${authenticated_account}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}"
 
       - name: Provision production demo accounts
-        run: |
-          set -euo pipefail
-          bun run provision:demo-accounts
+        run: bun run provision:demo-accounts
 
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
-        run: |
-          bunx firebase-tools deploy \
-            --only hosting,functions,firestore,storage \
-            --project "${FIREBASE_PROJECT_ID}" \
-            --non-interactive \
-            --force
+        run: bunx firebase-tools deploy --only hosting,functions,firestore,storage --project "${FIREBASE_PROJECT_ID}" --non-interactive --force
