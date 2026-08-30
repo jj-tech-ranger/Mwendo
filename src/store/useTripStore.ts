@@ -56,14 +56,18 @@ function loadPersistedTrip(): PersistedTripState {
     if (!raw) return EMPTY_TRIP_STATE;
     const parsed = JSON.parse(raw) as Partial<PersistedTripState>;
     if (!parsed.activeTrip || !parsed.isTracking) return EMPTY_TRIP_STATE;
+
+    const saccoId: string | undefined = typeof parsed.saccoId === 'string' ? parsed.saccoId : undefined;
+    const telemetrySampleCount =
+      typeof parsed.telemetrySampleCount === 'number' && Number.isFinite(parsed.telemetrySampleCount)
+        ? parsed.telemetrySampleCount
+        : 0;
+
     return {
       ...EMPTY_TRIP_STATE,
       ...parsed,
-      saccoId: parsed.saccoId ?? EMPTY_TRIP_STATE.saccoId,
-      telemetrySampleCount:
-        typeof parsed.telemetrySampleCount === 'number' && Number.isFinite(parsed.telemetrySampleCount)
-          ? parsed.telemetrySampleCount
-          : 0,
+      saccoId,
+      telemetrySampleCount,
       routeCoordinates: Array.isArray(parsed.routeCoordinates) ? parsed.routeCoordinates : [],
     };
   } catch {
@@ -203,7 +207,6 @@ export const useTripStore = create<TripState>((set, get) => ({
   updateTelemetry: (speed, gps) => {
     const state = get();
     if (!state.isTracking || state.isPaused) return;
-
     if (!Number.isFinite(speed) || speed < 0 || speed > 180) return;
 
     if (gps) {
@@ -216,32 +219,40 @@ export const useTripStore = create<TripState>((set, get) => ({
       }
     }
 
-    const safeSpeed = speed;
-    const newMaxSpeed = Math.max(state.maxSpeed, safeSpeed);
-    const updatedCoords = gps ? [...state.routeCoordinates, gps] : state.routeCoordinates;
-    const previousPoint = state.routeCoordinates.at(-1);
-    const addedDistance = gps && previousPoint ? haversineDistanceMeters(previousPoint, gps) : 0;
-    const nextDistanceMeters = (state.activeTrip?.distanceMeters ?? 0) + addedDistance;
-    const nextTelemetrySampleCount = state.telemetrySampleCount + 1;
-    const nextAvgSpeed = ((state.avgSpeed * state.telemetrySampleCount) + safeSpeed) / nextTelemetrySampleCount;
+    // Compute the aggregate from the state captured by the atomic Zustand update.
+    // This keeps average speed, max speed and distance consistent if telemetry
+    // updates arrive back-to-back.
+    set((current) => {
+      if (!current.isTracking || current.isPaused) return current;
 
-    set((s) => ({
-      currentSpeed: safeSpeed,
-      maxSpeed: newMaxSpeed,
-      avgSpeed: nextAvgSpeed,
-      telemetrySampleCount: nextTelemetrySampleCount,
-      routeCoordinates: updatedCoords,
-      activeTrip: s.activeTrip
-        ? {
-            ...s.activeTrip,
-            currentSpeedKmH: safeSpeed,
-            maxSpeedKmH: newMaxSpeed,
-            avgSpeedKmH: nextAvgSpeed,
-            distanceMeters: nextDistanceMeters,
-            ...(gps ? { lastGpsUpdate: gps } : {}),
-          }
-        : null,
-    }));
+      const safeSpeed = speed;
+      const newMaxSpeed = Math.max(current.maxSpeed, safeSpeed);
+      const previousPoint = current.routeCoordinates.at(-1);
+      const updatedCoords = gps ? [...current.routeCoordinates, gps] : current.routeCoordinates;
+      const addedDistance = gps && previousPoint ? haversineDistanceMeters(previousPoint, gps) : 0;
+      const nextDistanceMeters = (current.activeTrip?.distanceMeters ?? 0) + addedDistance;
+      const nextTelemetrySampleCount = current.telemetrySampleCount + 1;
+      const nextAvgSpeed =
+        (current.avgSpeed * current.telemetrySampleCount + safeSpeed) / nextTelemetrySampleCount;
+
+      return {
+        currentSpeed: safeSpeed,
+        maxSpeed: newMaxSpeed,
+        avgSpeed: nextAvgSpeed,
+        telemetrySampleCount: nextTelemetrySampleCount,
+        routeCoordinates: updatedCoords,
+        activeTrip: current.activeTrip
+          ? {
+              ...current.activeTrip,
+              currentSpeedKmH: safeSpeed,
+              maxSpeedKmH: newMaxSpeed,
+              avgSpeedKmH: nextAvgSpeed,
+              distanceMeters: nextDistanceMeters,
+              ...(gps ? { lastGpsUpdate: gps } : {}),
+            }
+          : null,
+      };
+    });
 
     const now = Date.now();
     if (now - lastTelemetryPersistence >= TELEMETRY_PERSIST_INTERVAL_MS) {
