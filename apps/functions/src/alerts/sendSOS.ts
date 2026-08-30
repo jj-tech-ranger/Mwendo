@@ -129,7 +129,7 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
       } catch (err) {
         dlqCount++;
         contactsSummary.push({ name: contact.name || 'Emergency contact', relationship: contact.relationship || '', status: 'failed' });
-        await writeToDLQ(db, { id: `dlq_sms_${alertId}_${successfulSmsCount}_${Date.now()}`, topic: 'safety-alerts', type: 'sms_emergency_contact', alertId, userId, targetRecipient: contact.phone, payload: { message: smsBody }, error: err });
+        await writeToDLQ(db, { id: `dlq_sms_${alertId}_${successfulSmsCount}_${Date.now()}`, topic: 'safety-alerts', type: 'sms_emergency_contact', alertId, userId, targetRecipient: `${contact.name || 'Emergency contact'} (${contact.phone})`, payload: { message: smsBody }, error: err });
       }
     }
 
