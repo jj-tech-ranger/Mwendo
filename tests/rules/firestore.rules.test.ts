@@ -111,6 +111,48 @@ describe('Firestore security rules', () => {
     }));
   });
 
+  it('denies cross-SACCO complaint reads and mutations', async () => {
+    const db = authedDb('manager-a', 'sacco_manager', 'sacco-a');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'complaints/complaint-b'), {
+        reportedByUid: 'passenger-b',
+        saccoId: 'sacco-b',
+        status: 'open',
+      });
+    });
+
+    await assertFails(getDoc(doc(db, 'complaints/complaint-b')));
+    await assertFails(updateDoc(doc(db, 'complaints/complaint-b'), { status: 'resolved' }));
+  });
+
+  it('denies cross-SACCO violation reads and mutations', async () => {
+    const db = authedDb('manager-a', 'sacco_manager', 'sacco-a');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'violations/violation-b'), {
+        userId: 'driver-b',
+        saccoId: 'sacco-b',
+        status: 'open',
+      });
+    });
+
+    await assertFails(getDoc(doc(db, 'violations/violation-b')));
+    await assertFails(updateDoc(doc(db, 'violations/violation-b'), { status: 'disputed' }));
+  });
+
+  it('denies cross-SACCO safety-alert reads and mutations', async () => {
+    const db = authedDb('manager-a', 'sacco_manager', 'sacco-a');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'safety_alerts/alert-b'), {
+        userId: 'passenger-b',
+        saccoId: 'sacco-b',
+        status: 'open',
+      });
+    });
+
+    await assertFails(getDoc(doc(db, 'safety_alerts/alert-b')));
+    await assertFails(updateDoc(doc(db, 'safety_alerts/alert-b'), { status: 'acknowledged' }));
+  });
+
   it('denies clients from modifying an existing trip', async () => {
     const db = authedDb('passenger-1', 'passenger', 'sacco-a');
     const tripRef = doc(db, 'trips/trip-1');
@@ -122,9 +164,6 @@ describe('Firestore security rules', () => {
       maxSpeedKmH: 70,
     }));
 
-    // updateDoc is intentionally used here so the test can never fall back to
-    // evaluating the create rule. The production rule permits trip creation by
-    // the owner but reserves all subsequent modifications for authorities.
     await assertFails(updateDoc(tripRef, {
       maxSpeedKmH: 150,
     }));
