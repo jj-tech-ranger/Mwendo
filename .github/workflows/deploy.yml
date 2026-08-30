@@ -32,26 +32,21 @@ jobs:
       VITE_RECAPTCHA_SITE_KEY: ${{ secrets.VITE_RECAPTCHA_SITE_KEY }}
       VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
       VITE_MAP_TILE_URL: ${{ secrets.VITE_MAP_TILE_URL }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: "24"
           package-manager-cache: false
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-
       - name: Setup Java for Firebase Emulator Suite
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
-
       - name: Verify required production frontend configuration
         run: |
           set -euo pipefail
@@ -64,41 +59,31 @@ jobs:
           test "${VITE_FIREBASE_STORAGE_BUCKET}" = "mwendo-salama-prod.firebasestorage.app"
           test "${VITE_FIREBASE_MESSAGING_SENDER_ID}" = "1004280240722"
           test "${VITE_FIREBASE_APP_ID}" = "1:1004280240722:web:e339c20b645e839b3c5d8b"
-
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
-
       - name: Install Functions dependencies
         run: cd apps/functions && npm ci
-
       - name: Root Linter & Typecheck
         run: bun run lint
-
       - name: Functions Linter & Typecheck
         run: cd apps/functions && npm run lint
-
       - name: Build frontend & Bundle Security Audit
         run: |
           bun run build
           bun run check:bundle-security
-
       - name: Build Functions
         working-directory: apps/functions
         run: npm run build
-
       - name: Run Vitest tests
         run: bun run test
-
       - name: Run Firebase Security Rules tests
         run: bun run test:rules
-
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v6
         with:
           name: frontend-dist
           path: dist/
           retention-days: 1
-
       - name: Upload functions artifact
         uses: actions/upload-artifact@v6
         with:
@@ -111,25 +96,20 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality-gate
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
     env:
       MWENDO_DEMO_ADMIN_PASSWORD: ${{ secrets.MWENDO_DEMO_ADMIN_PASSWORD }}
       MWENDO_DEMO_SACCO_PASSWORD: ${{ secrets.MWENDO_DEMO_SACCO_PASSWORD }}
       MWENDO_DEMO_AUTHORITY_PASSWORD: ${{ secrets.MWENDO_DEMO_AUTHORITY_PASSWORD }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: "24"
           package-manager-cache: false
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-
       - name: Verify deployment configuration
         env:
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -142,25 +122,20 @@ jobs:
           test "${GCP_WORKLOAD_IDENTITY_PROVIDER}" = "projects/1004280240722/locations/global/workloadIdentityPools/mwendo-github-actions/providers/github-actions"
           required_demo_secrets=(MWENDO_DEMO_ADMIN_PASSWORD MWENDO_DEMO_SACCO_PASSWORD MWENDO_DEMO_AUTHORITY_PASSWORD)
           for var in "${required_demo_secrets[@]}"; do test -n "${!var:-}"; done
-
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
-
       - name: Install Functions dependencies
         run: cd apps/functions && npm ci
-
       - name: Download frontend artifact
         uses: actions/download-artifact@v7
         with:
           name: frontend-dist
           path: dist
-
       - name: Download functions artifact
         uses: actions/download-artifact@v7
         with:
           name: functions-dist
           path: apps/functions/lib
-
       - name: Authenticate to Google Cloud (attempt 1)
         id: google-auth-1
         continue-on-error: true
@@ -170,7 +145,6 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
           export_environment_variables: true
-
       - name: Authenticate to Google Cloud (attempt 2)
         id: google-auth-2
         if: steps.google-auth-1.outcome == 'failure'
@@ -181,7 +155,6 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
           export_environment_variables: true
-
       - name: Authenticate to Google Cloud (attempt 3)
         if: steps.google-auth-1.outcome == 'failure' && steps.google-auth-2.outcome == 'failure'
         uses: google-github-actions/auth@v3
@@ -190,22 +163,17 @@ jobs:
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           create_credentials_file: true
           export_environment_variables: true
-
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
-
       - name: Verify authenticated Google identity
         run: |
           set -euo pipefail
           authenticated_account="$(gcloud auth list --format='value(account)' | head -n 1)"
           test "${authenticated_account}" = "${EXPECTED_GCP_SERVICE_ACCOUNT}"
-
       - name: Provision production demo accounts
         run: bun run provision:demo-accounts
-
       - name: Deploy Firebase Hosting, Functions, Firestore and Storage
         run: bunx firebase-tools deploy --only hosting,functions,firestore,storage --project "${FIREBASE_PROJECT_ID}" --non-interactive --force
-
       - name: Production hosting smoke test
         run: |
           set -euo pipefail
@@ -213,7 +181,12 @@ jobs:
 
           curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/" -o /tmp/mwendo-index.html
           grep -Fq '<title>Mwendo Salama | PSV Passenger Safety Platform</title>' /tmp/mwendo-index.html
-          grep -Fq '<script type="module" src="/src/main.tsx"></script>' /tmp/mwendo-index.html
+          grep -Fq '<div id="root"></div>' /tmp/mwendo-index.html
+          if grep -Fq '/src/main.tsx' /tmp/mwendo-index.html; then
+            echo "ERROR: Production hosting served an unbuilt Vite source entrypoint."
+            exit 1
+          fi
+          grep -Eq '<script[^>]+type="module"[^>]+src="/assets/[^"?]+\.js"' /tmp/mwendo-index.html
           if grep -Eiq 'demo-mwendo|demo-mwendo-salama-audit' /tmp/mwendo-index.html; then
             echo "ERROR: Production hosting returned demo Firebase configuration markers."
             exit 1
@@ -227,5 +200,9 @@ jobs:
 
           curl --fail --silent --show-error --location --retry 5 --retry-delay 2 --retry-all-errors "${base_url}/passenger" -o /tmp/mwendo-route.html
           grep -Fq '<div id="root"></div>' /tmp/mwendo-route.html
+          if grep -Fq '/src/main.tsx' /tmp/mwendo-route.html; then
+            echo "ERROR: Production deep-link served unbuilt source HTML."
+            exit 1
+          fi
 
           echo "Production hosting smoke test passed: ${base_url}"
