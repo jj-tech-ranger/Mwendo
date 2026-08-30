@@ -73,10 +73,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     set((state) => {
       if (!state.user) return { claims, user: null };
 
-      // Firebase custom claims are the authorization source of truth. Only update
-      // the role fields when the token actually contains a valid activeRole;
-      // otherwise preserve the required UserProfile.role rather than assigning
-      // undefined to a mandatory field.
+      // Firebase custom claims are the authorization source of truth. A missing
+      // activeRole must clear the local authorization role rather than retaining
+      // a stale role from an earlier token. UserProfile.role remains the required
+      // baseline profile role and is only replaced when a verified claim exists.
       const activeRole = claims?.activeRole;
       const nextUser: UserProfile = {
         ...state.user,
@@ -85,7 +85,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         claimedAuthorityScope: claims?.authorityScope,
         claimedIsSuspended: claims?.isSuspended,
         role: activeRole ?? state.user.role,
-        activeRole: activeRole ?? state.user.activeRole,
+        activeRole,
         claims: claims || undefined,
         isActive: claims?.isSuspended === true ? false : state.user.isActive,
       };
