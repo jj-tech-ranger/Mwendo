@@ -55,7 +55,7 @@ export const RegisterScreen: React.FC = () => {
   const currentUser = useAuthStore((s) => s.user);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<RegisterFormValues>({
+  const { register, handleSubmit, watch, trigger, getValues, formState: { errors, isSubmitting } } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { fullName: currentUser?.displayName && !currentUser?.isAnonymous ? currentUser.displayName : '', email: currentUser?.email || '', terms: false, ageConfirmed: false },
   });
@@ -65,7 +65,10 @@ export const RegisterScreen: React.FC = () => {
   const onSubmit = async (data: RegisterFormValues) => {
     setErrorMsg(null);
     try {
-      await authService.registerWithEmail(data.email, data.password, data.fullName, 'passenger');
+      await authService.registerWithEmail(data.email, data.password, data.fullName, 'passenger', {
+        termsAccepted: data.terms,
+        ageConfirmed: data.ageConfirmed,
+      });
       navigate('/passenger');
     } catch (err: unknown) {
       console.error('Registration error:', err);
@@ -74,10 +77,18 @@ export const RegisterScreen: React.FC = () => {
   };
 
   const handleGoogleRegister = async () => {
-    setErrorMsg(null); setIsGoogleLoading(true);
-    try { await authService.signInWithGoogle(); navigate('/passenger'); }
-    catch (err: unknown) { console.error('Google register error:', err); setErrorMsg('Failed to register with Google'); }
-    finally { setIsGoogleLoading(false); }
+    setErrorMsg(null);
+    const validConsent = await trigger(['terms', 'ageConfirmed']);
+    if (!validConsent) return;
+    setIsGoogleLoading(true);
+    try {
+      const values = getValues();
+      await authService.signInWithGoogle({ termsAccepted: values.terms, ageConfirmed: values.ageConfirmed });
+      navigate('/passenger');
+    } catch (err: unknown) {
+      console.error('Google register error:', err);
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to register with Google');
+    } finally { setIsGoogleLoading(false); }
   };
 
   return (
