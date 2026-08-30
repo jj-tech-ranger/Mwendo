@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-mwendo-salama-rules';
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
@@ -115,18 +115,16 @@ describe('Firestore security rules', () => {
     const db = authedDb('passenger-1', 'passenger');
     const tripRef = doc(db, 'trips/trip-1');
 
-    // Create the document through the same client context first. This guarantees
-    // the following write is evaluated as an update rather than accidentally
-    // exercising the create rule if emulator-backed setup data is isolated.
     await assertSucceeds(setDoc(tripRef, {
       userId: 'passenger-1',
       status: 'completed',
       maxSpeedKmH: 70,
     }));
 
-    await assertFails(setDoc(tripRef, {
-      userId: 'passenger-1',
-      status: 'completed',
+    // updateDoc is intentionally used here so the test can never fall back to
+    // evaluating the create rule. The production rule permits trip creation by
+    // the owner but reserves all subsequent modifications for authorities.
+    await assertFails(updateDoc(tripRef, {
       maxSpeedKmH: 150,
     }));
   });
