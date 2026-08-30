@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
 
 interface Capability {
   id: string;
