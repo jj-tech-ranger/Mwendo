@@ -1,6 +1,6 @@
 # Mwendo Salama Implementation Backlog
 
-Updated: 2026-08-30
+Updated: 2026-08-31
 
 This is the working backlog for the application audit and production-readiness phases. Priority is based on impact, security, and whether a complete user journey can function without manual intervention. See `docs/release-readiness.md` for the verification ledger and release blockers.
 
@@ -9,8 +9,8 @@ This is the working backlog for the application audit and production-readiness p
 - [x] Verify privileged route authorization uses authoritative claims and fails closed when claims cannot be established.
 - [x] Audit client-side role/profile reconciliation for privilege confusion between Firestore profile fields and custom claims.
 - [x] Verify registration consent/age controls do not silently accept missing consent.
-- [ ] Complete adversarial Firestore/Storage authorization tests for cross-user, cross-SACCO, role escalation, and path manipulation.
-- [ ] Complete callable/HTTP Cloud Function inventory and authorization/input/idempotency matrix.
+- [x] Complete adversarial Firestore/Storage authorization coverage for cross-user, cross-SACCO, role escalation, and Storage path manipulation where currently implemented; remaining callable matrix is tracked separately.
+- [x] Complete Cloud Function export inventory; remaining authorization/input/idempotency evidence is tracked per function in `docs/cloud-functions-inventory.md`.
 - [x] Verify production configuration cannot accidentally target demo/test Firebase projects through the deployment quality gate.
 
 ## P1 — Required for normal operation
@@ -31,12 +31,13 @@ This is the working backlog for the application audit and production-readiness p
 
 ### Black spots
 - [x] Passenger report creation and real-location behavior have automated coverage.
-- [ ] Evidence upload/read/delete authorization matrix.
+- [x] Storage evidence ownership, cross-SACCO reads, protected deletion, invalid content types, size limits and spoofed UID paths have rules coverage.
 - [ ] SACCO-scoped complaint visibility end-to-end.
 - [ ] Authority review, status changes, escalation and resolution end-to-end.
 
 ### Notifications / backend
-- [ ] Audit every deployed Cloud Function trigger and output.
+- [x] Export-level audit of every deployed Cloud Function is documented.
+- [ ] Function-by-function authorization/input/idempotency evidence.
 - [ ] Verify FCM token registration and push delivery paths.
 - [x] Retry/rate-limit/failure behavior has targeted automated coverage.
 - [x] Missing-document/malformed-input behavior is covered in targeted backend tests.
@@ -69,7 +70,7 @@ This is the working backlog for the application audit and production-readiness p
 ## Phase gates
 
 - Phase 0: **verified** — frozen-lockfile install, Java 21 emulator runtime, quality gates, rules tests, production configuration checks, and main-only deployment are present in CI.
-- Phase 1: **in progress** — major application/backend areas have targeted coverage; route/function/dependency inventory still needs explicit closure.
-- Phase 2–6: **in progress** — foundational security and workflow coverage is strong, but full role-based journeys and adversarial matrices remain.
+- Phase 1: **in progress** — major application/backend areas have targeted coverage; route/dependency inventories and some function evidence still need explicit closure.
+- Phase 2–6: **in progress** — foundational security and workflow coverage is strong, but full role-based journeys and callable/function matrices remain.
 - Phase 7–13: **in progress** — integration/E2E, reliability, final security, realistic mobile/performance, operations, and expanded production smoke validation remain.
 - Phase 14: **blocked** until all critical release blockers in `docs/release-readiness.md` are verified.
