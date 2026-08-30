@@ -57,9 +57,6 @@ const initialAuth = getInitialAuthState();
 export const useAuthStore = create<AuthState>((set) => ({
   user: initialAuth.user,
   claims: initialAuth.claims,
-  // Firebase Auth state is asynchronous. Start in a loading state so a direct
-  // navigation to a protected route cannot redirect to /auth/login before
-  // onAuthStateChanged has had a chance to restore the existing session.
   isLoading: !initialAuth.isAuthenticated,
   isAuthenticated: initialAuth.isAuthenticated,
   setUser: (user, claims) =>
@@ -78,18 +75,25 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: state.user
         ? {
             ...state.user,
+            // Firebase custom claims are the authorization source of truth.
             claimedActiveRole: claims?.activeRole ?? state.user.claimedActiveRole,
             claimedSaccoId: claims?.saccoId ?? state.user.claimedSaccoId,
             claimedAuthorityScope: claims?.authorityScope ?? state.user.claimedAuthorityScope,
             claimedIsSuspended: claims?.isSuspended ?? state.user.claimedIsSuspended,
+            role: claims?.activeRole ?? state.user.role,
+            activeRole: claims?.activeRole ?? state.user.activeRole,
             claims: claims || undefined,
+            isActive: claims?.isSuspended === true ? false : state.user.isActive,
           }
         : null,
     })),
+  // Retained for backwards compatibility. It cannot grant a role: the requested
+  // role must already be present in the verified Firebase custom claims.
   setRole: (role) =>
-    set((state) => ({
-      user: state.user ? { ...state.user, role, activeRole: role } : null,
-    })),
+    set((state) => {
+      if (!state.user || state.claims?.activeRole !== role) return state;
+      return { user: { ...state.user, role, activeRole: role } };
+    }),
   setLoading: (isLoading) => set({ isLoading }),
   logout: () => set({ user: null, claims: null, isAuthenticated: false, isLoading: false }),
 }));
