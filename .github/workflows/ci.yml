@@ -2,9 +2,9 @@ name: Continuous Integration
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   quality-gate:
@@ -42,31 +42,31 @@ jobs:
       - name: Verify Java runtime
         run: java -version
 
-      - name: 1. Install root dependencies from bun.lock
+      - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
 
-      - name: 2. Install Functions dependencies
+      - name: Install Functions dependencies
         run: cd apps/functions && npm ci
 
-      - name: 3. Root Linter & Typecheck
+      - name: Root Linter & Typecheck
         run: bun run lint
 
-      - name: 4. Functions Linter & Typecheck
+      - name: Functions Linter & Typecheck
         run: cd apps/functions && npm run lint
 
-      - name: 5. Build Frontend & Bundle Security Audit
+      - name: Build Frontend & Bundle Security Audit
         run: |
           bun run build
           bun run check:bundle-security
 
-      - name: 6. Build Functions
+      - name: Build Functions
         run: cd apps/functions && npm run build
 
-      - name: 7. Run Vitest tests
+      - name: Run Vitest tests
         run: bun run test
 
-      - name: 7b. Run Firebase Firestore & Storage rules tests
+      - name: Run Firebase Firestore & Storage rules tests
         run: bun run test:rules
 
-      - name: 8. Generate Test Coverage Report
+      - name: Generate Test Coverage Report
         run: bun run test:coverage
