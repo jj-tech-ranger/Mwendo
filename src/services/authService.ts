@@ -29,11 +29,21 @@ export interface MfaAuthError extends Error {
   resolver?: unknown;
 }
 
+export interface RegistrationConsent {
+  termsAccepted: boolean;
+  ageConfirmed: boolean;
+}
+
 // SEC-004: Current legal consent policy version ledger
 export const CURRENT_PRIVACY_POLICY_VERSION = '1.0.0';
 
+function assertRegistrationConsent(consent?: RegistrationConsent) {
+  if (!consent?.termsAccepted || !consent?.ageConfirmed) {
+    throw new Error('You must accept the Terms and Privacy Policy and confirm the age requirement before creating an account.');
+  }
+}
+
 export const authService = {
-  // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
   initAuthListener() {
     const isDev = import.meta.env.DEV;
     const testOverrideKey = ['__', 'TEST', '_', 'AUTH', '_', 'OVERRIDE', '__'].join('');
@@ -54,16 +64,13 @@ export const authService = {
       }
 
       try {
-        // AUTH-004: Authoritative ID Token Custom Claims retrieval
         const tokenResult = await firebaseUser.getIdTokenResult();
         const claims = (tokenResult?.claims || {}) as UserClaims;
-
         const profile = await this.fetchOrInitUserProfile(firebaseUser, 'passenger', claims);
         useAuthStore.getState().setUser(profile, claims);
         analyticsService.syncConsentFromProfile(profile);
       } catch (err) {
         console.error('Error loading user profile or token claims:', err);
-        // Fallback user object if firestore or token fails temporarily
         const fallbackClaims: UserClaims = { activeRole: 'passenger' };
         useAuthStore.getState().setUser({
           id: firebaseUser.uid,
@@ -89,9 +96,9 @@ export const authService = {
   async fetchOrInitUserProfile(
     firebaseUser: FirebaseUser,
     defaultRole: UserRole = 'passenger',
-    claims?: UserClaims
+    claims?: UserClaims,
+    registrationConsent?: RegistrationConsent
   ): Promise<UserProfile> {
-    // If claims weren't passed in, fetch them from the Firebase Auth user's ID token
     let tokenClaims = claims;
     if (!tokenClaims) {
       try {
@@ -118,17 +125,11 @@ export const authService = {
 
     if (snap && snap.exists()) {
       const data = snap.data();
-
-      // UX-001: Reconcile Firestore language & theme preferences (Firestore wins for signed-in user)
       if (data.language && (data.language === 'en' || data.language === 'sw')) {
-        if (useLanguageStore.getState().language !== data.language) {
-          useLanguageStore.getState().setLanguage(data.language, false);
-        }
+        if (useLanguageStore.getState().language !== data.language) useLanguageStore.getState().setLanguage(data.language, false);
       }
       if (data.theme && (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system')) {
-        if (useThemeStore.getState().mode !== data.theme) {
-          useThemeStore.getState().setMode(data.theme, false);
-        }
+        if (useThemeStore.getState().mode !== data.theme) useThemeStore.getState().setMode(data.theme, false);
       }
 
       return {
@@ -139,18 +140,11 @@ export const authService = {
         phoneNumber: firebaseUser.phoneNumber || data.phoneNumber || '',
         role: (data.activeRole || data.role || defaultRole) as UserRole,
         activeRole: (data.activeRole || data.role || defaultRole) as UserRole,
-        // AUTH-004: ID Token Custom Claims for Route & Backend Authorization
         claimedActiveRole,
         claimedSaccoId,
         claimedAuthorityScope,
         claimedIsSuspended,
-        claims: {
-          activeRole: claimedActiveRole,
-          saccoId: claimedSaccoId,
-          authorityScope: claimedAuthorityScope,
-          isSuspended: claimedIsSuspended,
-          ...tokenClaims,
-        },
+        claims: { activeRole: claimedActiveRole, saccoId: claimedSaccoId, authorityScope: claimedAuthorityScope, isSuspended: claimedIsSuspended, ...tokenClaims },
         saccoId: data.saccoId,
         authorityId: data.authorityId,
         authorityScope: data.authorityScope,
@@ -166,7 +160,6 @@ export const authService = {
         updatedAt: new Date().toISOString(),
         isAnonymous: firebaseUser.isAnonymous,
         trustScore: data.trustScore ?? 50,
-        // SEC-004: Consent ledger
         termsAccepted: data.termsAccepted,
         privacyPolicyVersion: data.privacyPolicyVersion,
         termsAcceptedAt: data.termsAcceptedAt,
@@ -175,8 +168,8 @@ export const authService = {
       };
     }
 
-    // Initialize brand new user profile in Firestore
     const nowIso = new Date().toISOString();
+    const consentAccepted = registrationConsent?.termsAccepted === true && registrationConsent?.ageConfirmed === true;
     const newProfile: UserProfile = {
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
@@ -188,23 +181,16 @@ export const authService = {
       claimedSaccoId,
       claimedAuthorityScope,
       claimedIsSuspended,
-      claims: {
-        activeRole: claimedActiveRole || defaultRole,
-        saccoId: claimedSaccoId,
-        authorityScope: claimedAuthorityScope,
-        isSuspended: claimedIsSuspended,
-        ...tokenClaims,
-      },
+      claims: { activeRole: claimedActiveRole || defaultRole, saccoId: claimedSaccoId, authorityScope: claimedAuthorityScope, isSuspended: claimedIsSuspended, ...tokenClaims },
       isVerified: firebaseUser.emailVerified || false,
       isActive: claimedIsSuspended !== true,
       isMfaEnrolled: false,
       isMfaVerified: false,
-      // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
-      termsAccepted: true,
-      privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION,
-      termsAcceptedAt: nowIso,
-      ageConfirmed: true,
-      ageConfirmedAt: nowIso,
+      termsAccepted: consentAccepted,
+      privacyPolicyVersion: consentAccepted ? CURRENT_PRIVACY_POLICY_VERSION : undefined,
+      termsAcceptedAt: consentAccepted ? nowIso : undefined,
+      ageConfirmed: registrationConsent?.ageConfirmed === true,
+      ageConfirmedAt: registrationConsent?.ageConfirmed === true ? nowIso : undefined,
       createdAt: nowIso,
       updatedAt: nowIso,
       isAnonymous: firebaseUser.isAnonymous,
@@ -212,15 +198,7 @@ export const authService = {
     };
 
     try {
-      // Firestore rejects undefined values. Claims such as saccoId and authorityScope
-      // are optional for passengers and are legitimately absent from a new profile.
-      // JSON serialization removes only undefined properties while preserving the
-      // rest of this profile, including nested optional claim fields.
-      const firestoreProfile = JSON.parse(JSON.stringify({
-        ...newProfile,
-        activeRole: defaultRole,
-        roles: [defaultRole],
-      }));
+      const firestoreProfile = JSON.parse(JSON.stringify({ ...newProfile, activeRole: defaultRole, roles: [defaultRole] }));
       await setDoc(userRef, firestoreProfile);
     } catch (e) {
       console.warn('[authService] Could not persist new user profile to Firestore (offline mode active):', e);
@@ -246,43 +224,35 @@ export const authService = {
     }
   },
 
-  async registerWithEmail(email: string, pass: string, displayName: string, role: UserRole = 'passenger') {
+  async registerWithEmail(email: string, pass: string, displayName: string, role: UserRole = 'passenger', consent?: RegistrationConsent) {
+    assertRegistrationConsent(consent);
     const currentUser = auth.currentUser;
     if (currentUser && currentUser.isAnonymous) {
-      // Upgrade anonymous guest account to email/pass preserving UID
-      return await this.upgradeGuestAccount(email, pass, displayName, role);
+      return await this.upgradeGuestAccount(email, pass, displayName, role, consent);
     }
 
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    if (displayName) {
-      await updateProfile(cred.user, { displayName });
-    }
-    return await this.fetchOrInitUserProfile(cred.user, role);
+    if (displayName) await updateProfile(cred.user, { displayName });
+    return await this.fetchOrInitUserProfile(cred.user, role, undefined, consent);
   },
 
-  async upgradeGuestAccount(email: string, pass: string, displayName: string, role: UserRole = 'passenger') {
+  async upgradeGuestAccount(email: string, pass: string, displayName: string, role: UserRole = 'passenger', consent?: RegistrationConsent) {
+    assertRegistrationConsent(consent);
     const currentUser = auth.currentUser;
-    if (!currentUser) {
-      throw new Error('No user currently signed in');
-    }
+    if (!currentUser) throw new Error('No user currently signed in');
 
     const credential = EmailAuthProvider.credential(email, pass);
     let updatedUser: FirebaseUser = currentUser;
-
     try {
       const result = await linkWithCredential(currentUser, credential);
       updatedUser = result.user;
     } catch (err: unknown) {
-      // If link fails (e.g., account already exists), create new account or fallback
       console.warn('Account linking warning, falling back to createUser:', err);
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
       updatedUser = cred.user;
     }
 
-    if (displayName) {
-      await updateProfile(updatedUser, { displayName });
-    }
-
+    if (displayName) await updateProfile(updatedUser, { displayName });
     const profileRef = doc(db, 'users', updatedUser.uid);
     const nowIso = new Date().toISOString();
     const updatedProfile: UserProfile = {
@@ -293,7 +263,6 @@ export const authService = {
       role,
       isVerified: updatedUser.emailVerified,
       isActive: true,
-      // SEC-002, SEC-003, SEC-004: Explicit Consent Ledger & Age Confirmation
       termsAccepted: true,
       privacyPolicyVersion: CURRENT_PRIVACY_POLICY_VERSION,
       termsAcceptedAt: nowIso,
@@ -305,20 +274,18 @@ export const authService = {
       trustScore: 60,
     };
 
-    await setDoc(profileRef, {
-      ...updatedProfile,
-      activeRole: role,
-      roles: [role],
-    }, { merge: true });
-
+    await setDoc(profileRef, { ...updatedProfile, activeRole: role, roles: [role] }, { merge: true });
     useAuthStore.getState().setUser(updatedProfile);
     return updatedProfile;
   },
 
-  async signInWithGoogle() {
+  async signInWithGoogle(consent?: RegistrationConsent) {
+    const existingUser = auth.currentUser;
     const provider = new GoogleAuthProvider();
     const cred = await signInWithPopup(auth, provider);
-    return await this.fetchOrInitUserProfile(cred.user);
+    const existingProfile = await getDoc(doc(db, 'users', cred.user.uid));
+    if (!existingProfile.exists()) assertRegistrationConsent(consent);
+    return await this.fetchOrInitUserProfile(cred.user, 'passenger', undefined, consent);
   },
 
   async signInGuest() {
@@ -329,31 +296,14 @@ export const authService = {
       console.warn('Anonymous signin fallback to guest offline profile:', e);
       const fallbackClaims: UserClaims = { activeRole: 'passenger' };
       const nowIso = new Date().toISOString();
-      const guestUser: UserProfile = {
-        id: `guest_${Date.now()}`,
-        uid: `guest_${Date.now()}`,
-        email: 'guest@mwendo.co.ke',
-        displayName: 'Guest Passenger',
-        role: 'passenger',
-        activeRole: 'passenger',
-        claimedActiveRole: 'passenger',
-        claims: fallbackClaims,
-        isActive: true,
-        isVerified: true,
-        isAnonymous: true,
-        createdAt: nowIso,
-        updatedAt: nowIso,
-      };
+      const guestUser: UserProfile = { id: `guest_${Date.now()}`, uid: `guest_${Date.now()}`, email: 'guest@mwendo.co.ke', displayName: 'Guest Passenger', role: 'passenger', activeRole: 'passenger', claimedActiveRole: 'passenger', claims: fallbackClaims, isActive: true, isVerified: true, isAnonymous: true, createdAt: nowIso, updatedAt: nowIso };
       useAuthStore.getState().setUser(guestUser, fallbackClaims);
       return guestUser;
     }
   },
 
   async sendMagicLink(email: string) {
-    const actionCodeSettings = {
-      url: `${window.location.origin}/auth/verify-email`,
-      handleCodeInApp: true,
-    };
+    const actionCodeSettings = { url: `${window.location.origin}/auth/verify-email`, handleCodeInApp: true };
     await sendSignInLinkToEmail(auth, email, actionCodeSettings);
     window.localStorage.setItem('emailForSignIn', email);
   },
@@ -367,84 +317,30 @@ export const authService = {
     return null;
   },
 
-  async sendPasswordReset(email: string) {
-    await sendPasswordResetEmail(auth, email);
-  },
-
-  async logout() {
-    await signOut(auth);
-    useAuthStore.getState().logout();
-  },
+  async sendPasswordReset(email: string) { await sendPasswordResetEmail(auth, email); },
+  async logout() { await signOut(auth); useAuthStore.getState().logout(); },
 
   async updateProfileData(data: Partial<UserProfile>) {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
+    if (data.displayName) await updateProfile(currentUser, { displayName: data.displayName });
 
-    if (data.displayName) {
-      await updateProfile(currentUser, { displayName: data.displayName });
-    }
-
-    // Strip out privileged fields so client-side updates match firestore.rules owner update restriction
     const {
-      role: _role,
-      activeRole: _activeRole,
-      roles: _roles,
-      saccoId: _saccoId,
-      authorityId: _authorityId,
-      authorityScope: _authorityScope,
-      isActive: _isActive,
-      trustScore: _trustScore,
-      termsAccepted: _termsAccepted,
-      privacyPolicyVersion: _privacyPolicyVersion,
-      termsAcceptedAt: _termsAcceptedAt,
-      ageConfirmed: _ageConfirmed,
-      ageConfirmedAt: _ageConfirmedAt,
+      role: _role, activeRole: _activeRole, roles: _roles, saccoId: _saccoId, authorityId: _authorityId,
+      authorityScope: _authorityScope, isActive: _isActive, trustScore: _trustScore,
+      termsAccepted: _termsAccepted, privacyPolicyVersion: _privacyPolicyVersion,
+      termsAcceptedAt: _termsAcceptedAt, ageConfirmed: _ageConfirmed, ageConfirmedAt: _ageConfirmedAt,
       ...safeProfileData
     } = data as Record<string, unknown>;
 
     const userRef = doc(db, 'users', currentUser.uid);
-    await updateDoc(userRef, {
-      ...safeProfileData,
-      updatedAt: new Date().toISOString(),
-    });
-
+    await updateDoc(userRef, { ...safeProfileData, updatedAt: new Date().toISOString() });
     const existingUser = useAuthStore.getState().user;
-    if (existingUser) {
-      useAuthStore.getState().setUser({
-        ...existingUser,
-        ...safeProfileData,
-      });
-    }
+    if (existingUser) useAuthStore.getState().setUser({ ...existingUser, ...safeProfileData });
   },
 
-  /**
-   * Server-Side Role Switching Callable (/v1/setActiveRole)
-   * Direct client-side updates to activeRole/role are blocked by security rules.
-   * Role updates are processed via server-side verification.
-   */
   async setActiveRole(targetRole: UserRole) {
-    console.warn(
-      `[authService] Client-side write to activeRole ('${targetRole}') is disabled. ` +
-      `Role switching requires secure server authorization.`
-    );
-    throw new Error(
-      'Role switching is disabled on the client. Role updates must be performed via secure server authorization.'
-    );
-  },
-
-  // High-stakes admin live status check (§5.6)
-  async checkLiveAdminStatus(uid?: string): Promise<boolean> {
-    const targetUid = uid || auth.currentUser?.uid;
-    if (!targetUid) return false;
-
-    try {
-      const snap = await getDoc(doc(db, 'users', targetUid));
-      if (!snap.exists()) return false;
-      const data = snap.data();
-      return data.isActive !== false && (data.activeRole === 'admin' || data.role === 'admin');
-    } catch (err) {
-      console.warn('[authService] checkLiveAdminStatus failed:', err);
-      return false;
-    }
+    console.warn(`[authService] Client-side write to activeRole ('${targetRole}') is disabled. Role switching requires secure server authorization.`);
+    throw new Error('Role switching requires secure server authorization.');
   },
 };
