@@ -1,10 +1,26 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import type { HTMLMotionProps, MotionStyle } from 'motion/react';
+import type { MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-type SosButtonProps = Omit<HTMLMotionProps<'button'>, 'children' | 'style' | 'whileTap'> & {
+type NativeButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  | 'style'
+  | 'onAnimationStart'
+  | 'onAnimationEnd'
+  | 'onAnimationIteration'
+  | 'onDrag'
+  | 'onDragEnd'
+  | 'onDragEnter'
+  | 'onDragExit'
+  | 'onDragLeave'
+  | 'onDragOver'
+  | 'onDragStart'
+  | 'onDrop'
+>;
+
+type SosButtonProps = NativeButtonProps & {
   label?: string;
   variant?: 'row' | 'fab';
   style?: MotionStyle;
@@ -33,7 +49,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
       {...(style !== undefined ? { style } : {})}
       {...pressableProps}
       {...(whileTap !== undefined ? { whileTap } : {})}
-      {...(props as Record<string, unknown>)}
+      {...props}
     >
       {variant === 'row' ? (
         <span className="flex items-center gap-3">
