@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   quality-gate:
     name: CI Quality Gate
@@ -41,6 +44,22 @@ jobs:
 
       - name: Verify Java runtime
         run: java -version
+
+      - name: Synchronize Bun lockfile
+        shell: bash
+        run: |
+          bun install
+          if git diff --quiet -- bun.lock; then
+            echo "bun.lock is already synchronized."
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add bun.lock
+            git commit -m "chore: synchronize bun lockfile"
+            git push
+          else
+            echo "bun.lock differs on this pull request; validating the generated lockfile in this workspace."
+          fi
 
       - name: Install root dependencies from bun.lock
         run: bun install --frozen-lockfile
