@@ -166,8 +166,12 @@ export const SaccoDriversScreen: React.FC = () => {
       </div>
 
       {/* DRIVER PROFILE MODAL */}
-      {selectedDriver && (
-        <Dialog isOpen={!!selectedDriver} onClose={() => setSelectedDriver(null)} title={`Driver Profile: ${selectedDriver.name}`}>
+      <Dialog
+        isOpen={!!selectedDriver}
+        onClose={() => setSelectedDriver(null)}
+        title={selectedDriver ? `Driver Profile: ${selectedDriver.name}` : 'Driver Profile'}
+      >
+        {selectedDriver && (
           <div className="space-y-4 text-xs">
             <div className="flex items-center gap-4 p-4 bg-surface-container rounded-xl">
               <div className="w-14 h-14 rounded-full bg-primary text-on-primary flex items-center justify-center font-black text-xl">
@@ -201,37 +205,39 @@ export const SaccoDriversScreen: React.FC = () => {
               Close Profile
             </Button>
           </div>
-        </Dialog>
-      )}
+        )}
+      </Dialog>
 
       {/* ADD DRIVER DIALOG */}
-      {showAddModal && (
-        <Dialog isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Register New SACCO Driver">
-          <div className="space-y-4 text-xs">
-            <div>
-              <label className="font-bold block mb-1">Driver Name / Identifier</label>
-              <Input placeholder="e.g. Driver #88 or John Kamau" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div>
-              <label className="font-bold block mb-1">DL Number (NTSA)</label>
-              <Input placeholder="e.g. DL-1029384" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
-            </div>
-            <div>
-              <label className="font-bold block mb-1">Phone Number</label>
-              <Input placeholder="+254 7..." value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div>
-              <label className="font-bold block mb-1">Assigned Vehicle Reg</label>
-              <Input placeholder="e.g. KDA 123A" value={assignedVehicleReg} onChange={(e) => setAssignedVehicleReg(e.target.value)} />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button>
-              <Button onClick={handleAddDriver}>Save Driver</Button>
-            </div>
+      <Dialog
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="Register New SACCO Driver"
+      >
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="font-bold block mb-1">Driver Name / Identifier</label>
+            <Input placeholder="e.g. Driver #88 or John Kamau" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-        </Dialog>
-      )}
+          <div>
+            <label className="font-bold block mb-1">DL Number (NTSA)</label>
+            <Input placeholder="e.g. DL-1029384" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} />
+          </div>
+          <div>
+            <label className="font-bold block mb-1">Phone Number</label>
+            <Input placeholder="+254 7..." value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+          <div>
+            <label className="font-bold block mb-1">Assigned Vehicle Reg</label>
+            <Input placeholder="e.g. KDA 123A" value={assignedVehicleReg} onChange={(e) => setAssignedVehicleReg(e.target.value)} />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setShowAddModal(false)}>Cancel</Button>
+            <Button onClick={handleAddDriver}>Save Driver</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 };
