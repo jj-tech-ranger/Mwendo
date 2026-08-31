@@ -4,7 +4,12 @@ import type { MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-interface SosButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style'> {
+type NativeButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'children' | 'style' | 'onDrag' | 'onDragStart' | 'onDragEnd'
+>;
+
+interface SosButtonProps extends NativeButtonProps {
   label?: string;
   variant?: 'row' | 'fab';
   style?: React.CSSProperties;
