@@ -2,25 +2,24 @@ import sharp from 'sharp';
 import path from 'path';
 
 const publicDir = path.resolve(process.cwd(), 'public');
-const brandDir = path.join(publicDir, 'brand');
-const officialFavicon = path.join(brandDir, 'favicon-light.png');
+const derivedDir = path.join(publicDir, 'derived');
+const appIcon = path.join(derivedDir, 'app-icon-light.png');
 
 /**
- * Generate technical PWA icon variants from the official Mwendo Salama
- * favicon artwork. The source of truth is public/brand/favicon-light.png;
- * no logo artwork is recreated in this script.
+ * Generate technical PWA icon sizes from the supplied circular Mwendo Salama
+ * app artwork. The artwork itself is never recreated here; this script only
+ * resizes the committed brand asset for platform-specific dimensions.
  */
 async function generate() {
-  // Fail loudly if the official asset is missing rather than silently
-  // rebuilding an approximation of the brand.
-  const source = sharp(officialFavicon);
+  const source = sharp(appIcon);
   const metadata = await source.metadata();
 
   if (!metadata.width || !metadata.height) {
-    throw new Error(`Unable to read official brand asset: ${officialFavicon}`);
+    throw new Error(`Unable to read derived brand asset: ${appIcon}`);
   }
 
-  // Standard PWA icons preserve the official favicon artwork.
+  // Standard PWA icons preserve the circular app artwork and its transparent
+  // corners rather than introducing a square white/green container.
   await source.clone()
     .resize(192, 192, { fit: 'contain' })
     .png()
@@ -31,8 +30,8 @@ async function generate() {
     .png()
     .toFile(path.join(publicDir, 'icon-512.png'));
 
-  // Maskable icons need safe-zone padding. Keep the official artwork intact
-  // and place it inside a full-bleed Mwendo green background.
+  // Maskable icons require a safe area and a full-bleed background. Keep the
+  // circular artwork centered so platform masking can crop it safely.
   await source.clone()
     .resize(146, 146, { fit: 'contain' })
     .extend({
@@ -59,13 +58,13 @@ async function generate() {
     .png()
     .toFile(path.join(publicDir, 'icon-maskable-512.png'));
 
-  // iOS expects a dedicated 180x180 PNG. It uses the same official artwork.
+  // iOS expects a dedicated 180x180 PNG. Use the same circular app artwork.
   await source.clone()
     .resize(180, 180, { fit: 'contain' })
     .png()
     .toFile(path.join(publicDir, 'apple-touch-icon.png'));
 
-  console.log('Generated PWA icons from official Mwendo Salama brand asset:', officialFavicon);
+  console.log('Generated PWA icons from circular Mwendo Salama app artwork:', appIcon);
 }
 
 generate().catch((error) => {
