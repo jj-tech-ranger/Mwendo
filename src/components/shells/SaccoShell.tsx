@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { BRAND_ASSETS } from '../assets/BrandAssets';
@@ -8,7 +8,7 @@ import { ThemeToggle } from '../common/ThemeToggle';
 import { LanguageToggle } from '../common/LanguageToggle';
 import { useAuthStore } from '../../store/useAuthStore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
-import { BrandLoader } from '../ui/LoadingIndicators';
+import { AnimatedOutlet } from '../common/AnimatedOutlet';
 
 export const SaccoShell: React.FC = () => {
   const { t } = useTranslation();
@@ -82,7 +82,7 @@ export const SaccoShell: React.FC = () => {
             </div>
           </header>
           <main className="p-6 max-w-7xl w-full mx-auto flex-1">
-            <React.Suspense fallback={<div className="min-h-[400px] flex items-center justify-center p-8" aria-live="polite"><BrandLoader size="md" /></div>}><Outlet /></React.Suspense>
+            <AnimatedOutlet />
           </main>
         </div>
       </div>

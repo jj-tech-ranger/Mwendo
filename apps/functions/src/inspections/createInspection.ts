@@ -35,7 +35,7 @@ function resolveAuthorityRole(token: Record<string, unknown> | undefined): strin
 
 function generateCertificateNumber(inspectionId: string, now: Date): string {
   const year = now.getUTCFullYear();
-  const suffix = inspectionId.replace(/-/g, '').slice(-8).toUpperCase();
+  const suffix = inspectionId.replace(/[^A-Za-z0-9]/g, '').slice(-8).toUpperCase();
   return `MWD-${year}-${suffix}`;
 }
 

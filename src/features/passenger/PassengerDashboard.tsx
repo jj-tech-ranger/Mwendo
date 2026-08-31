@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { doc, getDoc } from 'firebase/firestore';
+import { motion } from 'motion/react';
 import { db } from '../../lib/firebase';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
@@ -11,6 +12,7 @@ import { Input } from '../../components/ui/Input';
 import { SosButton } from '../../components/ui/SosButton';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
+import { useMotionPresets } from '../../lib/motion';
 
 export const PassengerDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -18,6 +20,7 @@ export const PassengerDashboard: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const startTrip = useTripStore((s) => s.startTrip);
   const activeTrip = useTripStore((s) => s.activeTrip);
+  const { variants } = useMotionPresets();
 
   const isGuestMode = !!user?.isAnonymous;
   const [plateNumber, setPlateNumber] = useState('');
@@ -53,8 +56,13 @@ export const PassengerDashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between pt-1">
+    <motion.div
+      variants={variants.staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="p-4 sm:p-6 space-y-6 max-w-xl mx-auto pb-24"
+    >
+      <motion.div variants={variants.staggerItem} className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
           <BrandMark className="w-10 h-10" />
           <div>
@@ -84,121 +92,125 @@ export const PassengerDashboard: React.FC = () => {
             <span className="material-symbols-outlined text-2xl">notifications</span>
           </button>
         )}
-      </div>
+      </motion.div>
 
       {isGuestMode && (
-        <Card className="bg-gradient-to-r from-emerald-900/10 to-teal-900/10 border border-emerald-500/20 p-4 space-y-2">
-          <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-emerald-700 text-2xl">info</span>
-            <div className="space-y-1">
-              <h3 className="text-sm font-bold text-on-surface">
-                {t('passenger.dashboard.createFreeAccount')}
-              </h3>
-              <p className="text-xs text-on-surface-variant">
-                {t('passenger.dashboard.guestBannerDesc')}
-              </p>
-              <Button size="sm" className="mt-2 text-xs" onClick={() => navigate('/auth/register')}>
-                {t('passenger.dashboard.signUpNow')}
-              </Button>
+        <motion.div variants={variants.staggerItem}>
+          <Card className="bg-gradient-to-r from-emerald-900/10 to-teal-900/10 border border-emerald-500/20 p-4 space-y-2">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-emerald-700 text-2xl">info</span>
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-on-surface">
+                  {t('passenger.dashboard.createFreeAccount')}
+                </h3>
+                <p className="text-xs text-on-surface-variant">
+                  {t('passenger.dashboard.guestBannerDesc')}
+                </p>
+                <Button size="sm" className="mt-2 text-xs" onClick={() => navigate('/auth/register')}>
+                  {t('passenger.dashboard.signUpNow')}
+                </Button>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </motion.div>
       )}
 
-      <Card className="p-5 space-y-4 shadow-sm border border-outline-variant/30">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
-            {t('passenger.dashboard.quickTripSetup')}
-          </span>
-          <Badge variant="neutral" className="text-[10px]">
-            {t('passenger.dashboard.liveGpsReady')}
-          </Badge>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label htmlFor="psv-plate-input" className="text-xs font-bold text-on-surface mb-1 block">
-              {t('passenger.dashboard.enterPsvPlate')}
-            </label>
-            <Input
-              id="psv-plate-input"
-              value={plateNumber}
-              onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-              placeholder={t('passenger.dashboard.platePlaceholder')}
-              className="font-mono text-base font-bold uppercase tracking-wider"
-            />
+      <motion.div variants={variants.staggerItem}>
+        <Card className="p-5 space-y-4 shadow-sm border border-outline-variant/30">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
+              {t('passenger.dashboard.quickTripSetup')}
+            </span>
+            <Badge variant="neutral" className="text-[10px]">
+              {t('passenger.dashboard.liveGpsReady')}
+            </Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
-              <label htmlFor="sacco-org-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
-                {t('passenger.dashboard.saccoOrg')}
+              <label htmlFor="psv-plate-input" className="text-xs font-bold text-on-surface mb-1 block">
+                {t('passenger.dashboard.enterPsvPlate')}
               </label>
-              <select
-                id="sacco-org-select"
-                value={sacco}
-                onChange={(e) => setSacco(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
-              >
-                <option value="">{t('passenger.dashboard.selectSacco')}</option>
-                <option value="MetroLink SACCO">MetroLink SACCO</option>
-                <option value="GreenLine SACCO">GreenLine SACCO</option>
-                <option value="TransitStar SACCO">TransitStar SACCO</option>
-                <option value="CityRide SACCO">CityRide SACCO</option>
-              </select>
+              <Input
+                id="psv-plate-input"
+                value={plateNumber}
+                onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
+                placeholder={t('passenger.dashboard.platePlaceholder')}
+                className="font-mono text-base font-bold uppercase tracking-wider"
+              />
             </div>
 
-            <div>
-              <label htmlFor="route-corridor-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
-                {t('passenger.dashboard.routeCorridor')}
-              </label>
-              <select
-                id="route-corridor-select"
-                value={route}
-                onChange={(e) => setRoute(e.target.value)}
-                className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
-              >
-                <option value="">{t('passenger.dashboard.selectRoute')}</option>
-                <option value="Thika Road – Nairobi CBD">Thika Road – Nairobi CBD</option>
-                <option value="Waiyaki Way – Westlands">Waiyaki Way – Westlands</option>
-                <option value="Mombasa Road – Syokimau">Mombasa Road – Syokimau</option>
-                <option value="Ngong Road – Karen">Ngong Road – Karen</option>
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="sacco-org-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
+                  {t('passenger.dashboard.saccoOrg')}
+                </label>
+                <select
+                  id="sacco-org-select"
+                  value={sacco}
+                  onChange={(e) => setSacco(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
+                >
+                  <option value="">{t('passenger.dashboard.selectSacco')}</option>
+                  <option value="MetroLink SACCO">MetroLink SACCO</option>
+                  <option value="GreenLine SACCO">GreenLine SACCO</option>
+                  <option value="TransitStar SACCO">TransitStar SACCO</option>
+                  <option value="CityRide SACCO">CityRide SACCO</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="route-corridor-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
+                  {t('passenger.dashboard.routeCorridor')}
+                </label>
+                <select
+                  id="route-corridor-select"
+                  value={route}
+                  onChange={(e) => setRoute(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
+                >
+                  <option value="">{t('passenger.dashboard.selectRoute')}</option>
+                  <option value="Thika Road – Nairobi CBD">Thika Road – Nairobi CBD</option>
+                  <option value="Waiyaki Way – Westlands">Waiyaki Way – Westlands</option>
+                  <option value="Mombasa Road – Syokimau">Mombasa Road – Syokimau</option>
+                  <option value="Ngong Road – Karen">Ngong Road – Karen</option>
+                </select>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            <Button
+              onClick={handleStartTrip}
+              disabled={!plateNumber.trim()}
+              className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-lg">speed</span>
+              {t('passenger.dashboard.startTrip')}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => navigate('/passenger/report-blackspot')}
+              className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2 border-warning text-warning hover:bg-warning/10"
+            >
+              <span className="material-symbols-outlined text-lg">warning</span>
+              {t('passenger.dashboard.reportBlackSpot')}
+            </Button>
+          </div>
+
           <Button
-            onClick={handleStartTrip}
-            disabled={!plateNumber.trim()}
-            className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2"
+            variant="secondary"
+            onClick={() => navigate('/passenger/map')}
+            className="w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
           >
-            <span className="material-symbols-outlined text-lg">speed</span>
-            {t('passenger.dashboard.startTrip')}
+            <span className="material-symbols-outlined text-base">map</span>
+            {t('passenger.dashboard.viewLiveMap')}
           </Button>
+        </Card>
+      </motion.div>
 
-          <Button
-            variant="outline"
-            onClick={() => navigate('/passenger/report-blackspot')}
-            className="w-full h-11 text-sm font-bold flex items-center justify-center gap-2 border-warning text-warning hover:bg-warning/10"
-          >
-            <span className="material-symbols-outlined text-lg">warning</span>
-            {t('passenger.dashboard.reportBlackSpot')}
-          </Button>
-        </div>
-
-        <Button
-          variant="secondary"
-          onClick={() => navigate('/passenger/map')}
-          className="w-full h-10 text-xs font-semibold flex items-center justify-center gap-2"
-        >
-          <span className="material-symbols-outlined text-base">map</span>
-          {t('passenger.dashboard.viewLiveMap')}
-        </Button>
-      </Card>
-
-      <div className="grid grid-cols-2 gap-3">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-2 gap-3">
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">{t('passenger.dashboard.tripsTracked')}</span>
@@ -245,9 +257,9 @@ export const PassengerDashboard: React.FC = () => {
             {t('passenger.dashboard.noReportedSpots')}
           </p>
         </Card>
-      </div>
+      </motion.div>
 
-      <div className="space-y-2">
+      <motion.div variants={variants.staggerItem} className="space-y-2">
         <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase tracking-wider">
           {t('passenger.dashboard.quickTools')}
         </h2>
@@ -265,7 +277,7 @@ export const PassengerDashboard: React.FC = () => {
             {t('passenger.dashboard.tripLogs')}
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

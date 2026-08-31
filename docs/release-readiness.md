@@ -21,7 +21,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Core validation, lifecycle, offline/reconnect, SOS, rate limits, Storage ownership and cross-SACCO isolation are covered.
 - [x] Scheduled purge/archival logic drains batches and is retry-safe.
 - [x] Deterministic analytics/report writes are used for repeat execution.
-- [ ] Final function-by-function authorization/input/idempotency evidence for every pending export.
+- [x] Final function-by-function authorization/input/idempotency evidence for every pending export in `docs/cloud-functions-inventory.md`.
 - [ ] Emulator-safe FCM invalid-token/delivery lifecycle harness.
 
 ## Phase 6 — Production Firebase

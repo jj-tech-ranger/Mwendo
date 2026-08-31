@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'motion/react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
@@ -7,9 +8,11 @@ import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
+import { useMotionPresets } from '../../lib/motion';
 
 export const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { variants } = useMotionPresets();
 
   const { data: dashboardData, isError, error, refetch } = useQuery<{
     logs: AuditLog[];
@@ -68,9 +71,17 @@ export const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-lg">
+    <motion.div
+      variants={variants.staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="space-y-lg"
+    >
       {/* Top Banner */}
-      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md sm:p-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-md">
+      <motion.div
+        variants={variants.staggerItem}
+        className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md sm:p-lg shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-md"
+      >
         <div>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-2xl">admin_panel_settings</span>
@@ -89,10 +100,10 @@ export const AdminDashboard: React.FC = () => {
             SYSTEM OPERATIONAL
           </Badge>
         </div>
-      </div>
+      </motion.div>
 
       {/* Top Row: KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-md">
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-1">
           <span className="font-label-mono text-[11px] text-on-surface-variant uppercase">
             Total Users
@@ -124,10 +135,10 @@ export const AdminDashboard: React.FC = () => {
           <p className="font-headline-lg-mobile text-2xl text-amber-600 font-bold">{complaints.length}</p>
           <span className="font-label-mono text-[10px] text-on-surface-variant">Reports awaiting review</span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Second Row: System Status Card & Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
         {/* Recent Admin Activity Feed */}
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <div className="flex items-center justify-between border-b border-outline-variant/20 pb-sm">
@@ -205,7 +216,7 @@ export const AdminDashboard: React.FC = () => {
             Review Moderation Queue
           </Button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'motion/react';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -11,6 +12,7 @@ import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { toStandardDate } from '../../lib/utils';
 import { Trip } from '../../types';
+import { useMotionPresets } from '../../lib/motion';
 
 interface RecentReportItem {
   id: string;
@@ -30,6 +32,7 @@ interface RouteRankingItem {
 export const SaccoDashboard: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const saccoId = getEffectiveSaccoId(user?.saccoId);
+  const { variants } = useMotionPresets();
 
   const [recentReports] = useState<RecentReportItem[]>([]);
   const [routeRankings] = useState<RouteRankingItem[]>([]);
@@ -126,9 +129,17 @@ export const SaccoDashboard: React.FC = () => {
   const saccoName = getSaccoName(saccoId);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <motion.div
+      variants={variants.staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
       {/* Top Welcome Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-surface-container to-surface p-6 rounded-2xl border border-primary/20">
+      <motion.div
+        variants={variants.staggerItem}
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-primary/10 via-surface-container to-surface p-6 rounded-2xl border border-primary/20"
+      >
         <div>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-2xl">verified_user</span>
@@ -147,10 +158,10 @@ export const SaccoDashboard: React.FC = () => {
             24/7 Safety Monitoring Active
           </Badge>
         </div>
-      </div>
+      </motion.div>
 
       {/* 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="p-5 space-y-2 border-l-4 border-l-primary">
           <div className="flex justify-between items-center text-xs text-on-surface-variant font-mono uppercase">
             <span>Total Trips (30d)</span>
@@ -194,10 +205,10 @@ export const SaccoDashboard: React.FC = () => {
             {stats.activePilots > 0 ? 'Active fleet drivers' : 'No drivers registered'}
           </div>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Row 2: Fleet Safety Trend & Safety Score Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2 p-6 space-y-4">
           <div className="flex justify-between items-center">
             <div>
@@ -298,10 +309,10 @@ export const SaccoDashboard: React.FC = () => {
             )}
           </div>
         </Card>
-      </div>
+      </motion.div>
 
       {/* Row 3: Recent Reports & Route Risk Rankings */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-on-surface">Recent Safety Alerts & Incidents</h2>
@@ -365,7 +376,7 @@ export const SaccoDashboard: React.FC = () => {
             )}
           </div>
         </Card>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

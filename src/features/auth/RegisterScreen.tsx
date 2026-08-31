@@ -20,31 +20,98 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const RegisterVisual: React.FC = () => (
-  <section className="relative hidden min-h-screen overflow-hidden bg-primary text-on-primary lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-10 xl:px-20">
-    <style>{`@keyframes route{from{stroke-dashoffset:0}to{stroke-dashoffset:-360}}@keyframes pulse{0%,100%{transform:scale(.85);opacity:.35}50%{transform:scale(1.25);opacity:.85}}@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important}}`}</style>
-    <div className="absolute -right-32 -top-28 h-96 w-96 rounded-full border border-on-primary/10" />
-    <div className="absolute -bottom-48 -left-32 h-[34rem] w-[34rem] rounded-full border border-on-primary/10" />
+const RegisterPhotoHero: React.FC = () => (
+  <section className="relative hidden min-h-screen overflow-hidden bg-surface-container-high text-on-primary lg:flex lg:flex-col lg:justify-between lg:px-12 lg:py-10 xl:px-16">
+    {/* High-Resolution Transit & Highway Photo */}
+    <img
+      src="https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80"
+      alt="Scenic highway journey across Kenya"
+      referrerPolicy="no-referrer"
+      className="absolute inset-0 h-full w-full object-cover object-center"
+    />
+
+    {/* Brand Gradient Overlay for Maximum Visual Depth & Legibility */}
+    <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/75 to-black/45" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.18),transparent_60%)]" />
+
+    {/* Header */}
     <div className="relative z-10 flex items-center justify-between gap-4">
       <img src="/brand/logo-dark.png" alt="Mwendo Salama" className="h-11 w-auto" />
-      <span className="rounded-full bg-on-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em]">Safer journeys</span>
+      <span className="rounded-full border border-white/20 bg-black/40 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-white backdrop-blur-md">
+        Safer Journeys
+      </span>
     </div>
-    <div className="relative z-10 flex flex-1 items-center justify-center py-10">
-      <svg viewBox="0 0 560 500" className="h-full w-full max-w-2xl" fill="none" aria-hidden="true">
-        <defs><linearGradient id="register-route" x1="40" y1="430" x2="500" y2="70"><stop stopColor="rgba(255,255,255,.18)"/><stop offset="1" stopColor="rgba(255,255,255,.85)"/></linearGradient></defs>
-        <path d="M55 430 C145 380 105 300 210 270 S330 225 355 145 S440 105 505 65" stroke="rgba(255,255,255,.08)" strokeWidth="54" strokeLinecap="round" />
-        <path d="M55 430 C145 380 105 300 210 270 S330 225 355 145 S440 105 505 65" stroke="url(#register-route)" strokeWidth="4" strokeLinecap="round" strokeDasharray="14 18" className="[animation:route_7s_linear_infinite]" />
-        <circle cx="55" cy="430" r="10" fill="white"/><circle cx="505" cy="65" r="10" fill="white"/>
-        <g transform="translate(285 235)" className="[animation:pulse_3s_ease-in-out_infinite]"><circle r="70" fill="rgba(255,255,255,.07)"/><circle r="38" fill="white"/><circle r="15" fill="#1A5C2E"/></g>
-        <g transform="translate(92 120)" className="[animation:float_5s_ease-in-out_infinite]"><rect width="155" height="58" rx="18" fill="rgba(255,255,255,.11)"/><circle cx="25" cy="29" r="8" fill="#86efac"/><text x="43" y="25" fill="white" fontSize="12" fontWeight="700">YOUR JOURNEY</text><text x="43" y="42" fill="rgba(255,255,255,.62)" fontSize="9">Starts here</text></g>
-        <g transform="translate(348 335)" className="[animation:float_5s_ease-in-out_infinite_1s]"><rect width="150" height="58" rx="18" fill="rgba(255,255,255,.11)"/><circle cx="25" cy="29" r="8" fill="#fde68a"/><text x="43" y="25" fill="white" fontSize="12" fontWeight="700">SAFETY NETWORK</text><text x="43" y="42" fill="rgba(255,255,255,.62)" fontSize="9">Built for Kenya</text></g>
-      </svg>
+
+    {/* Center Feature Card */}
+    <div className="relative z-10 my-auto py-8">
+      <div className="max-w-md rounded-3xl border border-white/20 bg-slate-950/70 p-6 text-white shadow-2xl backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-300">
+            <span className="material-symbols-outlined text-2xl">verified_user</span>
+          </span>
+          <div>
+            <p className="text-sm font-extrabold text-white">What You Get as a Passenger</p>
+            <p className="text-xs text-white/70">Continuous on-trip safety guardian</p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-300">
+              <span className="material-symbols-outlined text-base">speed</span>
+            </span>
+            <div className="text-xs">
+              <p className="font-bold text-white">Live Speed Awareness</p>
+              <p className="text-white/65">Automatic detection when vehicle exceeds 80 km/h</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
+              <span className="material-symbols-outlined text-base">report_problem</span>
+            </span>
+            <div className="text-xs">
+              <p className="font-bold text-white">Community Black Spot Alerts</p>
+              <p className="text-white/65">Real-time alerts when approaching dangerous sectors</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-xl bg-white/5 p-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-red-500/20 text-red-300">
+              <span className="material-symbols-outlined text-base">emergency</span>
+            </span>
+            <div className="text-xs">
+              <p className="font-bold text-white">Rapid SOS Emergency Response</p>
+              <p className="text-white/65">Instant location and vehicle broadcast to responders</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    {/* Footer Callout */}
     <div className="relative z-10 max-w-xl">
-      <p className="mb-3 text-xs font-bold uppercase tracking-[.2em] text-on-primary/60">Join Mwendo Salama</p>
-      <h1 className="text-3xl font-extrabold leading-tight sm:text-4xl">Turn every trip into better safety data.</h1>
-      <p className="mt-4 max-w-lg text-sm leading-6 text-on-primary/70">Track journeys, understand road risks and help make public transport safer across Kenya.</p>
-      <div className="mt-7 flex flex-wrap gap-2 text-xs font-bold text-on-primary/80"><span className="rounded-full bg-on-primary/10 px-3 py-2">Live trip safety</span><span className="rounded-full bg-on-primary/10 px-3 py-2">Hazard reporting</span><span className="rounded-full bg-on-primary/10 px-3 py-2">Emergency support</span></div>
+      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-emerald-300">
+        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+        Join Mwendo Salama
+      </div>
+      <h1 className="text-3xl font-extrabold leading-tight text-white sm:text-4xl">
+        Turn every trip into better safety data.
+      </h1>
+      <p className="mt-3 max-w-lg text-sm leading-6 text-white/80">
+        Track journeys, understand road risks, and help make public transport safer across Kenya.
+      </p>
+      <div className="mt-5 flex flex-wrap gap-2 text-xs font-bold text-white/90">
+        <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+          Live trip safety
+        </span>
+        <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+          Hazard reporting
+        </span>
+        <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1.5 backdrop-blur-sm">
+          Emergency support
+        </span>
+      </div>
     </div>
   </section>
 );
@@ -93,7 +160,7 @@ export const RegisterScreen: React.FC = () => {
 
   return (
     <main className="min-h-screen bg-surface text-on-surface lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(480px,.9fr)]">
-      <RegisterVisual />
+      <RegisterPhotoHero />
       <section className="flex min-h-screen items-center justify-center px-5 py-8 sm:px-8 lg:px-10 xl:px-16">
         <div className="w-full max-w-xl">
           <div className="mb-7 flex items-center justify-between"><PrimaryLogo className="h-9 w-auto lg:hidden" /><Link to="/auth/login" className="ml-auto text-xs font-bold text-on-surface-variant hover:text-primary">Already have an account? Sign in</Link></div>

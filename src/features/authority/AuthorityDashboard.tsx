@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'motion/react';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
   tripRepository,
@@ -20,6 +21,7 @@ import { Input } from '../../components/ui/Input';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { toStandardDate } from '../../lib/utils';
+import { useMotionPresets } from '../../lib/motion';
 
 const KENYA_COUNTIES = [
   'All Kenya (National)',
@@ -38,6 +40,7 @@ export const AuthorityDashboard: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const userCounty = user?.county || 'Nairobi';
   const isCountyScoped = user?.authorityScope === 'county';
+  const { variants } = useMotionPresets();
 
   const [selectedCounty, setSelectedCounty] = useState<string>(
     isCountyScoped ? userCounty : 'All Kenya (National)'
@@ -218,9 +221,17 @@ export const AuthorityDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-lg">
+    <motion.div
+      variants={variants.staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="space-y-lg"
+    >
       {/* Scope & Jurisdiction Header Bar */}
-      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md sm:p-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-md">
+      <motion.div
+        variants={variants.staggerItem}
+        className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md sm:p-lg shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-md"
+      >
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
             <span className="material-symbols-outlined text-2xl">shield_person</span>
@@ -262,10 +273,10 @@ export const AuthorityDashboard: React.FC = () => {
             ))}
           </select>
         </div>
-      </div>
+      </motion.div>
 
       {/* Global Search Bar */}
-      <div className="flex items-center gap-md">
+      <motion.div variants={variants.staggerItem} className="flex items-center gap-md">
         <div className="relative flex-1">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">
             search
@@ -282,10 +293,10 @@ export const AuthorityDashboard: React.FC = () => {
           <span className="material-symbols-outlined text-base">tune</span>
           Filters
         </Button>
-      </div>
+      </motion.div>
 
       {/* Top Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-md">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-md">
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-1">
           <div className="flex justify-between items-center text-on-surface-variant">
             <span className="font-label-mono text-[11px] uppercase tracking-wider">Active PSVs</span>
@@ -352,10 +363,10 @@ export const AuthorityDashboard: React.FC = () => {
             Requires Police Dispatch
           </span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Map & Live Alert Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
         {/* Live Authority Operations Map */}
         <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <div className="flex items-center justify-between">
@@ -438,10 +449,10 @@ export const AuthorityDashboard: React.FC = () => {
             View All Incident Logs
           </Button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Speed Trends & County Risk Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
+      <motion.div variants={variants.staggerItem} className="grid grid-cols-1 lg:grid-cols-2 gap-lg">
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <div className="flex items-center justify-between">
             <div>
@@ -489,10 +500,13 @@ export const AuthorityDashboard: React.FC = () => {
             height={240}
           />
         </div>
-      </div>
+      </motion.div>
 
       {/* High Risk SACCO Regulatory Priority Queue */}
-      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
+      <motion.div
+        variants={variants.staggerItem}
+        className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md"
+      >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="font-headline-lg-mobile text-sm text-on-surface">
@@ -578,7 +592,7 @@ export const AuthorityDashboard: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

@@ -17,70 +17,72 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RouteProfile = Pick<UserProfile, 'activeRole' | 'role' | 'isMfaEnrolled'>;
 
-const JourneyVisual: React.FC = () => (
-  <div className="relative h-full min-h-[520px] overflow-hidden rounded-[36px] bg-primary p-8 text-on-primary lg:min-h-[680px]">
-    <style>{`
-      @keyframes mwAuthAurora { 0%,100% { transform:translate3d(0,0,0) scale(1); opacity:.4; } 50% { transform:translate3d(20px,-14px,0) scale(1.08); opacity:.7; } }
-      @keyframes mwAuthNode { 0%,100% { opacity:.3; transform:scale(.8); } 50% { opacity:1; transform:scale(1); } }
-      @keyframes mwAuthRing { 0% { transform:scale(.78); opacity:.5; } 70%,100% { transform:scale(1.5); opacity:0; } }
-      @keyframes mwAuthGlow { 0%,100% { opacity:.25; } 50% { opacity:.65; } }
-      .mw-auth-aurora { animation:mwAuthAurora 8s ease-in-out infinite; transform-origin:center; }
-      .mw-auth-node { animation:mwAuthNode 3.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-      .mw-auth-ring { animation:mwAuthRing 3.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
-      .mw-auth-glow { animation:mwAuthGlow 4.5s ease-in-out infinite; }
-      @media(prefers-reduced-motion:reduce){.mw-auth-aurora,.mw-auth-node,.mw-auth-ring,.mw-auth-glow{animation:none!important}}
-    `}</style>
-    <div className="absolute -right-28 -top-28 h-96 w-96 rounded-full border border-on-primary/10" />
-    <div className="absolute -bottom-40 -left-28 h-[28rem] w-[28rem] rounded-full border border-on-primary/10" />
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="mw-auth-aurora absolute -right-16 top-20 h-80 w-80 rounded-full bg-emerald-200/10 blur-3xl" />
-      <div className="mw-auth-aurora absolute bottom-20 left-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" style={{ animationDelay: '-3.5s' }} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_65%_42%,rgba(255,255,255,.12),transparent_30%)]" />
-    </div>
+const AuthPhotoHero: React.FC = () => (
+  <div className="relative h-full min-h-[520px] overflow-hidden rounded-[36px] border border-outline-variant/20 bg-surface-container-high p-8 text-on-primary shadow-2xl lg:min-h-[680px]">
+    {/* High-Resolution Transit Photo */}
+    <img
+      src="https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=1200&q=80"
+      alt="Modern passenger transit journey in Kenya"
+      referrerPolicy="no-referrer"
+      className="absolute inset-0 h-full w-full object-cover object-center"
+    />
+
+    {/* Brand Green Dark Gradient Overlay for Crisp Text Contrast */}
+    <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/75 to-black/40" />
+    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,197,94,0.18),transparent_60%)]" />
+
     <div className="relative z-10 flex h-full flex-col justify-between">
+      {/* Header with Logo and Badge */}
       <div className="flex items-center justify-between gap-4">
         <img src="/brand/logo-dark.png" alt="Mwendo Salama" className="h-11 w-auto" />
-        <span className="rounded-full border border-on-primary/10 bg-on-primary/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.18em]">Kenya safety network</span>
+        <span className="rounded-full border border-white/20 bg-black/40 px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[.18em] text-white backdrop-blur-md">
+          Kenya Safety Network
+        </span>
       </div>
-      <div className="relative flex flex-1 items-center justify-center py-8">
-        <svg viewBox="0 0 520 460" className="h-full w-full max-w-xl" fill="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="login-route" x1="70" y1="385" x2="470" y2="45" gradientUnits="userSpaceOnUse">
-              <stop stopColor="rgba(255,255,255,.18)" />
-              <stop offset=".55" stopColor="rgba(255,255,255,.62)" />
-              <stop offset="1" stopColor="rgba(255,255,255,.94)" />
-            </linearGradient>
-          </defs>
-          <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="rgba(255,255,255,.09)" strokeWidth="38" strokeLinecap="round" />
-          <path d="M70 385 C145 340 130 260 215 240 S315 205 345 130 S425 85 470 45" stroke="url(#login-route)" strokeWidth="3" strokeLinecap="round" strokeDasharray="2 13" />
-          <circle cx="70" cy="385" r="10" fill="white" />
-          <circle cx="470" cy="45" r="10" fill="white" />
-          <circle cx="70" cy="385" r="22" stroke="rgba(255,255,255,.18)" className="mw-auth-ring" />
-          <circle cx="470" cy="45" r="22" stroke="rgba(255,255,255,.18)" className="mw-auth-ring" style={{ animationDelay: '1.8s' }} />
-          <g transform="translate(260 220)">
-            <circle r="92" fill="rgba(255,255,255,.035)" className="mw-auth-glow" />
-            <circle r="62" stroke="rgba(255,255,255,.12)" strokeDasharray="2 10" />
-            <circle r="48" stroke="rgba(255,255,255,.12)" />
-            <circle r="34" fill="white" />
-            <circle r="13" fill="#1A5C2E" />
-            <circle cx="0" cy="-62" r="5" fill="#a7f3b0" className="mw-auth-node" />
-            <circle cx="54" cy="31" r="4" fill="#fde68a" className="mw-auth-node" style={{ animationDelay: '1.2s' }} />
-            <circle cx="-52" cy="34" r="4" fill="#bfdbfe" className="mw-auth-node" style={{ animationDelay: '2.2s' }} />
-          </g>
-          <circle cx="215" cy="240" r="6" fill="#a7f3b0" className="mw-auth-node" />
-          <circle cx="345" cy="130" r="6" fill="#fde68a" className="mw-auth-node" style={{ animationDelay: '1.5s' }} />
-        </svg>
-        <div className="pointer-events-none absolute left-[7%] top-[19%] rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
-          <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><span className="material-symbols-outlined text-lg">shield</span></span><div><p className="text-[11px] font-extrabold text-white">Safe route</p><p className="mt-0.5 text-[9px] text-white/60">Protected journey</p></div></div>
-        </div>
-        <div className="pointer-events-none absolute bottom-[18%] right-[5%] rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
-          <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-amber-200"><span className="material-symbols-outlined text-lg">warning</span></span><div><p className="text-[11px] font-extrabold text-white">Road alert</p><p className="mt-0.5 text-[9px] text-white/60">Risk detected ahead</p></div></div>
+
+      {/* Center Verified Stats Card */}
+      <div className="my-auto py-8">
+        <div className="max-w-md rounded-3xl border border-white/20 bg-slate-950/70 p-6 text-white shadow-2xl backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/20 text-emerald-300">
+              <span className="material-symbols-outlined text-2xl">shield_with_heart</span>
+            </span>
+            <div>
+              <p className="text-sm font-extrabold text-white">Verified Safety Platform</p>
+              <p className="text-xs text-white/70">Protecting passengers & fleet crews</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4">
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-2xl font-black text-white">48+</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-white/70">Partner SACCOs</p>
+            </div>
+            <div className="rounded-2xl bg-white/5 p-3">
+              <p className="text-2xl font-black text-emerald-300">18k+</p>
+              <p className="mt-0.5 text-[11px] font-semibold text-white/70">Safe Trips Logged</p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-[11px] font-medium text-emerald-200">
+            <span className="material-symbols-outlined text-sm text-emerald-400">check_circle</span>
+            <span>Real-time speed & hazard protection</span>
+          </div>
         </div>
       </div>
+
+      {/* Footer Title */}
       <div className="max-w-lg">
-        <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-on-primary/60"><span className="h-1.5 w-1.5 rounded-full bg-on-primary/70" />Mwendo Salama</div>
-        <h2 className="text-3xl font-extrabold leading-tight sm:text-4xl">Every journey deserves a safer route.</h2>
-        <p className="mt-4 max-w-md text-sm leading-6 text-on-primary/70">Track journeys, understand road risks, and help make public transport safer across Kenya.</p>
+        <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-[.2em] text-emerald-300">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          Mwendo Salama
+        </div>
+        <h2 className="text-3xl font-extrabold leading-tight text-white sm:text-4xl">
+          Every journey deserves a safer route.
+        </h2>
+        <p className="mt-3 max-w-md text-sm leading-6 text-white/80">
+          Track journeys, understand road risks, and help make public transport safer across Kenya.
+        </p>
       </div>
     </div>
   </div>
@@ -140,7 +142,7 @@ export const LoginScreen: React.FC = () => {
   return (
     <main className="min-h-screen bg-surface text-on-surface lg:p-5 xl:p-7">
       <div className="mx-auto grid min-h-[calc(100vh-40px)] max-w-[1500px] gap-5 lg:grid-cols-[minmax(0,1.05fr)_minmax(460px,.95fr)] xl:gap-7">
-        <section className="hidden lg:block"><JourneyVisual /></section>
+        <section className="hidden lg:block"><AuthPhotoHero /></section>
         <section className="flex items-center justify-center px-5 py-8 sm:px-8 lg:rounded-[36px] lg:bg-surface-container-low lg:px-10 xl:px-14">
           <div className="w-full max-w-lg">
             <div className="mb-8 flex items-center justify-between"><PrimaryLogo className="h-9 w-auto lg:hidden" /><Link to="/" className="text-xs font-bold text-on-surface-variant hover:text-primary">← Back to home</Link></div>

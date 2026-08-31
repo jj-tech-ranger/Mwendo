@@ -18,62 +18,79 @@ const howItWorksItems: Array<[number: string, icon: string, title: string, desc:
   ['03', 'shield', 'welcome.howItWorks.step3Title', 'welcome.howItWorks.step3Desc'],
 ];
 
-const RouteIllustration: React.FC = () => (
-  <div className="relative h-[430px] overflow-hidden rounded-[32px] bg-primary text-on-primary shadow-2xl sm:h-[500px]">
-    <style>{`
-      @keyframes mwSafetyAurora { 0%,100% { transform: translate3d(0,0,0) scale(1); opacity:.45; } 50% { transform: translate3d(18px,-12px,0) scale(1.08); opacity:.72; } }
-      @keyframes mwSafetyNode { 0%,100% { opacity:.35; transform:scale(.82); } 50% { opacity:1; transform:scale(1); } }
-      @keyframes mwSafetyRing { 0% { transform:scale(.78); opacity:.55; } 70%,100% { transform:scale(1.55); opacity:0; } }
-      @keyframes mwSafetyGlow { 0%,100% { opacity:.28; } 50% { opacity:.7; } }
-      .mw-safety-aurora { animation:mwSafetyAurora 8s ease-in-out infinite; transform-origin:center; }
-      .mw-safety-node { animation:mwSafetyNode 3.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
-      .mw-safety-ring { animation:mwSafetyRing 3.6s ease-out infinite; transform-box:fill-box; transform-origin:center; }
-      .mw-safety-glow { animation:mwSafetyGlow 4.5s ease-in-out infinite; }
-      @media(prefers-reduced-motion:reduce){.mw-safety-aurora,.mw-safety-node,.mw-safety-ring,.mw-safety-glow{animation:none!important}}
-    `}</style>
-    <div className="absolute -right-32 -top-32 h-80 w-80 rounded-full border border-white/10" />
-    <div className="absolute -bottom-44 -left-32 h-[30rem] w-[30rem] rounded-full border border-white/10" />
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="mw-safety-aurora absolute -right-20 top-12 h-72 w-72 rounded-full bg-emerald-200/10 blur-3xl" />
-      <div className="mw-safety-aurora absolute bottom-8 left-8 h-64 w-64 rounded-full bg-white/10 blur-3xl" style={{ animationDelay: '-3.5s' }} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_58%_48%,rgba(255,255,255,.12),transparent_32%)]" />
+const HeroPhotoShowcase: React.FC = () => (
+  <div className="relative h-[440px] overflow-hidden rounded-[32px] border border-outline-variant/30 bg-surface-container-high shadow-2xl sm:h-[520px]">
+    {/* High-Resolution Transit Photo */}
+    <img
+      src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80"
+      alt="Modern Kenyan passenger transport highway"
+      referrerPolicy="no-referrer"
+      className="absolute inset-0 h-full w-full object-cover object-center"
+    />
+    
+    {/* Dark Forest Overlay for Maximum Legibility & Brand Consistency */}
+    <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/60 to-black/35" />
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(34,197,94,0.15),transparent_60%)]" />
+
+    {/* Top Badges */}
+    <div className="absolute left-5 right-5 top-5 flex items-center justify-between gap-3 sm:left-6 sm:right-6 sm:top-6">
+      <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md">
+        <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
+        <span>Live Safety Network Active</span>
+      </div>
+      <div className="hidden items-center gap-1.5 rounded-2xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 backdrop-blur-md sm:flex">
+        <span className="material-symbols-outlined text-sm text-emerald-300">verified</span>
+        <span>SACCO Monitored</span>
+      </div>
     </div>
-    <svg viewBox="0 0 620 520" className="absolute inset-0 h-full w-full" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="mw-route-gradient" x1="60" y1="440" x2="560" y2="80" gradientUnits="userSpaceOnUse">
-          <stop stopColor="rgba(255,255,255,.2)" />
-          <stop offset=".55" stopColor="rgba(255,255,255,.62)" />
-          <stop offset="1" stopColor="rgba(255,255,255,.95)" />
-        </linearGradient>
-      </defs>
-      <path d="M55 438 C150 390 112 310 220 278 S350 238 375 158 S470 110 565 72" stroke="rgba(255,255,255,.08)" strokeWidth="58" strokeLinecap="round" />
-      <path d="M55 438 C150 390 112 310 220 278 S350 238 375 158 S470 110 565 72" stroke="url(#mw-route-gradient)" strokeWidth="4" strokeLinecap="round" strokeDasharray="2 14" />
-      <circle cx="55" cy="438" r="11" fill="white" />
-      <circle cx="565" cy="72" r="11" fill="white" />
-      <circle cx="55" cy="438" r="28" stroke="rgba(255,255,255,.16)" className="mw-safety-ring" />
-      <circle cx="565" cy="72" r="28" stroke="rgba(255,255,255,.16)" className="mw-safety-ring" style={{ animationDelay: '1.8s' }} />
-      <g transform="translate(308 254)">
-        <circle r="92" fill="rgba(255,255,255,.035)" className="mw-safety-glow" />
-        <circle r="62" stroke="rgba(255,255,255,.12)" strokeDasharray="2 10" />
-        <circle r="48" stroke="rgba(255,255,255,.12)" />
-        <circle r="35" fill="white" />
-        <circle r="14" fill="#1A5C2E" />
-        <circle cx="0" cy="-62" r="5" fill="#a7f3b0" className="mw-safety-node" />
-        <circle cx="54" cy="31" r="4" fill="#fde68a" className="mw-safety-node" style={{ animationDelay: '1.2s' }} />
-        <circle cx="-52" cy="34" r="4" fill="#bfdbfe" className="mw-safety-node" style={{ animationDelay: '2.2s' }} />
-      </g>
-      <circle cx="220" cy="278" r="6" fill="#a7f3b0" className="mw-safety-node" />
-      <circle cx="375" cy="158" r="6" fill="#fde68a" className="mw-safety-node" style={{ animationDelay: '1.5s' }} />
-    </svg>
-    <div className="absolute left-6 top-6 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
-      <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-300/15 text-emerald-200"><span className="material-symbols-outlined text-lg">shield</span></span><div><p className="text-[11px] font-extrabold text-white">Live safety</p><p className="mt-0.5 text-[9px] text-white/60">Journey protected</p></div></div>
+
+    {/* Center Floating Telemetry Card */}
+    <div className="absolute left-5 right-5 top-20 sm:left-8 sm:right-8 sm:top-24">
+      <div className="rounded-2xl border border-white/20 bg-slate-950/70 p-4 text-white shadow-xl backdrop-blur-md sm:p-5">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+              <span className="material-symbols-outlined text-xl">directions_bus</span>
+            </span>
+            <div>
+              <p className="text-xs font-extrabold text-white">KBZ 819M · 2N SACCO</p>
+              <p className="text-[10px] text-white/70">Nairobi ➔ Nakuru Expressway</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-extrabold text-emerald-300">
+            NORMAL
+          </span>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-3">
+          <div className="rounded-xl bg-white/5 p-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Speed</p>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-2xl font-black text-white">74</span>
+              <span className="text-[10px] text-white/60">/ 80 km/h</span>
+            </div>
+          </div>
+          <div className="rounded-xl bg-white/5 p-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Status</p>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-base text-emerald-400">check_circle</span>
+              <span className="text-xs font-bold text-white">Safe Journey</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div className="absolute bottom-24 right-6 rounded-2xl border border-white/10 bg-white/10 px-3.5 py-3 backdrop-blur-md">
-      <div className="flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-amber-200"><span className="material-symbols-outlined text-lg">warning</span></span><div><p className="text-[11px] font-extrabold text-white">Road alert</p><p className="mt-0.5 text-[9px] text-white/60">Risk detected ahead</p></div></div>
-    </div>
-    <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
-      <div><p className="text-[10px] font-bold uppercase tracking-[.22em] text-white/55">Mwendo Salama</p><p className="mt-1 text-sm font-semibold">A safer view of every journey.</p></div>
-      <div className="hidden rounded-2xl border border-white/10 bg-white/10 px-3 py-2 backdrop-blur sm:block"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-white/75"><span className="h-2 w-2 rounded-full bg-emerald-300" /> Network active</div></div>
+
+    {/* Bottom Footer Info */}
+    <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white sm:bottom-6 sm:left-6 sm:right-6">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-300">Mwendo Salama</p>
+        <p className="mt-0.5 text-sm font-semibold text-white/95">Protecting every kilometer across Kenya.</p>
+      </div>
+      <div className="flex items-center gap-1.5 text-[11px] font-bold text-white/80">
+        <span className="material-symbols-outlined text-sm text-emerald-300">location_on</span>
+        <span className="hidden sm:inline">GPS & Sensor Verified</span>
+      </div>
     </div>
   </div>
 );
@@ -111,7 +128,7 @@ export const WelcomeScreenV2: React.FC = () => {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_15%,rgba(26,92,46,.13),transparent_30%),linear-gradient(to_bottom,var(--color-surface),var(--color-surface-container-lowest))]" />
           <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[1.02fr_.98fr] lg:gap-16 lg:px-8 lg:pb-24 lg:pt-20">
             <div className="max-w-2xl"><div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary"><span className="material-symbols-outlined text-base">shield</span>{t('welcome.hero.badge')}</div><h1 className="text-4xl font-extrabold leading-[1.05] tracking-[-.035em] sm:text-5xl lg:text-6xl">{t('welcome.hero.title')} <span className="text-primary">Mwendo Salama</span>.</h1><p className="mt-6 max-w-xl text-base leading-7 text-on-surface-variant sm:text-lg">{t('welcome.hero.description')}</p><div className="mt-8 flex flex-wrap gap-3"><Button variant="primary" size="lg" onClick={() => navigate('/location-permission')} className="rounded-2xl px-6 shadow-lg shadow-primary/15"><span>{t('welcome.hero.startSafeTrip')}</span><span className="material-symbols-outlined ml-1 text-lg">arrow_forward</span></Button><Button variant="outline" size="lg" onClick={() => navigate('/safety-map')} className="rounded-2xl px-6"><span className="material-symbols-outlined mr-1 text-lg text-primary">map</span>{t('welcome.hero.exploreSafetyMap')}</Button></div><div className="mt-9 grid max-w-xl grid-cols-1 gap-3 border-t border-outline-variant/25 pt-6 sm:grid-cols-3">{trustItems.map(([icon, key]) => <div key={key} className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><span className="material-symbols-outlined text-base text-primary">{icon}</span>{t(key)}</div>)}</div></div>
-            <RouteIllustration />
+            <HeroPhotoShowcase />
           </div>
         </section>
 

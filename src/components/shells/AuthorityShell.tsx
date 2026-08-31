@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { BRAND_ASSETS } from '../assets/BrandAssets';
@@ -7,7 +7,7 @@ import { OfflineBanner } from '../common/OfflineBanner';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { LanguageToggle } from '../common/LanguageToggle';
 import { useThemeStore } from '../../store/useThemeStore';
-import { BrandLoader } from '../ui/LoadingIndicators';
+import { AnimatedOutlet } from '../common/AnimatedOutlet';
 
 export const AuthorityShell: React.FC = () => {
   const { t } = useTranslation();
@@ -70,9 +70,7 @@ export const AuthorityShell: React.FC = () => {
             </div>
           </header>
           <main className="p-lg sm:p-xl max-w-7xl w-full mx-auto flex-1">
-            <React.Suspense fallback={<div className="min-h-[400px] flex items-center justify-center p-8" aria-live="polite"><BrandLoader size="md" /></div>}>
-              <Outlet />
-            </React.Suspense>
+            <AnimatedOutlet />
           </main>
         </div>
       </div>

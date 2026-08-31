@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { PassengerShell } from '../components/shells/PassengerShell';
 import { SaccoShell } from '../components/shells/SaccoShell';
 import { AuthorityShell } from '../components/shells/AuthorityShell';
@@ -89,12 +89,6 @@ const AdminSecurityScreen = lazyWithRetry(() => import('../features/admin/AdminS
 const AdminMaintenanceScreen = lazyWithRetry(() => import('../features/admin/AdminMaintenanceScreen').then((m) => ({ default: m.AdminMaintenanceScreen })));
 const AdminSettingsScreen = lazyWithRetry(() => import('../features/admin/AdminSettingsScreen').then((m) => ({ default: m.AdminSettingsScreen })));
 
-const ContentLoadingFallback = () => (
-  <div className="w-full h-full min-h-[300px] flex items-center justify-center p-8" aria-live="polite">
-    <BrandLoader size="md" />
-  </div>
-);
-
 const FullPageLoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-background" aria-live="polite">
     <BrandLoader size="lg" />
@@ -103,12 +97,6 @@ const FullPageLoadingFallback = () => (
 
 const withFullPageSuspense = (element: React.ReactNode) => (
   <Suspense fallback={<FullPageLoadingFallback />}>{element}</Suspense>
-);
-
-export const ContentSuspenseOutlet: React.FC = () => (
-  <Suspense fallback={<ContentLoadingFallback />}>
-    <Outlet />
-  </Suspense>
 );
 
 const router = createBrowserRouter([

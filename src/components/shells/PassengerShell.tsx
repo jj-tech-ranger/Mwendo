@@ -1,9 +1,9 @@
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 import { OfflineBanner } from '../common/OfflineBanner';
-import { BrandLoader } from '../ui/LoadingIndicators';
+import { AnimatedOutlet } from '../common/AnimatedOutlet';
 
 interface PassengerShellProps {
   hideBottomNav?: boolean;
@@ -35,15 +35,7 @@ export const PassengerShell: React.FC<PassengerShellProps> = ({ hideBottomNav = 
       <OfflineBanner />
 
       <main className={cn('flex-1 w-full max-w-lg mx-auto', !isImmersiveRoute && 'pb-20')}>
-        <React.Suspense
-          fallback={
-            <div className="min-h-[50vh] flex items-center justify-center p-8" aria-live="polite">
-              <BrandLoader size="md" />
-            </div>
-          }
-        >
-          <Outlet />
-        </React.Suspense>
+        <AnimatedOutlet />
       </main>
 
       {!isImmersiveRoute && (

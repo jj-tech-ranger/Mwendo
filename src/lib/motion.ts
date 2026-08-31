@@ -1,5 +1,5 @@
 import { useReducedMotion } from 'motion/react';
-import type { HTMLMotionProps } from 'motion/react';
+import type { HTMLMotionProps, Variants } from 'motion/react';
 
 /**
  * Shared motion tokens. CSS uses milliseconds while Motion uses seconds;
@@ -21,7 +21,53 @@ export const EASE = {
   emphasizedAccelerate: [0.3, 0, 0.8, 0.15] as const,
 } as const;
 
+export const transitions = {
+  enter: {
+    duration: DURATION.moderate,
+    ease: EASE.standardDecelerate,
+  },
+  exit: {
+    duration: DURATION.fast,
+    ease: EASE.standardAccelerate,
+  },
+} as const;
+
 const REDUCED_MOTION_DURATION = 0.01;
+
+export const pageVariants: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: transitions.enter },
+  exit: { opacity: 0, y: -6, transition: transitions.exit },
+};
+
+export const staggerContainerVariants: Variants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+export const staggerItemVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: DURATION.moderate,
+      ease: EASE.standardDecelerate,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 8,
+    transition: {
+      duration: DURATION.fast,
+      ease: EASE.standardAccelerate,
+    },
+  },
+};
 
 export const variants = {
   fadeIn: {
@@ -60,25 +106,9 @@ export const variants = {
       },
     },
   },
-  staggerItem: {
-    hidden: { opacity: 0, y: 8 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: DURATION.standard,
-        ease: EASE.standardDecelerate,
-      },
-    },
-    exit: {
-      opacity: 0,
-      y: 8,
-      transition: {
-        duration: DURATION.fast,
-        ease: EASE.standardAccelerate,
-      },
-    },
-  },
+  staggerContainer: staggerContainerVariants,
+  staggerItem: staggerItemVariants,
+  page: pageVariants,
   toast: {
     hidden: { opacity: 0, y: 12, scale: 0.96 },
     visible: {
@@ -109,10 +139,17 @@ export const variants = {
 export function useMotionPresets() {
   const shouldReduceMotion = useReducedMotion();
 
-  if (!shouldReduceMotion) return variants;
+  if (!shouldReduceMotion) {
+    return {
+      ...variants,
+      variants,
+    };
+  }
 
-  const reduced = (variant: Record<string, unknown>) => {
-    const transition = (variant.transition ?? {}) as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const reduced = (variant?: any) => {
+    if (!variant || typeof variant !== 'object') return {};
+    const transition = (variant.transition ? variant.transition : {}) as Record<string, unknown>;
     return {
       ...variant,
       transition: {
@@ -122,7 +159,7 @@ export function useMotionPresets() {
     };
   };
 
-  return {
+  const reducedPresets = {
     fadeIn: {
       hidden: reduced(variants.fadeIn.hidden),
       visible: reduced(variants.fadeIn.visible),
@@ -133,16 +170,34 @@ export function useMotionPresets() {
       visible: reduced(variants.scaleIn.visible),
       exit: reduced(variants.scaleIn.exit),
     },
+    staggerContainer: {
+      hidden: {},
+      visible: {
+        transition: {
+          staggerChildren: 0.001,
+        },
+      },
+    },
     staggerItem: {
       hidden: reduced(variants.staggerItem.hidden),
       visible: reduced(variants.staggerItem.visible),
       exit: reduced(variants.staggerItem.exit),
+    },
+    page: {
+      hidden: reduced(variants.page.hidden),
+      visible: reduced(variants.page.visible),
+      exit: reduced(variants.page.exit),
     },
     toast: {
       hidden: reduced(variants.toast.hidden),
       visible: reduced(variants.toast.visible),
       exit: reduced(variants.toast.exit),
     },
+  };
+
+  return {
+    ...reducedPresets,
+    variants: reducedPresets,
   };
 }
 
@@ -174,3 +229,4 @@ export function usePressableMotionProps(): PressableMotionProps {
     },
   };
 }
+
