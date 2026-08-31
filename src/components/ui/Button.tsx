@@ -43,7 +43,7 @@ export const Button: React.FC<ButtonProps> = ({
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
       aria-busy={isLoading}
-      style={style}
+      {...(style !== undefined ? { style: style as React.CSSProperties & Record<string, unknown> } : {})}
       {...pressableProps}
       {...props}
     >
