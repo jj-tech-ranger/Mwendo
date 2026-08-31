@@ -1,20 +1,16 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import type { MotionStyle } from 'motion/react';
+import type { HTMLMotionProps, MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-type NativeButtonProps = Omit<
-  React.ButtonHTMLAttributes<HTMLButtonElement>,
-  'style' | 'onDrag' | 'onDragStart' | 'onDragEnd'
->;
-
-interface ButtonProps extends NativeButtonProps {
-  variant?: ('primary' | 'secondary' | 'outline' | 'ghost' | 'danger') | undefined;
-  size?: ('sm' | 'md' | 'lg') | undefined;
-  isLoading?: boolean | undefined;
-  style?: React.CSSProperties;
-}
+type ButtonProps = Omit<HTMLMotionProps<'button'>, 'children' | 'style'> & {
+  children?: React.ReactNode;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  size?: 'sm' | 'md' | 'lg';
+  isLoading?: boolean;
+  style?: MotionStyle;
+};
 
 export const Button: React.FC<ButtonProps> = ({
   children,
@@ -49,7 +45,7 @@ export const Button: React.FC<ButtonProps> = ({
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
       aria-busy={isLoading}
-      {...(style !== undefined ? { style: style as MotionStyle } : {})}
+      {...(style !== undefined ? { style } : {})}
       {...pressableProps}
       {...props}
     >
