@@ -242,6 +242,10 @@
   50% { box-shadow: 0 0 0 8px rgb(186 26 26 / 0); }
 }
 
+.sos-breathe {
+  animation: sos-breathe 3s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-pulse,
   .animate-ping,
