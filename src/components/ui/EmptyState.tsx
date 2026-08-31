@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { useMotionPresets } from '../../lib/motion';
 import { Button } from './Button';
 
 interface EmptyStateProps {
@@ -25,8 +27,13 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   onSecondaryCta,
   className,
 }) => {
+  const motionPresets = useMotionPresets();
+
   return (
-    <div
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={motionPresets.fadeIn}
       className={cn(
         'flex flex-col items-center justify-center text-center p-lg sm:p-xl bg-surface-container-low/50 rounded-2xl border border-outline-variant/20 my-md',
         className
@@ -63,6 +70,6 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
