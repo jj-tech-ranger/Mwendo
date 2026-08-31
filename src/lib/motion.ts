@@ -146,11 +146,20 @@ export function useMotionPresets() {
   };
 }
 
+type PressableMotionProps = Pick<
+  HTMLMotionProps<'button'>,
+  'whileHover' | 'whileTap' | 'transition'
+>;
+
 /**
  * Shared direct-manipulation feedback for buttons and other pressable controls.
  * Reduced motion intentionally returns no animation props at all.
+ *
+ * Keep this type intentionally narrow: HTMLMotionProps also contains native
+ * attributes such as `style`, and spreading those into motion components can
+ * conflict with exactOptionalPropertyTypes.
  */
-export function usePressableMotionProps(): HTMLMotionProps<'button'> {
+export function usePressableMotionProps(): PressableMotionProps {
   const shouldReduceMotion = useReducedMotion();
 
   if (shouldReduceMotion) return {};
