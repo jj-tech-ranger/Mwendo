@@ -12,7 +12,7 @@ export const Badge: React.FC<BadgeProps> = ({
   ...props
 }) => {
   const baseStyles =
-    'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-label-bold tracking-wide uppercase';
+    'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-label-bold tracking-wide uppercase transition-colors duration-moderate ease-standard';
 
   const variants = {
     success: 'bg-secondary-container text-on-secondary-container',
