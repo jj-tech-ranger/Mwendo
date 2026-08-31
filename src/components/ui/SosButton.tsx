@@ -31,8 +31,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
       )}
       {...(style !== undefined ? { style } : {})}
       {...pressableProps}
-      whileTap={pressableProps.whileTap ? { scale: 0.92 } : undefined}
-      {...props}
+      {...(props as Record<string, unknown>)}
     >
       {variant === 'row' ? (
         <span className="flex items-center gap-3">
