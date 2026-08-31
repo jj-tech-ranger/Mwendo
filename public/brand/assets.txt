@@ -1,4 +1,20 @@
+Canonical artwork (do not overwrite):
 ├── logo-light.png
 ├── logo-dark.png
 ├── favicon-light.png
 └── favicon-dark.png
+
+Derived presentation assets:
+public/derived/
+├── favicon-round-light.png
+├── favicon-round-dark.png
+├── app-icon-light.png
+├── app-icon-dark.png
+├── logo-round-light.png
+└── logo-round-dark.png
+
+Usage:
+- round favicon variants: browser favicons and compact brand marks
+- app-icon variants: PWA/mobile launcher and app-icon UI
+- round logo variants: splash/feature branding where a circular treatment is appropriate
+- canonical full logos: headers, navigation and spacious brand placements
