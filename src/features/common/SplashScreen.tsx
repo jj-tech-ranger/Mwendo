@@ -62,8 +62,8 @@ export const SplashScreen: React.FC = () => {
               <div className="absolute inset-10 rounded-full bg-white/10 shadow-2xl backdrop-blur-sm" />
 
               {frame === 1 && (
-                <div className="relative flex h-32 w-32 items-center justify-center rounded-[2rem] bg-white/10 p-5 shadow-2xl backdrop-blur-md motion-safe:animate-pulse motion-reduce:animate-none">
-                  <img src={BRAND_ASSETS.darkIcon} alt="" className="h-full w-full object-contain" />
+                <div className="relative flex h-32 w-32 items-center justify-center motion-safe:animate-pulse motion-reduce:animate-none sm:h-40 sm:w-40">
+                  <img src={BRAND_ASSETS.darkRoundFavicon} alt="" className="h-full w-full object-contain" />
                 </div>
               )}
 
@@ -74,7 +74,7 @@ export const SplashScreen: React.FC = () => {
               {frame === 3 && (
                 <div className="relative flex h-32 w-32 items-center justify-center sm:h-40 sm:w-40">
                   <div className="absolute inset-0 rounded-full border-2 border-white/30 motion-safe:animate-ping motion-reduce:animate-none" />
-                  <img src={BRAND_ASSETS.darkIcon} alt="" className="relative h-24 w-24 object-contain sm:h-28 sm:w-28" />
+                  <img src={BRAND_ASSETS.darkRoundFavicon} alt="" className="relative h-28 w-28 object-contain sm:h-36 sm:w-36" />
                   <span className="absolute right-1 top-2 h-4 w-4 rounded-full bg-on-primary-container shadow-lg" />
                 </div>
               )}
@@ -92,10 +92,10 @@ export const SplashScreen: React.FC = () => {
               )}
 
               {frame === 5 && (
-                <div className="relative flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44">
+                <div className="relative flex h-40 w-40 items-center justify-center sm:h-48 sm:w-48">
                   <div className="absolute inset-0 rounded-full border-2 border-on-primary-container/40" />
                   <div className="absolute inset-5 rounded-full border border-on-primary-container/25" />
-                  <img src={BRAND_ASSETS.darkLogo} alt="Mwendo Salama" className="relative w-32 object-contain sm:w-40" />
+                  <img src={BRAND_ASSETS.darkRoundLogo} alt="Mwendo Salama" className="relative h-36 w-36 object-contain sm:h-44 sm:w-44" />
                 </div>
               )}
             </div>
