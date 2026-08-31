@@ -11,12 +11,12 @@ export const Card: React.FC<CardProps> = ({
   variant = 'default',
   ...props
 }) => {
-  const baseStyles = 'rounded-xl p-md sm:p-lg transition-all duration-200';
+  const baseStyles = 'rounded-xl p-md sm:p-lg transition-shadow duration-standard ease-standard';
 
   const variants = {
-    default: 'bg-surface-container-lowest border border-outline-variant/30 shadow-sm',
+    default: 'bg-surface-container-lowest border border-outline-variant/30 shadow-resting',
     flat: 'bg-surface-container border border-outline-variant/20',
-    elevated: 'bg-surface-container-lowest shadow-md border border-outline-variant/20',
+    elevated: 'bg-surface-container-lowest shadow-raised border border-outline-variant/20',
     outline: 'bg-transparent border border-outline-variant',
   };
 
