@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { usePressableMotionProps } from '../../lib/motion';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ('primary' | 'secondary' | 'outline' | 'ghost' | 'danger') | undefined;
@@ -16,15 +18,16 @@ export const Button: React.FC<ButtonProps> = ({
   disabled,
   ...props
 }) => {
+  const pressableProps = usePressableMotionProps();
   const baseStyles =
-    'inline-flex items-center justify-center font-label-bold rounded-full transition-all duration-200 active:scale-95 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer';
+    'inline-flex items-center justify-center font-label-bold rounded-full transition-colors duration-standard ease-standard disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer';
 
   const variants = {
-    primary: 'bg-primary-container text-on-primary hover:bg-primary shadow-sm',
+    primary: 'bg-primary-container text-on-primary hover:bg-primary shadow-resting',
     secondary: 'bg-secondary-container text-on-secondary-container hover:bg-secondary/20',
     outline: 'border border-outline-variant text-on-surface hover:bg-surface-container',
     ghost: 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface',
-    danger: 'bg-error text-on-error hover:bg-error/90 shadow-sm',
+    danger: 'bg-error text-on-error hover:bg-error/90 shadow-resting',
   };
 
   const sizes = {
@@ -34,10 +37,11 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   return (
-    <button
+    <motion.button
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
       aria-busy={isLoading}
+      {...pressableProps}
       {...props}
     >
       {isLoading ? (
@@ -51,6 +55,6 @@ export const Button: React.FC<ButtonProps> = ({
       ) : (
         children
       )}
-    </button>
+    </motion.button>
   );
 };
