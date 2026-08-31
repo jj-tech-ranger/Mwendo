@@ -116,8 +116,8 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
       )}
 
       {/* DETAIL MODAL */}
-      {selectedSpot && (
-        <Dialog isOpen={!!selectedSpot} onClose={() => setSelectedSpot(null)} title="Hazard Moderation Review">
+      <Dialog isOpen={!!selectedSpot} onClose={() => setSelectedSpot(null)} title="Hazard Moderation Review">
+        {selectedSpot && (
           <div className="space-y-4 text-xs">
             <div className="p-4 bg-surface-container rounded-xl space-y-2">
               <Badge variant="danger" className="uppercase font-mono text-[10px]">
@@ -143,8 +143,8 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
               </Button>
             </div>
           </div>
-        </Dialog>
-      )}
+        )}
+      </Dialog>
     </div>
   );
 };
