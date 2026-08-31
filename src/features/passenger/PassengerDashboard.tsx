@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
+import { SosButton } from '../../components/ui/SosButton';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
 
@@ -53,7 +54,6 @@ export const PassengerDashboard: React.FC = () => {
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-xl mx-auto pb-24 animate-in fade-in duration-300">
-      {/* Header Bar */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
           <BrandMark className="w-10 h-10" />
@@ -86,7 +86,6 @@ export const PassengerDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Guest Mode Banner */}
       {isGuestMode && (
         <Card className="bg-gradient-to-r from-emerald-900/10 to-teal-900/10 border border-emerald-500/20 p-4 space-y-2">
           <div className="flex items-start gap-3">
@@ -106,7 +105,6 @@ export const PassengerDashboard: React.FC = () => {
         </Card>
       )}
 
-      {/* Search & Start Trip Card */}
       <Card className="p-5 space-y-4 shadow-sm border border-outline-variant/30">
         <div className="flex items-center justify-between">
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
@@ -170,7 +168,6 @@ export const PassengerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Primary Action Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <Button
             onClick={handleStartTrip}
@@ -201,9 +198,7 @@ export const PassengerDashboard: React.FC = () => {
         </Button>
       </Card>
 
-      {/* 2x2 Stats Cards Grid */}
       <div className="grid grid-cols-2 gap-3">
-        {/* Stat 1: Trips Completed */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">{t('passenger.dashboard.tripsTracked')}</span>
@@ -215,7 +210,6 @@ export const PassengerDashboard: React.FC = () => {
           </p>
         </Card>
 
-        {/* Stat 2: Recent Alerts */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">{t('passenger.dashboard.recentAlerts')}</span>
@@ -227,7 +221,6 @@ export const PassengerDashboard: React.FC = () => {
           </p>
         </Card>
 
-        {/* Stat 3: Safety Score */}
         <Card className="p-4 space-y-1">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">{t('passenger.dashboard.safetyScore')}</span>
@@ -242,7 +235,6 @@ export const PassengerDashboard: React.FC = () => {
           </p>
         </Card>
 
-        {/* Stat 4: Nearby Danger Zones */}
         <Card className="p-4 space-y-1 border-outline-variant/30 bg-surface-container-low">
           <div className="flex items-center justify-between text-on-surface-variant">
             <span className="text-xs font-medium">{t('passenger.dashboard.dangerZones')}</span>
@@ -255,22 +247,19 @@ export const PassengerDashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Quick Access List */}
       <div className="space-y-2">
         <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase tracking-wider">
           {t('passenger.dashboard.quickTools')}
         </h2>
-        <div className="grid grid-cols-2 gap-2 text-xs font-medium">
-          <button
+        <div className="space-y-2 text-xs font-medium">
+          <SosButton
             onClick={() => navigate('/passenger/sos')}
-            className="flex items-center gap-2 p-3 rounded-xl bg-error/10 text-error border border-error/20 hover:bg-error/20 transition-colors text-left font-bold"
-          >
-            <span className="material-symbols-outlined text-lg">sos</span>
-            {t('passenger.dashboard.emergencySos')}
-          </button>
+            label={t('passenger.dashboard.emergencySos')}
+            variant="row"
+          />
           <button
             onClick={() => navigate('/passenger/trips')}
-            className="flex items-center gap-2 p-3 rounded-xl bg-surface-container border border-outline-variant/30 hover:bg-surface-container-high transition-colors text-left"
+            className="w-full flex items-center gap-2 p-3 rounded-xl bg-surface-container border border-outline-variant/30 hover:bg-surface-container-high transition-colors text-left"
           >
             <span className="material-symbols-outlined text-lg">history</span>
             {t('passenger.dashboard.tripLogs')}
