@@ -3,10 +3,11 @@ import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'style'> {
   variant?: ('primary' | 'secondary' | 'outline' | 'ghost' | 'danger') | undefined;
   size?: ('sm' | 'md' | 'lg') | undefined;
   isLoading?: boolean | undefined;
+  style?: React.CSSProperties;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -16,6 +17,7 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'md',
   isLoading = false,
   disabled,
+  style,
   ...props
 }) => {
   const pressableProps = usePressableMotionProps();
@@ -41,6 +43,7 @@ export const Button: React.FC<ButtonProps> = ({
       className={cn(baseStyles, variants[variant], sizes[size], className)}
       disabled={disabled || isLoading}
       aria-busy={isLoading}
+      style={style}
       {...pressableProps}
       {...props}
     >
