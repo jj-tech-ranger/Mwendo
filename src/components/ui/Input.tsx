@@ -1,5 +1,7 @@
 import React, { useId } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { useMotionPresets } from '../../lib/motion';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string | undefined;
@@ -11,6 +13,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, icon, helperText, className, id, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
     const generatedId = useId();
+    const motionPresets = useMotionPresets();
     const inputId = id || (label ? generatedId : undefined);
     const errorId = `${inputId || generatedId}-error`;
 
@@ -43,7 +46,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             aria-invalid={!!error}
             aria-describedby={computedDescribedBy}
             className={cn(
-              'w-full h-12 bg-surface-container-low border border-outline-variant/40 rounded-xl px-4 text-sm font-body-md text-on-surface placeholder:text-outline transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50',
+              'w-full h-12 bg-surface-container-low border border-outline-variant/40 rounded-xl px-4 text-sm font-body-md text-on-surface placeholder:text-outline transition-colors duration-standard ease-standard focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50',
               icon && 'pl-11',
               error && 'border-error focus:border-error focus:ring-error',
               className
@@ -51,14 +54,35 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {...props}
           />
         </div>
-        {error && (
-          <p id={errorId} role="alert" className="text-xs font-body-sm text-error">
-            {error}
-          </p>
-        )}
-        {helperText && !error && (
-          <p className="text-xs font-body-sm text-on-surface-variant">{helperText}</p>
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          {error ? (
+            <motion.p
+              key="error"
+              id={errorId}
+              role="alert"
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              variants={motionPresets.staggerItem}
+              className="text-xs font-body-sm text-error"
+            >
+              {error}
+            </motion.p>
+          ) : (
+            helperText && (
+              <motion.p
+                key="helper"
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                variants={motionPresets.staggerItem}
+                className="text-xs font-body-sm text-on-surface-variant"
+              >
+                {helperText}
+              </motion.p>
+            )
+          )}
+        </AnimatePresence>
       </div>
     );
   }
