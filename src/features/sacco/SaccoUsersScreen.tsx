@@ -178,39 +178,37 @@ export const SaccoUsersScreen: React.FC = () => {
         </Card>
       )}
 
-      {showInviteModal && (
-        <Dialog isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} title="Invite Team Member">
-          <div className="space-y-4 text-xs">
-            <div>
-              <label className="font-bold block mb-1">Full Name</label>
-              <Input placeholder="e.g. Jane Mutesi" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
-            </div>
-            <div>
-              <label className="font-bold block mb-1">Work Email</label>
-              <Input placeholder="jane@metrolink.co.ke" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-            </div>
-            <div>
-              <label className="font-bold block mb-1">Role Assignment</label>
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as 'sacco_manager' | 'operations' | 'viewer')}
-                className="w-full p-2 bg-surface text-on-surface border border-outline-variant/40 rounded-xl"
-              >
-                <option value="sacco_manager">SACCO Manager</option>
-                <option value="operations">Operations / Dispatch</option>
-                <option value="viewer">Viewer (Read-only)</option>
-              </select>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setShowInviteModal(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleInvite}>Send Invitation</Button>
-            </div>
+      <Dialog isOpen={showInviteModal} onClose={() => setShowInviteModal(false)} title="Invite Team Member">
+        <div className="space-y-4 text-xs">
+          <div>
+            <label className="font-bold block mb-1">Full Name</label>
+            <Input placeholder="e.g. Jane Mutesi" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
           </div>
-        </Dialog>
-      )}
+          <div>
+            <label className="font-bold block mb-1">Work Email</label>
+            <Input placeholder="jane@metrolink.co.ke" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+          </div>
+          <div>
+            <label className="font-bold block mb-1">Role Assignment</label>
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as 'sacco_manager' | 'operations' | 'viewer')}
+              className="w-full p-2 bg-surface text-on-surface border border-outline-variant/40 rounded-xl"
+            >
+              <option value="sacco_manager">SACCO Manager</option>
+              <option value="operations">Operations / Dispatch</option>
+              <option value="viewer">Viewer (Read-only)</option>
+            </select>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={() => setShowInviteModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleInvite}>Send Invitation</Button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 };
