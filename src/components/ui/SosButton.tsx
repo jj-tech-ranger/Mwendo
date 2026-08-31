@@ -4,7 +4,7 @@ import type { HTMLMotionProps, MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-type SosButtonProps = Omit<HTMLMotionProps<'button'>, 'children' | 'style'> & {
+type SosButtonProps = Omit<HTMLMotionProps<'button'>, 'children' | 'style' | 'whileTap'> & {
   label?: string;
   variant?: 'row' | 'fab';
   style?: MotionStyle;
@@ -18,6 +18,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
   ...props
 }) => {
   const pressableProps = usePressableMotionProps();
+  const whileTap = pressableProps.whileTap ? { scale: 0.92 } : undefined;
 
   return (
     <motion.button
@@ -31,6 +32,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
       )}
       {...(style !== undefined ? { style } : {})}
       {...pressableProps}
+      {...(whileTap !== undefined ? { whileTap } : {})}
       {...(props as Record<string, unknown>)}
     >
       {variant === 'row' ? (
