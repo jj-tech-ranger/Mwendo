@@ -47,7 +47,7 @@ export const Button: React.FC<ButtonProps> = ({
       aria-busy={isLoading}
       {...(style !== undefined ? { style } : {})}
       {...pressableProps}
-      {...props}
+      {...(props as Record<string, unknown>)}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">
