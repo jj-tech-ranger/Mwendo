@@ -117,8 +117,12 @@ export const SaccoViolationsScreen: React.FC = () => {
       </Card>
 
       {/* VIOLATION DETAILS MODAL */}
-      {selectedViolation && (
-        <Dialog isOpen={!!selectedViolation} onClose={() => setSelectedViolation(null)} title={`Violation Report: ${selectedViolation.violationId || selectedViolation.id}`}>
+      <Dialog
+        isOpen={!!selectedViolation}
+        onClose={() => setSelectedViolation(null)}
+        title={selectedViolation ? `Violation Report: ${selectedViolation.violationId || selectedViolation.id}` : 'Violation Report'}
+      >
+        {selectedViolation ? (
           <div className="space-y-4 text-xs">
             <div className="p-4 bg-surface-container rounded-xl grid grid-cols-2 gap-3 font-mono">
               <div>
@@ -154,8 +158,8 @@ export const SaccoViolationsScreen: React.FC = () => {
               Close
             </Button>
           </div>
-        </Dialog>
-      )}
+        ) : null}
+      </Dialog>
     </div>
   );
 };
