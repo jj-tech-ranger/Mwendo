@@ -20,6 +20,17 @@ export interface DailyAnalyticsPayload {
   updatedAt: string;
 }
 
+function assertValidAnalyticsDate(dateStr: unknown): asserts dateStr is string {
+  if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    throw new HttpsError('invalid-argument', 'dateStr must use YYYY-MM-DD format.');
+  }
+
+  const parsed = new Date(`${dateStr}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== dateStr) {
+    throw new HttpsError('invalid-argument', 'dateStr must be a valid calendar date.');
+  }
+}
+
 /**
  * ANALYTICS-001: Date-scoped Daily Analytics Engine
  * Aggregates daily platform metrics bounded strictly by the target date's range,
@@ -29,33 +40,31 @@ export async function processUpdateDailyAnalyticsLogic(
   db: Firestore,
   dateStr: string
 ): Promise<DailyAnalyticsPayload> {
+  assertValidAnalyticsDate(dateStr);
+
   const startOfDay = new Date(`${dateStr}T00:00:00.000Z`);
   const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
   const startIso = startOfDay.toISOString();
   const endIso = endOfDay.toISOString();
 
-  // 1. Date-scoped query for trips starting within the target day
   const tripsSnap = await db
     .collection('trips')
     .where('startTime', '>=', startIso)
     .where('startTime', '<=', endIso)
     .get();
 
-  // 2. Date-scoped query for violations recorded within the target day
   const violSnap = await db
     .collection('violations')
     .where('timestamp', '>=', startIso)
     .where('timestamp', '<=', endIso)
     .get();
 
-  // 3. Date-scoped query for safety alerts triggered within the target day
   const alertsSnap = await db
     .collection('safety_alerts')
     .where('timestamp', '>=', startIso)
     .where('timestamp', '<=', endIso)
     .get();
 
-  // 4. Vehicles risk-tier snapshot is current-state read across active fleet
   const vehiclesSnap = await db.collection('vehicles').get();
 
   const totalTrips = tripsSnap.size;
@@ -95,6 +104,7 @@ export async function processUpdateDailyAnalyticsLogic(
     updatedAt: new Date().toISOString(),
   };
 
+  // Deterministic date-scoped document ID makes retries/replays converge on one record.
   await db.collection('analytics').doc(docId).set(payload, { merge: true });
 
   return payload;
@@ -119,6 +129,8 @@ export const updateDailyAnalytics = onCall(
     }
 
     const dateStr = request.data?.dateStr || new Date().toISOString().split('T')[0];
+    assertValidAnalyticsDate(dateStr);
+
     const db = getFirestore();
     return await processUpdateDailyAnalyticsLogic(db, dateStr);
   }
@@ -137,4 +149,3 @@ export const dailyAnalyticsScheduled = onSchedule('every day 01:00', async () =>
   await processUpdateDailyAnalyticsLogic(db, todayStr);
   console.log(`[dailyAnalyticsScheduled] Computed daily analytics for ${yesterdayStr} and ${todayStr}`);
 });
-
