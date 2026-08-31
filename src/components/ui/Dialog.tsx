@@ -1,8 +1,8 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { cn } from '../../lib/utils';
-import { useMotionPresets } from '../../lib/motion';
 import { Button } from './Button';
+import { useMotionPresets } from '../../lib/motion';
+import { cn } from '../../lib/utils';
 
 interface DialogProps {
   isOpen: boolean;
@@ -13,7 +13,7 @@ interface DialogProps {
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
   isPrimaryLoading?: boolean;
-  variant?: 'default' | 'danger';
+  variant?: 'primary' | 'danger';
 }
 
 export const Dialog: React.FC<DialogProps> = ({
@@ -25,9 +25,9 @@ export const Dialog: React.FC<DialogProps> = ({
   primaryActionLabel,
   onPrimaryAction,
   isPrimaryLoading,
-  variant = 'default',
+  variant = 'primary',
 }) => {
-  const motionPresets = useMotionPresets();
+  const variants = useMotionPresets();
 
   return (
     <AnimatePresence>
@@ -36,34 +36,38 @@ export const Dialog: React.FC<DialogProps> = ({
           initial="hidden"
           animate="visible"
           exit="exit"
-          variants={motionPresets.fadeIn}
+          variants={variants.fadeIn}
           className="fixed inset-0 z-50 flex items-center justify-center p-md bg-on-background/60 backdrop-blur-xs"
+          onClick={onClose}
         >
           <motion.div
             initial="hidden"
             animate="visible"
             exit="exit"
-            variants={motionPresets.scaleIn}
-            className={cn(
-              'bg-surface-bright w-full max-w-md rounded-2xl p-lg shadow-overlay border border-outline-variant/30 space-y-md'
-            )}
+            variants={variants.scaleIn}
+            className="bg-surface-bright w-full max-w-md rounded-2xl p-lg shadow-overlay border border-outline-variant/30 space-y-md"
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex justify-between items-start">
-              <h2 className="font-headline-lg-mobile text-on-surface">{title}</h2>
+            <div className="flex items-start justify-between gap-md">
+              <div className="space-y-xs">
+                <h2 className="font-headline-sm text-on-surface">{title}</h2>
+                {description && (
+                  <p className="font-body-md text-on-surface-variant leading-relaxed">
+                    {description}
+                  </p>
+                )}
+              </div>
               <button
+                type="button"
                 onClick={onClose}
                 aria-label="Close dialog"
-                className="text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors p-2.5 -mr-1 -mt-1 rounded-xl min-w-[44px] min-h-[44px] flex items-center justify-center"
+                className={cn(
+                  'material-symbols-outlined shrink-0 rounded-full p-2 text-on-surface-variant hover:bg-surface-container transition-colors',
+                )}
               >
-                <span className="material-symbols-outlined text-xl">close</span>
+                close
               </button>
             </div>
-
-            {description && (
-              <p className="font-body-md text-on-surface-variant leading-relaxed">
-                {description}
-              </p>
-            )}
 
             {children && <div className="py-2">{children}</div>}
 
@@ -75,7 +79,7 @@ export const Dialog: React.FC<DialogProps> = ({
                 <Button
                   variant={variant === 'danger' ? 'danger' : 'primary'}
                   onClick={onPrimaryAction}
-                  isLoading={isPrimaryLoading}
+                  {...(isPrimaryLoading !== undefined ? { isLoading: isPrimaryLoading } : {})}
                 >
                   {primaryActionLabel}
                 </Button>
