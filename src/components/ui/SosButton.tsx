@@ -3,15 +3,17 @@ import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-interface SosButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
+interface SosButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'style'> {
   label?: string;
   variant?: 'row' | 'fab';
+  style?: React.CSSProperties;
 }
 
 export const SosButton: React.FC<SosButtonProps> = ({
   className,
   label = 'Emergency SOS',
   variant = 'fab',
+  style,
   ...props
 }) => {
   const pressableProps = usePressableMotionProps();
@@ -26,6 +28,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
           : 'w-14 h-14 rounded-full flex items-center justify-center shadow-floating border-2 border-error/70',
         className
       )}
+      style={style}
       {...pressableProps}
       whileTap={pressableProps.whileTap ? { scale: 0.92 } : undefined}
       {...props}
