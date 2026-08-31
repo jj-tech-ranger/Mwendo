@@ -1,10 +1,26 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import type { HTMLMotionProps, MotionStyle } from 'motion/react';
+import type { MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
-type ButtonProps = Omit<HTMLMotionProps<'button'>, 'children' | 'style'> & {
+type NativeButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  | 'style'
+  | 'onAnimationStart'
+  | 'onAnimationEnd'
+  | 'onAnimationIteration'
+  | 'onDrag'
+  | 'onDragEnd'
+  | 'onDragEnter'
+  | 'onDragExit'
+  | 'onDragLeave'
+  | 'onDragOver'
+  | 'onDragStart'
+  | 'onDrop'
+>;
+
+type ButtonProps = NativeButtonProps & {
   children?: React.ReactNode;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
@@ -47,7 +63,7 @@ export const Button: React.FC<ButtonProps> = ({
       aria-busy={isLoading}
       {...(style !== undefined ? { style } : {})}
       {...pressableProps}
-      {...(props as Record<string, unknown>)}
+      {...props}
     >
       {isLoading ? (
         <span className="flex items-center gap-2">
