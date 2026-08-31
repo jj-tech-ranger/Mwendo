@@ -1,59 +1,39 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 
-/**
- * CF-007: Monthly Archival Job
- * Runs on the 1st of every month at 03:00 UTC to archive/flag old trips and telemetry (>12 months)
- * and violations beyond 2 years.
- */
+const PAGE_SIZE = 500;
+const YEAR_MS = 365 * 86400000;
+
 export async function runMonthlyArchivalLogic(db: Firestore): Promise<{ archivedTripsCount: number; archivedViolationsCount: number }> {
-  const twelveMonthsAgoMs = Date.now() - 365 * 86400000;
-  const twelveMonthsAgoIso = new Date(twelveMonthsAgoMs).toISOString();
-
-  const twoYearsAgoMs = Date.now() - 730 * 86400000;
-  const twoYearsAgoIso = new Date(twoYearsAgoMs).toISOString();
-
+  const tripsCutoff = new Date(Date.now() - YEAR_MS).toISOString();
+  const violationsCutoff = new Date(Date.now() - 2 * YEAR_MS).toISOString();
   let archivedTripsCount = 0;
   let archivedViolationsCount = 0;
 
-  // Mark old trips as archived
-  const oldTripsSnap = await db
-    .collection('trips')
-    .where('startTime', '<', twelveMonthsAgoIso)
-    .where('status', '==', 'completed')
-    .limit(500)
-    .get();
-
-  if (!oldTripsSnap.empty) {
+  while (true) {
+    const snap = await db.collection('trips').where('startTime', '<', tripsCutoff).where('status', '==', 'completed').where('isArchived', '!=', true).limit(PAGE_SIZE).get();
+    if (snap.empty) break;
     const batch = db.batch();
-    oldTripsSnap.docs.forEach((doc) => {
-      batch.update(doc.ref, { isArchived: true, archivedAt: new Date().toISOString() });
-      archivedTripsCount++;
-    });
+    snap.docs.forEach((doc) => batch.update(doc.ref, { isArchived: true }));
     await batch.commit();
+    archivedTripsCount += snap.size;
+    if (snap.size < PAGE_SIZE) break;
   }
 
-  // Mark old violations as archived
-  const oldViolationsSnap = await db
-    .collection('violations')
-    .where('timestamp', '<', twoYearsAgoIso)
-    .limit(500)
-    .get();
-
-  if (!oldViolationsSnap.empty) {
+  while (true) {
+    const snap = await db.collection('violations').where('timestamp', '<', violationsCutoff).where('isArchived', '!=', true).limit(PAGE_SIZE).get();
+    if (snap.empty) break;
     const batch = db.batch();
-    oldViolationsSnap.docs.forEach((doc) => {
-      batch.update(doc.ref, { isArchived: true, archivedAt: new Date().toISOString() });
-      archivedViolationsCount++;
-    });
+    snap.docs.forEach((doc) => batch.update(doc.ref, { isArchived: true }));
     await batch.commit();
+    archivedViolationsCount += snap.size;
+    if (snap.size < PAGE_SIZE) break;
   }
 
-  console.log(`[MonthlyArchival] Flagged ${archivedTripsCount} trips and ${archivedViolationsCount} violations as archived.`);
+  console.log(`[MonthlyArchival] Archived ${archivedTripsCount} trips and ${archivedViolationsCount} violations.`);
   return { archivedTripsCount, archivedViolationsCount };
 }
 
 export const monthlyArchival = onSchedule('1 of month 03:00', async () => {
-  const db = getFirestore();
-  await runMonthlyArchivalLogic(db);
+  await runMonthlyArchivalLogic(getFirestore());
 });
