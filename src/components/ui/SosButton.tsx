@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import type { MotionStyle } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { usePressableMotionProps } from '../../lib/motion';
 
@@ -28,7 +29,7 @@ export const SosButton: React.FC<SosButtonProps> = ({
           : 'w-14 h-14 rounded-full flex items-center justify-center shadow-floating border-2 border-error/70',
         className
       )}
-      {...(style !== undefined ? { style: style as React.CSSProperties & Record<string, unknown> } : {})}
+      {...(style !== undefined ? { style: style as MotionStyle } : {})}
       {...pressableProps}
       whileTap={pressableProps.whileTap ? { scale: 0.92 } : undefined}
       {...props}
