@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { complaintRepository, auditLogRepository } from '../../repositories';
 import { Complaint } from '../../types';
@@ -21,7 +22,7 @@ export const AuthorityComplaintsScreen: React.FC = () => {
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
     queryFn: async () => {
-      return complaintRepository.getAll();
+      return complaintRepository.getAll([limit(100)]);
     },
     staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
   });

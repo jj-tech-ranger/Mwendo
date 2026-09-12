@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { inspectionReportRepository, vehicleRepository, auditLogRepository } from '../../repositories';
-import { InspectionReport, Vehicle } from '../../types';
+import { inspectionReportRepository, auditLogRepository } from '../../repositories';
+import { InspectionReport } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -33,17 +34,13 @@ export const AuthorityInspectionsScreen: React.FC = () => {
   const { data: inspectionData, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['inspectionsData'],
     queryFn: async () => {
-      const [fetchedReports, fetchedVehicles] = await Promise.all([
-        inspectionReportRepository.getAll(),
-        vehicleRepository.getAll(),
-      ]);
-      return { reports: fetchedReports, vehicles: fetchedVehicles };
+      const fetchedReports = await inspectionReportRepository.getAll([limit(100)]);
+      return { reports: fetchedReports };
     },
     staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
   });
 
   const reports = inspectionData?.reports || [];
-  const vehicles = inspectionData?.vehicles || [];
 
   const filteredReports = useMemo(() => {
     return reports.filter((r) =>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { where, limit } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { auditLogRepository } from '../../repositories';
@@ -20,8 +21,10 @@ export const AdminNotificationsScreen: React.FC = () => {
 
   async function loadLogs() {
     try {
-      const logs = await auditLogRepository.getAll();
-      const broadcasts = logs.filter((l) => l.action === 'SEND_PUSH_BROADCAST');
+      const broadcasts = await auditLogRepository.getAll([
+        where('action', '==', 'SEND_PUSH_BROADCAST'),
+        limit(50),
+      ]);
       setBroadcastLogs(broadcasts);
     } catch (err) {
       console.error('Failed to load broadcast logs:', err);

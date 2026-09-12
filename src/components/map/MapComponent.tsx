@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import L from 'leaflet';
+import L from '../../lib/leafletHeat';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/Badge';
 
@@ -18,6 +18,8 @@ export interface MapComponentProps {
   markers?: MapMarker[] | undefined;
   showRouteTrace?: boolean | undefined;
   showHeatmapOverlay?: boolean | undefined;
+  viewMode?: 'markers' | 'heatmap' | undefined;
+  onViewModeChange?: ((mode: 'markers' | 'heatmap') => void) | undefined;
   centerAddress?: string | undefined;
   initialCenter?: { lat: number; lng: number } | undefined;
   initialZoom?: number | undefined;
@@ -79,6 +81,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   markers = [],
   showRouteTrace = false,
   showHeatmapOverlay = true,
+  viewMode = 'markers',
+  onViewModeChange,
   centerAddress = 'Nairobi Metro Corridor',
   initialCenter,
   initialZoom = 12,
@@ -93,6 +97,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const heatmapLayerRef = useRef<L.LayerGroup | null>(null);
+  const heatLayerInstanceRef = useRef<L.HeatLayer | null>(null);
+
+  const [internalViewMode, setInternalViewMode] = useState<'markers' | 'heatmap'>(viewMode);
+  const currentViewMode = viewMode ?? internalViewMode;
+
+  const handleToggleViewMode = (targetMode?: 'markers' | 'heatmap') => {
+    const nextMode = targetMode || (currentViewMode === 'markers' ? 'heatmap' : 'markers');
+    setInternalViewMode(nextMode);
+    if (onViewModeChange) {
+      onViewModeChange(nextMode);
+    }
+  };
 
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(markers[0] || null);
 
@@ -180,9 +196,50 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     // Clear previous layers
     markersLayerRef.current.clearLayers();
     heatmapLayerRef.current.clearLayers();
+    if (heatLayerInstanceRef.current) {
+      try {
+        heatLayerInstanceRef.current.remove();
+      } catch {
+        // Safe handling when canvas is unmounted or detached
+      }
+      heatLayerInstanceRef.current = null;
+    }
     if (routeLayerRef.current) {
       routeLayerRef.current.remove();
       routeLayerRef.current = null;
+    }
+
+    // Leaflet Heat Layer for Density/Severity Heat-Map Mode
+    if (currentViewMode === 'heatmap') {
+      const getMarkerIntensity = (m: MapMarker): number => {
+        if (m.severity === 'high' || m.type === 'incident') return 1.0;
+        if (m.severity === 'medium') return 0.65;
+        return 0.35;
+      };
+
+      const heatPoints: Array<[number, number, number]> = markers.map((m) => [
+        m.lat,
+        m.lng,
+        getMarkerIntensity(m),
+      ]);
+
+      if (typeof L.heatLayer === 'function' && heatPoints.length > 0) {
+        const heat = L.heatLayer(heatPoints, {
+          radius: 32,
+          blur: 20,
+          maxZoom: 16,
+          minOpacity: 0.35,
+          gradient: {
+            0.2: '#00431b',
+            0.4: '#10b981',
+            0.6: '#f59e0b',
+            0.8: '#f97316',
+            1.0: '#e11d48',
+          },
+        });
+        heat.addTo(map);
+        heatLayerInstanceRef.current = heat;
+      }
     }
 
     // Add Pinned Location Marker if manual pin drop or active selection
@@ -220,8 +277,8 @@ export const MapComponent: React.FC<MapComponentProps> = ({
 
       leafletMarker.addTo(markersLayerRef.current!);
 
-      // Heatmap danger radius overlays
-      if (showHeatmapOverlay && (m.type === 'blackspot' || m.type === 'incident')) {
+      // Heatmap danger radius overlays (shown in marker view when showHeatmapOverlay is enabled)
+      if (currentViewMode === 'markers' && showHeatmapOverlay && (m.type === 'blackspot' || m.type === 'incident')) {
         const isCritical = m.severity === 'high' || m.type === 'incident';
         const circle = L.circle([m.lat, m.lng], {
           radius: isCritical ? 750 : 450,
@@ -257,7 +314,18 @@ export const MapComponent: React.FC<MapComponentProps> = ({
     } else if (firstMarker && !initialCenter) {
       map.setView([firstMarker.lat, firstMarker.lng], initialZoom);
     }
-  }, [markers, showHeatmapOverlay, showRouteTrace, selectedMarker?.id, handleSelectMarker, initialCenter, initialZoom, pinnedLocation]);
+
+    return () => {
+      if (heatLayerInstanceRef.current) {
+        try {
+          heatLayerInstanceRef.current.remove();
+        } catch {
+          // Safe handling when canvas is unmounted or detached
+        }
+        heatLayerInstanceRef.current = null;
+      }
+    };
+  }, [markers, showHeatmapOverlay, showRouteTrace, selectedMarker?.id, handleSelectMarker, initialCenter, initialZoom, pinnedLocation, currentViewMode]);
 
   // Zoom / Location Control Handlers
   const handleZoomIn = () => {
@@ -325,11 +393,29 @@ export const MapComponent: React.FC<MapComponentProps> = ({
               {pinnedLocation ? 'Pin Placed' : 'Tap Map to Pin'}
             </span>
           )}
-          {showHeatmapOverlay && (
-            <Badge variant="warning" className="shadow-sm">
-              Heatmap Active
-            </Badge>
-          )}
+          <button
+            id="btn-toggle-map-view"
+            data-testid="btn-toggle-map-view"
+            type="button"
+            onClick={() => handleToggleViewMode()}
+            title={`Switch to ${currentViewMode === 'markers' ? 'Heat-Map' : 'Marker'} View`}
+            className="bg-surface-bright/90 backdrop-blur-md border border-outline-variant/30 px-2.5 py-1 rounded-full text-xs font-bold text-on-surface hover:bg-surface-container active:scale-95 shadow-sm flex items-center gap-1 cursor-pointer transition-all"
+          >
+            <span className={`material-symbols-outlined text-sm ${currentViewMode === 'heatmap' ? 'text-rose-600' : 'text-primary'}`}>
+              {currentViewMode === 'heatmap' ? 'local_fire_department' : 'layers'}
+            </span>
+            <span className="hidden xs:inline">
+              {currentViewMode === 'heatmap' ? 'Heat View' : 'Marker View'}
+            </span>
+          </button>
+          <Badge
+            id="badge-map-mode"
+            data-testid="badge-map-mode"
+            variant={currentViewMode === 'heatmap' ? 'danger' : 'warning'}
+            className="shadow-sm font-bold"
+          >
+            {currentViewMode === 'heatmap' ? 'Density Heat-Map' : 'Markers Active'}
+          </Badge>
           <span className="text-[10px] font-mono font-bold bg-surface-bright/80 backdrop-blur-xs px-2 py-1 rounded-full border border-outline-variant/20 text-on-surface-variant hidden sm:inline-block">
             {markers.length} Pins Live
           </span>

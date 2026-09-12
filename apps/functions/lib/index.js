@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.decayBlackSpotsScheduled = exports.decayStaleBlackSpots = exports.generateTripSummary = exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.createInspection = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.deleteOwnAccount = exports.verifyTotpChallenge = exports.healthCheck = exports.reactivateUser = exports.suspendUser = void 0;
+exports.updateReporterTrust = exports.decayBlackSpotsScheduled = exports.decayStaleBlackSpots = exports.generateTripSummary = exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.createInspection = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.deleteOwnAccount = exports.verifyTotpChallenge = exports.healthCheck = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
 const v2_1 = require("firebase-functions/v2");
 // Enforce regional architecture for all Gen 2 Cloud Functions
@@ -43,4 +43,6 @@ Object.defineProperty(exports, "generateTripSummary", { enumerable: true, get: f
 var decayStaleBlackSpots_1 = require("./reports/decayStaleBlackSpots");
 Object.defineProperty(exports, "decayStaleBlackSpots", { enumerable: true, get: function () { return decayStaleBlackSpots_1.decayStaleBlackSpots; } });
 Object.defineProperty(exports, "decayBlackSpotsScheduled", { enumerable: true, get: function () { return decayStaleBlackSpots_1.decayBlackSpotsScheduled; } });
+var updateReporterTrust_1 = require("./trust/updateReporterTrust");
+Object.defineProperty(exports, "updateReporterTrust", { enumerable: true, get: function () { return updateReporterTrust_1.updateReporterTrust; } });
 //# sourceMappingURL=index.js.map

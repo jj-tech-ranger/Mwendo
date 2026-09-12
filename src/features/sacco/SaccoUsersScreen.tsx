@@ -112,36 +112,38 @@ export const SaccoUsersScreen: React.FC = () => {
 
       {activeSubTab === 'users' ? (
         <Card className="p-0 overflow-hidden">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
-              <tr>
-                <th className="p-3.5">Name</th>
-                <th className="p-3.5">Email</th>
-                <th className="p-3.5">Role</th>
-                <th className="p-3.5">Status</th>
-                <th className="p-3.5 font-mono text-right">Last Active</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/20 font-medium">
-              {teamUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-surface-container/50">
-                  <td className="p-3.5 font-bold text-on-surface">{u.name}</td>
-                  <td className="p-3.5 font-mono text-on-surface-variant">{u.email}</td>
-                  <td className="p-3.5 capitalize">
-                    <Badge variant="neutral" className="font-mono text-[10px]">
-                      {u.role.replace('_', ' ')}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5">
-                    <Badge variant={u.status === 'active' ? 'success' : 'warning'} className="capitalize text-[10px]">
-                      {u.status}
-                    </Badge>
-                  </td>
-                  <td className="p-3.5 text-right font-mono text-on-surface-variant">{u.lastActive}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
+                <tr>
+                  <th className="p-3.5">Name</th>
+                  <th className="p-3.5">Email</th>
+                  <th className="p-3.5">Role</th>
+                  <th className="p-3.5">Status</th>
+                  <th className="p-3.5 font-mono text-right">Last Active</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/20 font-medium">
+                {teamUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-surface-container/50">
+                    <td className="p-3.5 font-bold text-on-surface">{u.name}</td>
+                    <td className="p-3.5 font-mono text-on-surface-variant">{u.email}</td>
+                    <td className="p-3.5 capitalize">
+                      <Badge variant="neutral" className="font-mono text-[10px]">
+                        {u.role.replace('_', ' ')}
+                      </Badge>
+                    </td>
+                    <td className="p-3.5">
+                      <Badge variant={u.status === 'active' ? 'success' : 'warning'} className="capitalize text-[10px]">
+                        {u.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3.5 text-right font-mono text-on-surface-variant">{u.lastActive}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       ) : (
         <Card className="p-6 space-y-4">

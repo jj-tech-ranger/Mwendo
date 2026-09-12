@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { where, limit, orderBy } from 'firebase/firestore';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -6,12 +7,11 @@ import {
   tripRepository,
   violationRepository,
   blackSpotRepository,
-  vehicleRepository,
   saccoRepository,
   analyticsRepository,
   alertRepository,
 } from '../../repositories';
-import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO, PlatformAnalyticsDaily } from '../../types';
+import { Trip, Violation, BlackSpot, SafetyAlert, SACCO, PlatformAnalyticsDaily } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -67,21 +67,27 @@ export const AuthorityDashboard: React.FC = () => {
     queryKey: ['authorityDashboardData'],
     queryFn: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
-      const [fetchedTrips, fetchedViolations, fetchedSpots, fetchedVehicles, fetchedSaccos, _precomputedDoc] =
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+      const [precomputedDoc, fetchedTrips, fetchedViolations, fetchedSpots, fetchedSaccos] =
         await Promise.all([
-          tripRepository.getAll(),
-          violationRepository.getAll(),
-          blackSpotRepository.getAll(),
-          vehicleRepository.getAll(),
-          saccoRepository.getAll(),
-          analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
+          analyticsRepository
+            .getById(`daily_${todayStr}`)
+            .catch(() => null)
+            .then(async (doc) => {
+              if (doc) return doc;
+              return analyticsRepository.getById(`daily_${yesterdayStr}`).catch(() => null);
+            }),
+          tripRepository.getAll([where('status', '==', 'active'), limit(50)]),
+          violationRepository.getAll([orderBy('timestamp', 'desc'), limit(100)]),
+          blackSpotRepository.getAll([limit(50)]),
+          saccoRepository.getAll([limit(25)]),
         ]);
 
       return {
+        precomputed: precomputedDoc as PlatformAnalyticsDaily | null,
         trips: fetchedTrips,
         violations: fetchedViolations,
         blackSpots: fetchedSpots,
-        vehicles: fetchedVehicles,
         saccos: fetchedSaccos,
       };
     },
@@ -92,7 +98,6 @@ export const AuthorityDashboard: React.FC = () => {
   const violations = authorityData?.violations || [];
   const blackSpots = authorityData?.blackSpots || [];
   const alerts = realtimeAlerts;
-  const vehicles = authorityData?.vehicles || [];
   const saccos = authorityData?.saccos || [];
 
   // Sort SACCOs by safetyScore ascending (lowest safety score = highest audit priority)
@@ -122,8 +127,11 @@ export const AuthorityDashboard: React.FC = () => {
   }, [trips]);
 
   const violationsToday = useMemo(() => {
+    if (selectedCounty === 'All Kenya (National)' && authorityData?.precomputed?.totalViolations !== undefined) {
+      return authorityData.precomputed.totalViolations;
+    }
     return filteredViolations.length;
-  }, [filteredViolations]);
+  }, [filteredViolations, selectedCounty, authorityData?.precomputed]);
 
   const verifiedBlackSpotsCount = useMemo(() => {
     return filteredSpots.filter((s) => s.verifiedByAuthority).length;

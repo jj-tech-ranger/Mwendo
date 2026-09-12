@@ -105,6 +105,7 @@ export const EmergencySosScreen: React.FC = () => {
     alertId?: string;
     location?: { lat: number; lng: number } | null;
     isBackupActive?: boolean;
+    isOfflineQueued?: boolean;
     errorMessage?: string;
   } | null>(null);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
@@ -161,6 +162,60 @@ export const EmergencySosScreen: React.FC = () => {
     const tripContext = vehicleRegNumber ? `on vehicle ${vehicleRegNumber}` : '(no active trip)';
     const sosMessage = `EMERGENCY SOS: Passenger ${user?.displayName || 'Commuter'} triggered urgent safety broadcast ${tripContext}`;
 
+    const primaryEmergencyPhone = contacts.find((c) => c.phone)?.phone?.replace(/[^0-9+]/g, '') || null;
+
+    // Fast-path for offline status: queue immediately without false 'dispatched' promise
+    const isCurrentlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    if (isCurrentlyOffline) {
+      try {
+        await offlineStorage.setItem(`offline_sos_${alertId}`, {
+          alertId,
+          tripId,
+          userId,
+          vehicleRegNumber,
+          saccoId,
+          location: location ?? undefined,
+          speedKmH,
+          message: sosMessage,
+          timestamp: new Date().toISOString(),
+          type: 'sos',
+          status: 'queued',
+          retryCount: 0,
+        });
+        await offlineSyncService.updatePendingCount();
+      } catch (queueErr) {
+        console.warn('[EmergencySosScreen] Error queueing offline SOS alert:', queueErr);
+      }
+
+      setDispatchedSummary({
+        contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
+        fcmTargets: [],
+        alertId,
+        location,
+        isBackupActive: true,
+        isOfflineQueued: true,
+        errorMessage: 'Device is offline — SOS alert queued for automatic dispatch when connectivity returns.',
+      });
+
+      // Supplementary local SMS deep-link fallback
+      const mapsLink = location ? `https://maps.google.com/?q=${location.lat},${location.lng}` : 'Location unavailable';
+      const vehicleNotice = vehicleRegNumber ? ` on PSV ${vehicleRegNumber}` : '';
+      const smsFallbackBody = encodeURIComponent(
+        `EMERGENCY SOS: I need immediate assistance${vehicleNotice}! Live GPS: ${mapsLink}`
+      );
+      try {
+        const smsTarget = primaryEmergencyPhone || '999';
+        window.location.href = `sms:${smsTarget}?body=${smsFallbackBody}`;
+      } catch (smsDeepLinkErr) {
+        console.warn('[EmergencySosScreen] SMS deep-link fallback trigger:', smsDeepLinkErr);
+      }
+
+      setIsDispatching(false);
+      setSosSent(true);
+      return;
+    }
+
     // 2. Primary Backend Dispatch: Trigger sendSOS Cloud Function
     try {
       const result = await functionsService.sendSOS({
@@ -181,6 +236,7 @@ export const EmergencySosScreen: React.FC = () => {
           alertId,
           location,
           isBackupActive: false,
+          isOfflineQueued: false,
         });
       } else {
         throw new Error('SOS dispatch failed — using backup channels');
@@ -197,7 +253,7 @@ export const EmergencySosScreen: React.FC = () => {
 
       // Queue alert for background retry
       try {
-        await offlineStorage.setItem(`offline_report_sos_${alertId}`, {
+        await offlineStorage.setItem(`offline_sos_${alertId}`, {
           alertId,
           tripId,
           userId,
@@ -205,6 +261,7 @@ export const EmergencySosScreen: React.FC = () => {
           saccoId,
           location: location ?? undefined,
           speedKmH,
+          message: sosMessage,
           timestamp: new Date().toISOString(),
           type: 'sos',
           status: 'queued',
@@ -221,6 +278,7 @@ export const EmergencySosScreen: React.FC = () => {
         alertId,
         location,
         isBackupActive: true,
+        isOfflineQueued: false,
         errorMessage: 'SOS dispatch failed — using backup channels',
       });
     }
@@ -253,7 +311,8 @@ export const EmergencySosScreen: React.FC = () => {
       `EMERGENCY SOS: I need immediate assistance${vehicleNotice}! Live GPS: ${mapsLink}`
     );
     try {
-      window.location.href = `sms:999?body=${smsFallbackBody}`;
+      const smsTarget = primaryEmergencyPhone || '999';
+      window.location.href = `sms:${smsTarget}?body=${smsFallbackBody}`;
     } catch (smsDeepLinkErr) {
       console.warn('[EmergencySosScreen] SMS deep-link fallback trigger:', smsDeepLinkErr);
     }
@@ -433,13 +492,26 @@ export const EmergencySosScreen: React.FC = () => {
               <p className="text-xs text-on-surface-variant">
                 Server will automatically dispatch emergency SMS to your {contacts.length} saved contacts, send FCM push alerts to SACCO managers, and notify NTSA emergency portal.
               </p>
-              <Button
-                variant="outline"
-                className="w-full text-xs font-bold border-error text-error"
-                onClick={handleCancelCountdown}
-              >
-                Cancel Alert
-              </Button>
+              <div className="space-y-2">
+                <Button
+                  id="btn-skip-countdown"
+                  data-testid="btn-skip-countdown"
+                  className="w-full text-xs font-bold bg-error text-white hover:bg-error/90"
+                  onClick={() => {
+                    setCountdown(null);
+                    dispatchSosAlert();
+                  }}
+                >
+                  Send Immediately (Skip Countdown)
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full text-xs font-bold border-error text-error"
+                  onClick={handleCancelCountdown}
+                >
+                  Cancel Alert
+                </Button>
+              </div>
             </Card>
           ) : isDispatching ? (
             <Card className="p-8 bg-error/10 border border-error space-y-4 text-center">
@@ -452,70 +524,159 @@ export const EmergencySosScreen: React.FC = () => {
           ) : sosSent ? (
             /* SOS Sent Confirmation */
             dispatchedSummary?.isBackupActive ? (
-              /* Failure / Backup Channels Active Card */
-              <Card className="p-6 bg-amber-500/10 border border-amber-500/30 space-y-4 text-left">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-amber-600 text-3xl">warning</span>
-                  <div>
-                    <h2 className="text-base font-bold text-amber-900 dark:text-amber-200">
-                      SOS dispatch failed — using backup channels
+              /* Failure / Offline Queued Card */
+              <Card
+                id="sos-offline-card"
+                data-testid="sos-offline-card"
+                className="p-6 bg-amber-500/10 border border-amber-500/30 space-y-4 text-left shadow-lg"
+              >
+                <div className="flex items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
+                  <Badge
+                    id="badge-sos-offline-status"
+                    data-testid="badge-sos-offline-status"
+                    variant="warning"
+                    className="font-bold uppercase tracking-wider text-[10px]"
+                  >
+                    {dispatchedSummary.isOfflineQueued ? 'SOS Queued (Offline)' : 'Backup Channels Active'}
+                  </Badge>
+                  <span className="text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300">
+                    Pending Connection
+                  </span>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <span className="material-symbols-outlined text-amber-600 text-3xl mt-0.5">warning</span>
+                  <div className="space-y-1">
+                    <h2
+                      id="sos-offline-title"
+                      data-testid="sos-offline-title"
+                      className="text-base font-black text-amber-950 dark:text-amber-100"
+                    >
+                      {dispatchedSummary.isOfflineQueued
+                        ? 'SOS Queued: Will Send When Back Online'
+                        : 'SOS dispatch failed — using backup channels'}
                     </h2>
-                    <p className="text-xs text-amber-800 dark:text-amber-300">
-                      {dispatchedSummary?.location
-                        ? `Live GPS fix (${dispatchedSummary.location.lat.toFixed(4)}, ${dispatchedSummary.location.lng.toFixed(4)}) recorded.`
-                        : 'Location unavailable (No GPS fix acquired).'}
+                    <p className="text-xs text-amber-900 dark:text-amber-200 leading-relaxed">
+                      Cloud dispatch is waiting for a network connection. Help has <strong>not</strong> been dispatched to SACCO operations yet. Your alert is safely saved on this device and will broadcast automatically once reconnected.
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl">
-                  <div className="text-xs font-bold text-on-surface uppercase mb-1">Backup Dispatch Channels:</div>
-                  <div className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">sync</span>
-                    SOS alert queued for retry (offline sync active)
-                  </div>
-                  {dispatchedSummary?.contacts.map((c, idx) => (
-                    <div key={idx} className="text-on-surface-variant font-medium flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-xs text-amber-600">schedule</span>
-                      SMS to {c.name} ({c.relationship}): <span className="text-amber-700 dark:text-amber-300 font-bold">Queued — will retry</span>
+                {/* Direct-Dial Validated Emergency Contacts */}
+                {contacts.length > 0 ? (
+                  <div className="space-y-2 pt-1">
+                    <div className="text-[11px] font-mono font-bold text-on-surface uppercase flex items-center gap-1">
+                      <span className="material-symbols-outlined text-sm text-error">phone_in_talk</span>
+                      Direct-Dial Validated Emergency Contact:
                     </div>
-                  ))}
-                  <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">sms</span>
-                    Direct SMS (sms:999) composer triggered on device
+                    {contacts.map((c) => (
+                      <a
+                        key={c.id}
+                        id={`btn-dial-contact-${c.id}`}
+                        data-testid="btn-dial-primary-contact"
+                        href={`tel:${c.phone.replace(/[^0-9+]/g, '')}`}
+                        className="w-full p-3 rounded-xl bg-error text-white font-bold flex items-center justify-between text-xs hover:bg-error/90 shadow-md active:scale-98 transition-all"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-lg">call</span>
+                          </div>
+                          <div className="text-left">
+                            <div className="font-black text-sm">Call {c.name} ({c.relationship})</div>
+                            <div className="text-[11px] opacity-90 font-mono">{c.phone}</div>
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined text-sm">call_made</span>
+                      </a>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <div className="p-2.5 rounded-lg bg-surface border border-outline-variant/30 text-xs text-on-surface-variant flex items-center justify-between">
+                    <span>No emergency contact configured.</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('contacts')}
+                      className="text-primary font-bold hover:underline text-xs"
+                    >
+                      Add Contact Now
+                    </button>
+                  </div>
+                )}
 
                 {/* Hotlines Banner */}
-                <div className="p-3 bg-surface-container rounded-xl text-xs space-y-2">
-                  <div className="font-bold text-on-surface flex items-center gap-1">
-                    <span className="material-symbols-outlined text-sm text-error">phone_in_talk</span>
-                    Immediate Direct Emergency Hotlines
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-mono font-bold text-on-surface uppercase">
+                    Official Emergency Hotlines:
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <a
+                      id="btn-dial-police"
+                      data-testid="btn-dial-police"
                       href="tel:999"
-                      className="p-2.5 rounded-lg bg-error text-white font-bold flex items-center justify-between text-xs hover:bg-error/90"
+                      className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/30 font-bold flex items-center justify-between text-xs hover:bg-surface-container-high text-on-surface"
                     >
                       <span>Call Police (999)</span>
-                      <span className="material-symbols-outlined text-sm">call</span>
+                      <span className="material-symbols-outlined text-primary text-sm">call</span>
                     </a>
                     <a
+                      id="btn-dial-ntsa"
+                      data-testid="btn-dial-ntsa"
                       href="tel:0800720822"
-                      className="p-2.5 rounded-lg bg-surface border border-outline-variant font-bold flex items-center justify-between text-xs hover:bg-surface-container-high"
+                      className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/30 font-bold flex items-center justify-between text-xs hover:bg-surface-container-high text-on-surface"
                     >
                       <span>Call NTSA (0800720822)</span>
-                      <span className="material-symbols-outlined text-sm">call</span>
+                      <span className="material-symbols-outlined text-primary text-sm">call</span>
                     </a>
                   </div>
                 </div>
 
-                <Button
-                  className="w-full text-xs font-bold bg-surface-container-highest text-on-surface"
-                  onClick={() => setSosSent(false)}
-                >
-                  Dismiss / Back to SOS
-                </Button>
+                {/* Queued Details Telemetry */}
+                <div className="space-y-1.5 text-xs font-mono bg-surface p-3 rounded-xl border border-amber-500/20">
+                  <div className="text-[11px] font-bold text-on-surface uppercase flex items-center justify-between">
+                    <span>Queued Delivery Telemetry</span>
+                    <span className="text-amber-700 dark:text-amber-400 font-bold">Offline Storage</span>
+                  </div>
+                  <div
+                    className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5"
+                    data-testid="sos-queued-status-indicator"
+                  >
+                    <span className="material-symbols-outlined text-xs">hourglass_top</span>
+                    Status: Queued in offline store (ID: {dispatchedSummary.alertId?.slice(-8) || 'local'})
+                  </div>
+                  <div className="text-on-surface-variant flex items-center gap-1.5 text-[11px]">
+                    <span className="material-symbols-outlined text-xs">location_on</span>
+                    Fix: {dispatchedSummary.location ? `${dispatchedSummary.location.lat.toFixed(4)}, ${dispatchedSummary.location.lng.toFixed(4)}` : 'No GPS Fix Recorded'}
+                  </div>
+                  {dispatchedSummary.contacts.map((c, idx) => (
+                    <div key={idx} className="text-on-surface-variant flex items-center gap-1.5 text-[11px]">
+                      <span className="material-symbols-outlined text-xs text-amber-600">schedule</span>
+                      SMS to {c.name} ({c.relationship}): <span className="font-bold text-amber-700 dark:text-amber-300">Queued — will retry on reconnect</span>
+                    </div>
+                  ))}
+                  <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5 text-[11px]">
+                    <span className="material-symbols-outlined text-xs">sms</span>
+                    Direct SMS composer (999) invoked on device
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <Button
+                    id="btn-retry-sos"
+                    data-testid="btn-retry-sos"
+                    className="w-full text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white flex items-center justify-center gap-1.5 shadow-sm"
+                    onClick={dispatchSosAlert}
+                    disabled={isDispatching}
+                  >
+                    <span className="material-symbols-outlined text-sm">refresh</span>
+                    {isDispatching ? 'Retrying Dispatch...' : 'Retry Dispatch Now'}
+                  </Button>
+                  <Button
+                    className="w-full text-xs font-bold bg-surface-container-highest text-on-surface"
+                    onClick={() => setSosSent(false)}
+                  >
+                    Dismiss / Back to SOS
+                  </Button>
+                </div>
               </Card>
             ) : (
               /* Success Card */

@@ -19,7 +19,7 @@ export const ServerUnavailableScreen: React.FC = () => {
         <PrimaryLogo className="h-10 w-auto" />
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-margin-mobile text-center max-w-md mx-auto space-y-md">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center max-w-md mx-auto space-y-md">
         <div className="relative w-64 h-64 bg-surface-container-low rounded-2xl overflow-hidden flex items-center justify-center border border-outline-variant/30 mb-2">
           <img
             src={BRAND_ASSETS.disconnectedIllustration}

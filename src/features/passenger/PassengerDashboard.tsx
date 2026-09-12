@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
-import { db } from '../../lib/firebase';
 import { normalizePlate } from '../../lib/plate';
 import { vehicleRepository, vehiclePublicSummaryRepository } from '../../repositories';
 import { Vehicle, VehiclePublicSummary } from '../../types';

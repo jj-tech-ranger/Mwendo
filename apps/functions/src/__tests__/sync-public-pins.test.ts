@@ -310,7 +310,7 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
     expect(mockDbData['public_pins/spot_pending_review']).toBeUndefined();
 
     // Inspector verifies and publishes spot_pending_review (simulating AuthorityBlackSpotsScreen.tsx)
-    const verificationTime = '2026-09-12T12:00:00.000Z';
+    const verificationTime = new Date(Date.now() + 60000).toISOString();
     mockDbData['black_spots/spot_pending_review'] = {
       ...mockDbData['black_spots/spot_pending_review'],
       status: 'published',

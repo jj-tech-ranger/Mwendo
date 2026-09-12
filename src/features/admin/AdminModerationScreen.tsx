@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { where } from 'firebase/firestore';
+import { where, limit } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -31,7 +31,7 @@ export const AdminModerationScreen: React.FC = () => {
   const fetchDisputes = useCallback(async () => {
     setLoadingDisputes(true);
     try {
-      const results = await violationRepository.getAll([where('status', '==', 'disputed')]);
+      const results = await violationRepository.getAll([where('status', '==', 'disputed'), limit(50)]);
       setDisputedViolations(results);
     } catch (err) {
       console.error('[AdminModerationScreen] Error fetching disputed violations:', err);

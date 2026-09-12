@@ -175,26 +175,28 @@ export const SaccoSettingsScreen: React.FC = () => {
             <span className="font-mono text-on-surface-variant">Tenant: {saccoId}</span>
           </div>
 
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-surface-container-high border-b border-outline-variant/30 uppercase text-on-surface-variant">
-              <tr>
-                <th className="p-3">Timestamp</th>
-                <th className="p-3">Actor</th>
-                <th className="p-3">Action Executed</th>
-                <th className="p-3">Target Entity</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/20 font-medium">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-surface-container/50">
-                  <td className="p-3 text-on-surface-variant">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                  <td className="p-3 font-bold text-primary">{log.actorName}</td>
-                  <td className="p-3 text-on-surface">{log.action}</td>
-                  <td className="p-3 text-on-surface-variant">{log.target}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-surface-container-high border-b border-outline-variant/30 uppercase text-on-surface-variant">
+                <tr>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Actor</th>
+                  <th className="p-3">Action Executed</th>
+                  <th className="p-3">Target Entity</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-outline-variant/20 font-medium">
+                {logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-surface-container/50">
+                    <td className="p-3 text-on-surface-variant">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                    <td className="p-3 font-bold text-primary">{log.actorName}</td>
+                    <td className="p-3 text-on-surface">{log.action}</td>
+                    <td className="p-3 text-on-surface-variant">{log.target}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 

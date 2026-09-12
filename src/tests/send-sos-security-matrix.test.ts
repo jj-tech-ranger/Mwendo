@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { HttpsError } from 'firebase-functions/v2/https';
 import { processSendSosLogic } from '../../apps/functions/src/alerts/sendSOS';
 
 type Stored = Record<string, any>;

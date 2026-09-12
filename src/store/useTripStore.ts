@@ -23,7 +23,7 @@ interface PersistedTripState {
 }
 
 interface TripState extends PersistedTripState {
-  startTrip: (params: { vehicleId?: string; plateNumber: string; saccoName?: string; saccoId?: string; routeName?: string; isProvisional?: boolean }) => void;
+  startTrip: (params: { vehicleId?: string | undefined; plateNumber: string; saccoName?: string | undefined; saccoId?: string | undefined; routeName?: string | undefined; isProvisional?: boolean | undefined }) => void;
   updateTelemetry: (speed: number, gps?: GPSPoint) => void;
   pauseTrip: () => void;
   resumeTrip: () => void;

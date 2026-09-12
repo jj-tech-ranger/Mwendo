@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { where, limit } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { userRepository, auditLogRepository } from '../../repositories';
@@ -31,8 +32,7 @@ export const AdminAuthoritiesScreen: React.FC = () => {
   async function loadInspectors() {
     setIsLoading(true);
     try {
-      const allUsers = await userRepository.getAll();
-      const authorityUsers = allUsers.filter((u) => u.role === 'authority');
+      const authorityUsers = await userRepository.getAll([where('role', '==', 'authority'), limit(100)]);
       setInspectors(authorityUsers);
     } catch (err) {
       console.error('Failed to load inspectors:', err);

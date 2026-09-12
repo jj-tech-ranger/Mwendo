@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { blackSpotRepository, auditLogRepository } from '../../repositories';
 import { functionsService } from '../../services/functionsService';
@@ -37,7 +38,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
   const { data: blackSpots = [], isLoading } = useQuery({
     queryKey: ['blackSpots'],
     queryFn: async () => {
-      const data = await blackSpotRepository.getAll();
+      const data = await blackSpotRepository.getAll([limit(150)]);
       return data;
     },
     staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,

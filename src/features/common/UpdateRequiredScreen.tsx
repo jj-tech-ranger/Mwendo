@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/Button';
 
 export const UpdateRequiredScreen: React.FC = () => {
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-on-background/60 backdrop-blur-xs p-margin-mobile">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-on-background/60 backdrop-blur-xs p-4 sm:p-6">
       <div className="bg-surface-bright w-full max-w-sm rounded-2xl p-lg text-center shadow-2xl space-y-md border border-outline-variant/30">
         <img src={BRAND_ASSETS.appIcon} alt="App Icon" className="w-16 h-16 rounded-xl mx-auto shadow-sm" />
         <h2 className="font-headline-lg-mobile text-on-surface">Update required to continue</h2>

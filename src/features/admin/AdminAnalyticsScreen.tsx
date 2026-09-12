@@ -1,22 +1,39 @@
 import React, { useState, useEffect } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { PieChartWrapper } from '../../components/charts/Charts';
-import { userRepository, saccoRepository } from '../../repositories';
-import { SACCO, UserProfile } from '../../types';
+import { userRepository, saccoRepository, analyticsRepository } from '../../repositories';
+import { SACCO, UserProfile, PlatformAnalyticsDaily } from '../../types';
 
 export const AdminAnalyticsScreen: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [saccos, setSaccos] = useState<SACCO[]>([]);
+  const [totalUserCount, setTotalUserCount] = useState<number>(0);
+  const [totalSaccoCount, setTotalSaccoCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        const [uList, sList] = await Promise.all([
-          userRepository.getAll(),
-          saccoRepository.getAll(),
+        const todayStr = new Date().toISOString().split('T')[0];
+        const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+        const [precomputedDoc, uList, sList] = await Promise.all([
+          analyticsRepository
+            .getById(`daily_${todayStr}`)
+            .catch(() => null)
+            .then(async (doc) => {
+              if (doc) return doc;
+              return analyticsRepository.getById(`daily_${yesterdayStr}`).catch(() => null);
+            }),
+          userRepository.getAll([limit(100)]),
+          saccoRepository.getAll([orderBy('safetyScore', 'desc'), limit(25)]),
         ]);
+
+        const precomputed = precomputedDoc as PlatformAnalyticsDaily | null;
+        setTotalUserCount(precomputed?.userCount ?? uList.length);
+        setTotalSaccoCount(precomputed?.saccoCount ?? sList.length);
         setUsers(uList);
         setSaccos(sList);
       } catch (err) {
@@ -72,7 +89,7 @@ export const AdminAnalyticsScreen: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-lg">
         <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <h3 className="font-headline-lg-mobile text-sm text-on-surface font-bold border-b border-outline-variant/20 pb-sm">
-            Registered User Demographics ({users.length} total)
+            Registered User Demographics ({totalUserCount} total)
           </h3>
           {roleDistribution.length > 0 ? (
             <PieChartWrapper data={roleDistribution} height={200} />
@@ -85,7 +102,7 @@ export const AdminAnalyticsScreen: React.FC = () => {
 
         <div className="lg:col-span-2 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl p-md shadow-sm space-y-md">
           <h3 className="font-headline-lg-mobile text-sm text-on-surface font-bold border-b border-outline-variant/20 pb-sm">
-            Registered SACCO Performance Leaderboard ({saccos.length} total)
+            Registered SACCO Performance Leaderboard ({totalSaccoCount} total)
           </h3>
 
           <div className="overflow-x-auto">

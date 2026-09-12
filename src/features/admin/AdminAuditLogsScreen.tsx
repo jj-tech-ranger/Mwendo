@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -12,7 +13,7 @@ export const AdminAuditLogsScreen: React.FC = () => {
   const { data: logs = [], isLoading } = useQuery({
     queryKey: ['adminAuditLogs'],
     queryFn: async () => {
-      return auditLogRepository.getAll();
+      return auditLogRepository.getAll([orderBy('timestamp', 'desc'), limit(100)]);
     },
     staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
   });

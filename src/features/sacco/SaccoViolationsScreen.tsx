@@ -70,7 +70,8 @@ export const SaccoViolationsScreen: React.FC = () => {
 
       {/* Table of Violations */}
       <Card className="p-0 overflow-hidden">
-        <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
           <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
             <tr>
               <th className="p-3.5">Violation ID</th>
@@ -114,6 +115,7 @@ export const SaccoViolationsScreen: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
 
       {/* VIOLATION DETAILS MODAL */}

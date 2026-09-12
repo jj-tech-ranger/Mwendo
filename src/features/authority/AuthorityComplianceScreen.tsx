@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { violationRepository, auditLogRepository } from '../../repositories';
 import { Violation, SeverityLevel } from '../../types';
@@ -23,7 +24,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
   const { data: violations = [], isLoading } = useQuery({
     queryKey: ['violations'],
     queryFn: async () => {
-      return violationRepository.getAll();
+      return violationRepository.getAll([orderBy('timestamp', 'desc'), limit(100)]);
     },
     staleTime: QUERY_STALE_TIMES.SAFETY_ALERTS,
   });

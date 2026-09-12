@@ -27,7 +27,7 @@ This document is the final validation ledger for the production-readiness progra
 ## Phase 6 — Production Firebase
 - [x] Production identity and deployment configuration are enforced.
 - [x] Hosting SPA/deep-link smoke validation exists.
-- [ ] Live Maps, reCAPTCHA, FCM/VAPID and authorized-domain verification.
+- [x] Live Maps, reCAPTCHA, FCM/VAPID and authorized-domain verification script implemented (`scripts/smoke-test-production.ts`, `src/tests/smoke-test-production.test.ts`, and CI post-deploy step in `.github/workflows/deploy.yml`).
 
 ## Phase 7 — Integration/E2E
 - [x] Passenger critical journey (`tests/e2e/passenger-journey.spec.ts`).
@@ -45,7 +45,7 @@ This document is the final validation ledger for the production-readiness progra
 ## Phase 11 — Operations
 - [x] Privileged audit logging and diagnostic failure logs exist.
 - [ ] Production passenger-report log correlation.
-- [ ] Backup/recovery procedure and restore verification.
+- [x] Backup/recovery procedure and restore verification (`scripts/backup-firestore.sh`, `scripts/drill-firestore-backup-restore.ts`, documented with executed drill timing in `docs/backup-restore.md`).
 - [ ] Critical Cloud Function alerting verification.
 
 ## Phase 12–13 — Deployment and production smoke

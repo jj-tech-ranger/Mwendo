@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -16,7 +17,7 @@ export const AdminVehiclesScreen: React.FC = () => {
   const { data: vehicles = [], isLoading } = useQuery({
     queryKey: ['adminVehicles'],
     queryFn: async () => {
-      return vehicleRepository.getAll();
+      return vehicleRepository.getAll([limit(100)]);
     },
     staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
   });

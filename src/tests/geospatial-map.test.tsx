@@ -121,4 +121,38 @@ describe('PERF-001: Geospatial Real Map Component', () => {
     expect(zoomOutBtn).toBeDefined();
     expect(recenterBtn).toBeDefined();
   });
+
+  it('supports heat-map visualization mode and switching between marker and heat views', () => {
+    const handleViewModeChange = vi.fn();
+    const { rerender } = render(
+      <MapComponent
+        markers={[markerWest, markerEast]}
+        viewMode="markers"
+        onViewModeChange={handleViewModeChange}
+      />
+    );
+
+    // Initial state: Markers mode active
+    expect(screen.getByTestId('badge-map-mode').textContent).toContain('Markers Active');
+    const toggleBtn = screen.getByTestId('btn-toggle-map-view');
+    expect(toggleBtn).toBeDefined();
+
+    // Click toggle button to switch to heat-map view
+    fireEvent.click(toggleBtn);
+    expect(handleViewModeChange).toHaveBeenCalledWith('heatmap');
+
+    // Rerender with heat-map mode
+    rerender(
+      <MapComponent
+        markers={[markerWest, markerEast]}
+        viewMode="heatmap"
+        onViewModeChange={handleViewModeChange}
+      />
+    );
+
+    // Badge reflects density heat-map mode
+    expect(screen.getByTestId('badge-map-mode').textContent).toContain('Density Heat-Map');
+    expect(screen.getByTestId('leaflet-map-canvas')).toBeDefined();
+  });
 });
+

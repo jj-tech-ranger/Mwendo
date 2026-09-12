@@ -11,6 +11,11 @@ service cloud.firestore {
     function isAdmin() { return getActiveRole() == 'admin'; }
     function isAuthority() { return hasActiveRole('authority') || isAdmin(); }
     function isSaccoManager(saccoId) { return isAdmin() || (hasActiveRole('sacco_manager') && saccoId != null && request.auth.token.saccoId == saccoId); }
+    // CANONICAL SOURCE OF TRUTH REFERENCE:
+    // Bounding box limits (lat -5.5..6.0, lon 33.0..43.5) and speed limits (0..180 km/h)
+    // are canonically defined in apps/functions/src/lib/constants.ts (KENYA_BOUNDS & SPEED_LIMITS).
+    // Note: Firestore Security Rules cannot dynamically import or evaluate TypeScript/JavaScript modules.
+    // When updating geographic or speed limits, ensure both constants.ts and these rules functions remain in sync.
     function isWithinKenyaBounds(lat, lon) { return (lat is int || lat is float || lat is number) && (lon is int || lon is float || lon is number) && lat >= -5.5 && lat <= 6.0 && lon >= 33.0 && lon <= 43.5; }
     function isPlausibleSpeed(speed) { return (speed is int || speed is float || speed is number) && speed >= 0 && speed <= 180; }
     function isValidTripData(data) { return data.userId == request.auth.uid && data.saccoId != null && data.saccoId != 'unassigned' && ((!('latitude' in data) && !('longitude' in data)) || (('latitude' in data) && ('longitude' in data) && isWithinKenyaBounds(data.latitude, data.longitude))) && (!('startLocation' in data) || data.startLocation == null || (('latitude' in data.startLocation) && ('longitude' in data.startLocation) && isWithinKenyaBounds(data.startLocation.latitude, data.startLocation.longitude))) && (!('endLocation' in data) || data.endLocation == null || (('latitude' in data.endLocation) && ('longitude' in data.endLocation) && isWithinKenyaBounds(data.endLocation.latitude, data.endLocation.longitude))) && (!('currentSpeedKmH' in data) || isPlausibleSpeed(data.currentSpeedKmH)) && (!('maxSpeedKmH' in data) || isPlausibleSpeed(data.maxSpeedKmH)) && (!('avgSpeedKmH' in data) || isPlausibleSpeed(data.avgSpeedKmH)); }

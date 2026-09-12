@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -35,7 +36,7 @@ export const AdminSaccosScreen: React.FC = () => {
   const { data: saccos = [], isLoading } = useQuery({
     queryKey: ['adminSaccos'],
     queryFn: async () => {
-      return saccoRepository.getAll();
+      return saccoRepository.getAll([limit(100)]);
     },
     staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
   });

@@ -39,7 +39,7 @@ export const PassengerShell: React.FC<PassengerShellProps> = ({ hideBottomNav = 
       </main>
 
       {!isImmersiveRoute && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(0,0,0,0.04)] px-margin-mobile safe-area-bottom">
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-surface-container-lowest border-t border-outline-variant/20 shadow-[0px_-4px_20px_rgba(0,0,0,0.04)] px-4 safe-area-bottom">
           <div className="max-w-lg mx-auto flex justify-around items-center h-16">
             {navItems.map((item) => (
               <NavLink

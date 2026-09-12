@@ -33,6 +33,7 @@ export const SafetyMapScreen: React.FC = () => {
   const [selectedHazard, setSelectedHazard] = useState<HazardPin | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'hazards' | 'emergency'>('all');
+  const [mapViewMode, setMapViewMode] = useState<'markers' | 'heatmap'>('markers');
 
   const { data: hazards = [], isLoading } = useQuery({
     queryKey: ['publicPinHazards'],
@@ -150,12 +151,63 @@ export const SafetyMapScreen: React.FC = () => {
         </button>
       </div>
 
+      {/* Map View Mode Switcher: Markers vs Heat Map */}
+      <div className="flex items-center justify-between bg-surface-container/60 p-2 rounded-xl border border-outline-variant/30">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">layers</span>
+            Layer View
+          </span>
+          {mapViewMode === 'heatmap' && (
+            <Badge variant="danger" className="text-[10px] font-bold">
+              Density Heat-Map
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center bg-surface-container-high p-0.5 rounded-lg text-xs" role="tablist" aria-label="Map View Mode">
+          <button
+            id="btn-view-markers"
+            data-testid="btn-view-markers"
+            type="button"
+            role="tab"
+            aria-selected={mapViewMode === 'markers'}
+            onClick={() => setMapViewMode('markers')}
+            className={`px-3 py-1 rounded-md font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              mapViewMode === 'markers'
+                ? 'bg-surface text-on-surface shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">location_on</span>
+            Markers
+          </button>
+          <button
+            id="btn-view-heatmap"
+            data-testid="btn-view-heatmap"
+            type="button"
+            role="tab"
+            aria-selected={mapViewMode === 'heatmap'}
+            onClick={() => setMapViewMode('heatmap')}
+            className={`px-3 py-1 rounded-md font-bold flex items-center gap-1 transition-all cursor-pointer ${
+              mapViewMode === 'heatmap'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">local_fire_department</span>
+            Heat Map
+          </button>
+        </div>
+      </div>
+
       {/* Real Geospatial Map Component */}
       <MapComponent
         markers={mapMarkers}
         centerAddress="Kenya Transit Safety Corridor"
         showHeatmapOverlay={true}
         showRouteTrace={false}
+        viewMode={mapViewMode}
+        onViewModeChange={setMapViewMode}
         onMarkerClick={(m) => {
           const matched = filteredHazards.find((h) => h.id === m.id);
           if (matched) setSelectedHazard(matched);

@@ -233,9 +233,9 @@ export const SaccoFleetScreen: React.FC = () => {
       {activeTab === 'provisional' && (
         <div className="space-y-4">
           <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-800 dark:text-amber-200"><strong>Provisional Vehicles Note:</strong> These vehicles were auto-created from commuter trip reports and GPS telemetry logs. Claiming a vehicle links historical trip records directly to {saccoName}.</div>
-          <Card className="p-0 overflow-hidden"><table className="w-full text-left text-xs"><thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant"><tr><th className="p-3.5">Plate Number</th><th className="p-3.5">Route Detected</th><th className="p-3.5">First Seen</th><th className="p-3.5">Recorded Trips</th><th className="p-3.5">Pass Reports</th><th className="p-3.5 text-right">Action</th></tr></thead><tbody className="divide-y divide-outline-variant/20 font-medium">{provisionalVehicles.map((pv) => (
+          <Card className="p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-left text-xs"><thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant"><tr><th className="p-3.5">Plate Number</th><th className="p-3.5">Route Detected</th><th className="p-3.5">First Seen</th><th className="p-3.5">Recorded Trips</th><th className="p-3.5">Pass Reports</th><th className="p-3.5 text-right">Action</th></tr></thead><tbody className="divide-y divide-outline-variant/20 font-medium">{provisionalVehicles.map((pv) => (
             <tr key={pv.id} className="hover:bg-surface-container/50"><td className="p-3.5 font-mono font-bold text-amber-600">{pv.plate}</td><td className="p-3.5">{pv.route}</td><td className="p-3.5 font-mono">{pv.firstSeen}</td><td className="p-3.5 font-mono">{pv.trips}</td><td className="p-3.5 font-mono">{pv.reportsCount}</td><td className="p-3.5 text-right"><Button className="h-8 text-xs font-bold" onClick={() => { setClaimingVehicle(pv); setClaimStep(1); }}>Claim Vehicle</Button></td></tr>
-          ))}</tbody></table></Card>
+          ))}</tbody></table></div></Card>
         </div>
       )}
 

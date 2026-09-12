@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import QRCode from 'qrcode';
 import { db } from '../lib/firebase';
 import { SharedTrip } from '../types';

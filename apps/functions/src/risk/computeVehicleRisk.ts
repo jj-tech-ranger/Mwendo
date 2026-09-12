@@ -3,6 +3,7 @@ import { getFirestore, Firestore, QueryDocumentSnapshot, DocumentData } from 'fi
 import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 import { normalizePlate } from '../lib/plate';
+import { isPlausibleSpeed } from '../lib/constants';
 
 export interface VehicleRiskEventPayload {
   eventId: string;
@@ -94,7 +95,7 @@ export async function processVehicleRiskLogic(
     })
     .filter((e: ViolationCandidate) => {
       // VT-003: Plausibility checks - discard physically impossible speeds (>180 km/h) or invalid timestamps
-      if (e.recordedSpeedKmH !== undefined && (e.recordedSpeedKmH < 0 || e.recordedSpeedKmH > 180)) {
+      if (e.recordedSpeedKmH !== undefined && !isPlausibleSpeed(e.recordedSpeedKmH)) {
         return false;
       }
       const t = new Date(e.timestamp).getTime();
@@ -105,7 +106,7 @@ export async function processVehicleRiskLogic(
   const incomingTimeMs = new Date(event.timestamp).getTime();
   if (
     Number.isFinite(incomingTimeMs) &&
-    (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))
+    (event.recordedSpeedKmH === undefined || isPlausibleSpeed(event.recordedSpeedKmH))
   ) {
     eventsList.push({
       severity: parseSeverity(event.severity),

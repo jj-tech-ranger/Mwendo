@@ -6,8 +6,6 @@ import { SeverityLevel, PlatformAnalyticsDaily, SaccoAnalyticsDaily, GenerateTri
 import {
   calculateVehicleRiskScore,
   calculateSaccoSafetyScore,
-  calculateReporterTrustScore,
-  getTrustBadgeLevel,
   detectOverspeedViolations,
   ConfidenceScorer,
   GPSSample,

@@ -9,6 +9,9 @@ if (typeof HTMLCanvasElement !== 'undefined') {
       }),
       putImageData: () => {},
       createImageData: () => [],
+      createLinearGradient: () => ({
+        addColorStop: () => {},
+      }),
       setTransform: () => {},
       drawImage: () => {},
       save: () => {},

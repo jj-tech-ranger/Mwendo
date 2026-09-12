@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { tripRepository } from '../../repositories';
@@ -21,7 +22,7 @@ export const AdminTripsScreen: React.FC = () => {
   async function loadTrips() {
     setIsLoading(true);
     try {
-      const fetched = await tripRepository.getAll();
+      const fetched = await tripRepository.getAll([orderBy('startTime', 'desc'), limit(100)]);
       setTrips(fetched);
     } catch (err) {
       console.error('Failed to load trips:', err);

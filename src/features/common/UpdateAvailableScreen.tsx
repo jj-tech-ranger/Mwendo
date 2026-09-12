@@ -19,7 +19,7 @@ export const UpdateAvailableScreen: React.FC<{ onDismiss?: () => void }> = ({ on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-on-background/40 backdrop-blur-xs p-margin-mobile">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-on-background/40 backdrop-blur-xs p-4 sm:p-6">
       <div className="bg-surface-bright w-full max-w-sm rounded-2xl p-lg text-center shadow-2xl space-y-md border border-outline-variant/30">
         <img src={BRAND_ASSETS.appIcon} alt="App Icon" className="w-12 h-12 rounded-xl mx-auto shadow-sm" />
         <div className="w-16 h-16 rounded-full bg-secondary-container/30 mx-auto flex items-center justify-center">

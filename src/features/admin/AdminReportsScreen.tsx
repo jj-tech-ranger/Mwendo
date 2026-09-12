@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { limit } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { blackSpotRepository } from '../../repositories';
@@ -17,7 +18,7 @@ export const AdminReportsScreen: React.FC = () => {
   async function loadBlackspotReports() {
     setIsLoading(true);
     try {
-      const fetched = await blackSpotRepository.getAll();
+      const fetched = await blackSpotRepository.getAll([limit(100)]);
       setReports(fetched);
     } catch (err) {
       console.error('Failed to load blackspot reports:', err);

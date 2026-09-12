@@ -27,7 +27,7 @@ export const OtpVerificationScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-on-background flex flex-col justify-center items-center p-margin-mobile text-center">
+    <div className="min-h-screen bg-background text-on-background flex flex-col justify-center items-center p-4 text-center">
       <div className="w-full max-w-sm space-y-lg bg-surface-container-lowest p-lg sm:p-xl rounded-2xl border border-outline-variant/30 shadow-sm">
         <PrimaryLogo className="h-10 w-auto mx-auto mb-2" />
         <span className="material-symbols-outlined text-5xl text-secondary">phonelink_lock</span>

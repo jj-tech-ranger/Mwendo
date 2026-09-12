@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { enforceRateLimit } from '../lib/rateLimit';
+import { isWithinKenya, isPlausibleSpeed } from '../lib/constants';
 
 export interface EmergencyContact { name: string; phone: string; relationship: string; }
 export interface SendSosPayload { alertId?: string; tripId?: string; userId?: string; vehicleRegNumber?: string; saccoId?: string; location?: { lat: number; lng: number }; speedKmH?: number; message?: string; timestamp?: string; }
@@ -15,8 +16,6 @@ export interface SmsProvider { sendSms: (to: string, message: string) => Promise
 export interface MessagingProvider { sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>; }
 
 function isEmulator(): boolean { return process.env.FUNCTIONS_EMULATOR === 'true' || !!process.env.FIREBASE_EMULATOR_HUB; }
-function validLocation(lat: number, lng: number): boolean { return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -5.5 && lat <= 6.0 && lng >= 33.0 && lng <= 43.5; }
-function validSpeed(speed: number): boolean { return Number.isFinite(speed) && speed >= 0 && speed <= 180; }
 
 export class DefaultSmsProvider implements SmsProvider {
   private accountSid = process.env.TWILIO_ACCOUNT_SID;
@@ -70,9 +69,9 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
 
   const rawLat = payload.location?.lat ?? (payload as { latitude?: number }).latitude;
   const rawLng = payload.location?.lng ?? (payload as { longitude?: number }).longitude;
-  if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !validLocation(rawLat, rawLng)) throw new HttpsError('invalid-argument', 'A valid location is required.');
+  if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !isWithinKenya(rawLat, rawLng)) throw new HttpsError('invalid-argument', 'A valid location is required.');
   const speedKmH = payload.speedKmH ?? 0;
-  if (!validSpeed(speedKmH)) throw new HttpsError('invalid-argument', 'Speed must be between 0 and 180 km/h.');
+  if (!isPlausibleSpeed(speedKmH)) throw new HttpsError('invalid-argument', 'Speed must be between 0 and 180 km/h.');
   if (payload.message && payload.message.length > 1000) throw new HttpsError('invalid-argument', 'Message is too long.');
 
   const alertId = payload.alertId && /^sos_[A-Za-z0-9_-]{1,100}$/.test(payload.alertId) ? payload.alertId : `sos_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

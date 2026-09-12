@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -26,11 +27,11 @@ export const AuthorityReportsScreen: React.FC = () => {
     queryKey: ['authorityReportsData'],
     queryFn: async () => {
       const [sList, bList, vList, tList, vehList] = await Promise.all([
-        saccoRepository.getAll(),
-        blackSpotRepository.getAll(),
-        violationRepository.getAll(),
-        tripRepository.getAll(),
-        vehicleRepository.getAll(),
+        saccoRepository.getAll([limit(100)]),
+        blackSpotRepository.getAll([limit(150)]),
+        violationRepository.getAll([orderBy('timestamp', 'desc'), limit(200)]),
+        tripRepository.getAll([orderBy('startTime', 'desc'), limit(200)]),
+        vehicleRepository.getAll([limit(200)]),
       ]);
       return {
         saccos: sList,

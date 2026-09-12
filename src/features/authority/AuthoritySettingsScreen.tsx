@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { limit, orderBy } from 'firebase/firestore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { auditLogRepository } from '../../repositories';
 import { AuditLog } from '../../types';
@@ -31,7 +32,7 @@ export const AuthoritySettingsScreen: React.FC = () => {
     setIsErrorLogs(false);
     setErrorMessage(null);
     try {
-      const fetchedLogs = await auditLogRepository.getAll();
+      const fetchedLogs = await auditLogRepository.getAll([orderBy('timestamp', 'desc'), limit(50)]);
       setLogs(fetchedLogs);
     } catch (err: unknown) {
       console.error('Failed to load audit logs:', err);

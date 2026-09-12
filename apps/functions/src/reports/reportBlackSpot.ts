@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { enforceRateLimit } from '../lib/rateLimit';
 import { ConfidenceScorer } from '../lib/engine';
+import { isWithinKenya } from '../lib/constants';
 
 export interface ReportBlackSpotPayload {
   id?: string;
@@ -28,10 +29,6 @@ export interface ReportBlackSpotResult {
   createdAt: string;
 }
 
-function validKenyaLocation(lat: number, lng: number): boolean {
-  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -5.5 && lat <= 6.0 && lng >= 33.0 && lng <= 43.5;
-}
-
 function boundedText(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length <= max;
 }
@@ -47,7 +44,7 @@ export async function processReportBlackSpotLogic(
 
   const lat = payload.location?.lat ?? payload.latitude;
   const lng = payload.location?.lng ?? payload.longitude;
-  if (typeof lat !== 'number' || typeof lng !== 'number' || !validKenyaLocation(lat, lng)) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || !isWithinKenya(lat, lng)) {
     throw new HttpsError('invalid-argument', 'A valid location is required.');
   }
   if (payload.title !== undefined && !boundedText(payload.title, 120)) {

@@ -7,7 +7,7 @@ import { auditLogRepository } from '../../repositories';
 import { useAuthStore } from '../../store/useAuthStore';
 import { MfaEnrollmentScreen } from '../auth/MfaEnrollmentScreen';
 import { db } from '../../lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 
 interface BackupSnapshot {
   id: string;
@@ -30,7 +30,7 @@ export const AdminSecurityScreen: React.FC = () => {
     queryKey: ['systemBackups'],
     queryFn: async () => {
       try {
-        const snap = await getDocs(collection(db, 'system_backups'));
+        const snap = await getDocs(query(collection(db, 'system_backups'), limit(50)));
         return snap.docs.map((d) => ({ id: d.id, ...d.data() } as BackupSnapshot));
       } catch {
         return [];
@@ -194,7 +194,7 @@ export const AdminSecurityScreen: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-hidden">
+            <div className="bg-[#111827] border border-slate-800 rounded-xl overflow-x-auto">
               <table className="w-full text-left text-xs font-label-mono">
                 <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase border-b border-slate-800">
                   <tr>
