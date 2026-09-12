@@ -5,6 +5,14 @@ import { Trip, BlackSpot } from '../types';
 
 export const MAX_RETRIES = 5;
 
+export interface QueuedTrip extends Trip {
+  retryCount: number;
+}
+
+export interface QueuedBlackSpot extends BlackSpot {
+  retryCount: number;
+}
+
 export interface DrainResult {
   syncedTrips: number;
   syncedReports: number;
@@ -13,9 +21,8 @@ export interface DrainResult {
   remainingCount: number;
 }
 
-class OfflineSyncService {
+export class OfflineSyncService {
   private isDraining = false;
-  private retryCounts: Map<string, number> = new Map();
 
   /**
    * Scans offlineStorage for queued trips and black spot reports and returns the lists of keys.
@@ -67,7 +74,9 @@ class OfflineSyncService {
   /**
    * Drains all offline-queued trips and reports, uploading them to Firestore.
    * On success, removes the item from offline storage and decrements the pending count.
-   * On failure, increments retry count; if retries >= MAX_RETRIES, moves to dead-letter storage.
+   * On failure, increments retry count on the persisted item itself; if retries >= MAX_RETRIES,
+   * moves to dead-letter storage (offline_failed_*).
+   * Because retryCount is stored on the item record, retry durability survives app restarts.
    */
   async drainQueue(): Promise<DrainResult> {
     if (this.isDraining) {
@@ -93,66 +102,83 @@ class OfflineSyncService {
 
       // 1. Process queued trips
       for (const key of tripKeys) {
-        let currentTrip: Trip | null = null;
+        let currentTrip: QueuedTrip | null = null;
         try {
-          currentTrip = await offlineStorage.getItem<Trip>(key);
+          currentTrip = await offlineStorage.getItem<QueuedTrip>(key);
           if (!currentTrip || !currentTrip.id) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);
-            this.retryCounts.delete(key);
             continue;
           }
 
+          // Strip retryCount so queue telemetry does not pollute Firestore document data
+          const { retryCount: _retryCount, ...tripToSave } = currentTrip;
           // Use the SAME client-generated ID already embedded in the stored object
-          await tripRepository.save(currentTrip);
+          await tripRepository.save(tripToSave as Trip);
           await offlineStorage.removeItem(key);
-          this.retryCounts.delete(key);
           syncedTrips++;
         } catch (err) {
           console.warn(`[OfflineSyncService] Failed to sync offline trip ${key}:`, err);
           failedTrips++;
-          const retries = (this.retryCounts.get(key) || 0) + 1;
+          const currentRetries = currentTrip?.retryCount ?? 0;
+          const retries = currentRetries + 1;
           if (retries >= MAX_RETRIES) {
             if (currentTrip) {
-              await offlineStorage.setItem(`offline_failed_${key}`, currentTrip);
+              await offlineStorage.setItem(`offline_failed_${key}`, {
+                ...currentTrip,
+                retryCount: retries,
+              });
             }
             await offlineStorage.removeItem(key);
-            this.retryCounts.delete(key);
           } else {
-            this.retryCounts.set(key, retries);
+            if (currentTrip) {
+              await offlineStorage.setItem(key, {
+                ...currentTrip,
+                retryCount: retries,
+              });
+            }
           }
         }
       }
 
       // 2. Process queued black spot reports
       for (const key of reportKeys) {
-        let currentReport: BlackSpot | null = null;
+        let currentReport: QueuedBlackSpot | null = null;
         try {
-          currentReport = await offlineStorage.getItem<BlackSpot>(key);
-          if (!currentReport || !currentReport.id) {
+          currentReport = await offlineStorage.getItem<QueuedBlackSpot>(key);
+          const reportId = currentReport?.id || (currentReport as { alertId?: string } | null)?.alertId;
+          if (!currentReport || !reportId) {
             // Corrupt or empty item - clean up
             await offlineStorage.removeItem(key);
-            this.retryCounts.delete(key);
             continue;
           }
 
+          // Strip retryCount so queue telemetry does not pollute Firestore document data
+          const { retryCount: _retryCount, ...reportToSave } = currentReport;
           // Use the SAME client-generated ID already embedded in the stored object
-          await blackSpotRepository.save(currentReport);
+          await blackSpotRepository.save(reportToSave as BlackSpot);
           await offlineStorage.removeItem(key);
-          this.retryCounts.delete(key);
           syncedReports++;
         } catch (err) {
           console.warn(`[OfflineSyncService] Failed to sync offline report ${key}:`, err);
           failedReports++;
-          const retries = (this.retryCounts.get(key) || 0) + 1;
+          const currentRetries = currentReport?.retryCount ?? 0;
+          const retries = currentRetries + 1;
           if (retries >= MAX_RETRIES) {
             if (currentReport) {
-              await offlineStorage.setItem(`offline_failed_${key}`, currentReport);
+              await offlineStorage.setItem(`offline_failed_${key}`, {
+                ...currentReport,
+                retryCount: retries,
+              });
             }
             await offlineStorage.removeItem(key);
-            this.retryCounts.delete(key);
           } else {
-            this.retryCounts.set(key, retries);
+            if (currentReport) {
+              await offlineStorage.setItem(key, {
+                ...currentReport,
+                retryCount: retries,
+              });
+            }
           }
         }
       }
@@ -175,35 +201,39 @@ class OfflineSyncService {
   }
 
   /**
-   * Retries all dead-letter failed items by restoring them to the active queue.
+   * Retries all dead-letter failed items by restoring them to the active queue with reset retryCount.
    */
   async retryAllFailed(): Promise<DrainResult> {
     const allKeys = await offlineStorage.keys();
     const failedKeys = allKeys.filter((k) => k.startsWith('offline_failed_'));
     for (const fKey of failedKeys) {
-      const item = await offlineStorage.getItem(fKey);
+      const item = await offlineStorage.getItem<Record<string, unknown>>(fKey);
       const originalKey = fKey.replace(/^offline_failed_/, '');
       if (item) {
-        await offlineStorage.setItem(originalKey, item);
+        await offlineStorage.setItem(originalKey, {
+          ...item,
+          retryCount: 0,
+        });
       }
       await offlineStorage.removeItem(fKey);
-      this.retryCounts.delete(originalKey);
     }
     await this.updatePendingCount();
     return await this.drainQueue();
   }
 
   /**
-   * Retries a single dead-letter failed item.
+   * Retries a single dead-letter failed item with reset retryCount.
    */
   async retryFailedItem(failedKey: string): Promise<DrainResult> {
-    const item = await offlineStorage.getItem(failedKey);
+    const item = await offlineStorage.getItem<Record<string, unknown>>(failedKey);
     const originalKey = failedKey.replace(/^offline_failed_/, '');
     if (item) {
-      await offlineStorage.setItem(originalKey, item);
+      await offlineStorage.setItem(originalKey, {
+        ...item,
+        retryCount: 0,
+      });
     }
     await offlineStorage.removeItem(failedKey);
-    this.retryCounts.delete(originalKey);
     await this.updatePendingCount();
     return await this.drainQueue();
   }

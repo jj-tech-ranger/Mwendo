@@ -11,6 +11,7 @@ import { authService } from '../../services/authService';
 import { analyticsService } from '../../services/analyticsService';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
+import { computeRewardTier } from '../../services/pointsService';
 
 export const PassengerProfileScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -28,6 +29,8 @@ export const PassengerProfileScreen: React.FC = () => {
   const [editName, setEditName] = useState(user?.displayName || '');
   const [editPhone, setEditPhone] = useState(user?.phoneNumber || '');
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -55,10 +58,20 @@ export const PassengerProfileScreen: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = () => {
-    if (deleteConfirmText.toUpperCase() === 'DELETE') {
-      logout();
+  const handleConfirmDelete = async () => {
+    if (deleteConfirmText.toUpperCase() !== 'DELETE' || isDeletingAccount) return;
+    setIsDeletingAccount(true);
+    setDeleteError(null);
+    try {
+      await authService.deleteOwnAccount();
+      setActiveModal(null);
       navigate('/auth/login');
+    } catch (err: unknown) {
+      console.error('Failed to delete account:', err);
+      const message = err instanceof Error ? err.message : 'Failed to delete account. Please try again.';
+      setDeleteError(message);
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -94,18 +107,110 @@ export const PassengerProfileScreen: React.FC = () => {
           </div>
         </div>
         <div>
-          <div className="text-xl font-black text-emerald-700">--</div>
+          <div className="text-xl font-black text-emerald-700">
+            {user?.trustScore !== undefined ? `${user.trustScore}%` : '--'}
+          </div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
             {t('passenger.profile.trustScore')}
           </div>
         </div>
         <div>
-          <div className="text-xl font-black text-on-surface">0</div>
+          <div className="text-xl font-black text-on-surface">
+            {user?.pointsHistory ? user.pointsHistory.filter(p => p.event === 'black_spot_reported').length : 0}
+          </div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
             {t('passenger.profile.reportsCount')}
           </div>
         </div>
       </Card>
+
+      {/* Lightweight Points & Tier Card (Prompt 4.1) */}
+      {(() => {
+        const points = Number(user?.safetyPoints || 0);
+        const tier = user?.rewardTier || computeRewardTier(points);
+        const nextThreshold = tier === 'Bronze' ? 100 : tier === 'Silver' ? 300 : 300;
+        const prevThreshold = tier === 'Silver' ? 100 : 0;
+        const progressPercent = tier === 'Gold'
+          ? 100
+          : Math.min(100, Math.round(((points - prevThreshold) / (nextThreshold - prevThreshold)) * 100));
+
+        const tierColor = tier === 'Gold'
+          ? 'from-amber-500 to-yellow-300 text-yellow-950'
+          : tier === 'Silver'
+          ? 'from-slate-300 to-slate-100 text-slate-900'
+          : 'from-amber-700/80 to-amber-600/70 text-amber-100';
+
+        const tierBadgeVariant = tier === 'Gold' ? 'warning' : tier === 'Silver' ? 'neutral' : 'warning';
+
+        return (
+          <Card className="p-5 space-y-4 border border-outline/15 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${tierColor} flex items-center justify-center font-black shadow-sm`}>
+                  <span className="material-symbols-outlined text-xl">
+                    {tier === 'Gold' ? 'workspace_premium' : tier === 'Silver' ? 'military_tech' : 'shield'}
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                      Safety Rewards
+                    </span>
+                    <Badge variant={tierBadgeVariant} className="text-[10px] font-bold uppercase">
+                      {tier} Tier
+                    </Badge>
+                  </div>
+                  <h3 className="text-xl font-black font-mono text-on-surface">
+                    {points} <span className="text-xs font-sans font-medium text-on-surface-variant">Points</span>
+                  </h3>
+                </div>
+              </div>
+
+              <div className="text-right text-xs font-mono">
+                {tier === 'Gold' ? (
+                  <span className="text-emerald-600 font-bold">Max Tier Achieved</span>
+                ) : (
+                  <span className="text-on-surface-variant">
+                    {nextThreshold - points} pts to {tier === 'Bronze' ? 'Silver' : 'Gold'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1">
+              <div className="w-full h-2.5 bg-surface-container-high rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-500 rounded-full"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-on-surface-variant font-mono">
+                <span>Bronze (0)</span>
+                <span>Silver (100)</span>
+                <span>Gold (300+)</span>
+              </div>
+            </div>
+
+            {/* Points Earning Mechanic Legend */}
+            <div className="grid grid-cols-3 gap-2 pt-1 text-[11px] font-medium text-on-surface-variant">
+              <div className="bg-surface-container p-2 rounded-lg text-center">
+                <span className="block font-bold text-on-surface text-xs">+15 pts</span>
+                <span>Complete Trip</span>
+              </div>
+              <div className="bg-surface-container p-2 rounded-lg text-center">
+                <span className="block font-bold text-on-surface text-xs">+25 pts</span>
+                <span>Report Hazard</span>
+              </div>
+              <div className="bg-surface-container p-2 rounded-lg text-center">
+                <span className="block font-bold text-on-surface text-xs">+10 pts</span>
+                <span>Corroboration</span>
+              </div>
+            </div>
+          </Card>
+        );
+      })()}
+
 
       {/* Settings Group */}
       <div className="space-y-4">
@@ -402,13 +507,26 @@ export const PassengerProfileScreen: React.FC = () => {
       {/* MODAL 5: DELETE ACCOUNT */}
       <Dialog
         isOpen={activeModal === 'deleteAccount'}
-        onClose={() => setActiveModal(null)}
+        onClose={() => {
+          if (!isDeletingAccount) {
+            setActiveModal(null);
+            setDeleteError(null);
+            setDeleteConfirmText('');
+          }
+        }}
         title={t('passenger.profile.deleteAccount')}
       >
         <div className="space-y-3 text-xs text-on-surface">
           <p className="text-error font-semibold">
             {t('passenger.profile.deleteWarning')}
           </p>
+
+          {deleteError && (
+            <div className="p-2.5 bg-error/10 border border-error/30 rounded-lg text-error text-[11px] font-medium">
+              {deleteError}
+            </div>
+          )}
+
           <div>
             <label className="font-mono text-[11px] block mb-1 text-on-surface-variant">
               {t('passenger.profile.typeDeleteToConfirm')}
@@ -416,17 +534,28 @@ export const PassengerProfileScreen: React.FC = () => {
             <input
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
+              disabled={isDeletingAccount}
               placeholder="DELETE"
-              className="w-full h-9 px-3 rounded-lg border border-error/50 bg-surface font-mono uppercase text-error"
+              className="w-full h-9 px-3 rounded-lg border border-error/50 bg-surface font-mono uppercase text-error disabled:opacity-50"
             />
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setActiveModal(null)}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={isDeletingAccount}
+              onClick={() => {
+                setActiveModal(null);
+                setDeleteError(null);
+                setDeleteConfirmText('');
+              }}
+            >
               {t('passenger.profile.cancel')}
             </Button>
             <Button
-              disabled={deleteConfirmText.toUpperCase() !== 'DELETE'}
+              disabled={deleteConfirmText.toUpperCase() !== 'DELETE' || isDeletingAccount}
+              isLoading={isDeletingAccount}
               className="flex-1 bg-error text-on-error font-bold"
               onClick={handleConfirmDelete}
             >

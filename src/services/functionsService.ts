@@ -1,7 +1,8 @@
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions, auth } from '../lib/firebase';
-import { SeverityLevel, PlatformAnalyticsDaily, SaccoAnalyticsDaily } from '../types';
+import { normalizePlate } from '../lib/plate';
+import { SeverityLevel, PlatformAnalyticsDaily, SaccoAnalyticsDaily, GenerateTripSummaryPayload, GenerateTripSummaryResult } from '../types';
 import {
   calculateVehicleRiskScore,
   calculateSaccoSafetyScore,
@@ -70,7 +71,7 @@ export const functionsService = {
     }
 
     // Lookup vehicle and past risk events
-    const vehicleId = event.vehicleId || event.vehicleRegNumber.replace(/\s+/g, '_');
+    const vehicleId = event.vehicleId || normalizePlate(event.vehicleRegNumber);
     const vehicleRef = doc(db, 'vehicles', vehicleId);
     const vehicleSnap = await getDoc(vehicleRef);
 
@@ -157,14 +158,15 @@ export const functionsService = {
    * Provisional vehicle auto-provisioning (§8.2)
    */
   async provisionProvisionalVehicle(vehicleRegNumber: string, saccoId: string = 'unassigned'): Promise<void> {
-    const vehicleId = vehicleRegNumber.replace(/\s+/g, '_');
+    const normPlate = normalizePlate(vehicleRegNumber);
+    const vehicleId = normPlate;
     const vehicleRef = doc(db, 'vehicles', vehicleId);
     const snap = await getDoc(vehicleRef);
 
     if (!snap.exists()) {
       await setDoc(vehicleRef, {
         id: vehicleId,
-        regNumber: vehicleRegNumber,
+        regNumber: normPlate,
         saccoId,
         saccoName: saccoId === 'unassigned' ? 'Independent / Unassigned' : saccoId,
         capacity: 14,
@@ -175,7 +177,7 @@ export const functionsService = {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      console.log(`[VehicleResolution] Provisioned provisional vehicle for ${vehicleRegNumber}`);
+      console.log(`[VehicleResolution] Provisioned provisional vehicle for ${normPlate}`);
     }
   },
 
@@ -187,7 +189,7 @@ export const functionsService = {
     let totalOps = 0;
 
     // Update vehicle doc
-    const vehicleId = vehicleRegNumber.replace(/\s+/g, '_');
+    const vehicleId = normalizePlate(vehicleRegNumber);
     const vehicleRef = doc(db, 'vehicles', vehicleId);
     const vehicleSnap = await getDoc(vehicleRef);
     if (vehicleSnap.exists()) {
@@ -260,39 +262,99 @@ export const functionsService = {
 
   /**
    * Gen 2 Function: syncPublicPins (§9.5)
-   * Periodically syncs high-severity black spots to the lightweight public_pins collection.
+   * Synchronizes verified/published black spots to the lightweight public_pins collection.
+   * Invokes the authoritative backend Cloud Function with cursor-based incremental sync,
+   * falling back to client-side cursor-based sync if offline or running in mock mode.
    * NOTE (SEC-005 / §7.3): syncPublicPins MUST ONLY copy records where verifiedByAuthority: true / status: 'published'.
-   * It MUST NEVER copy reportedByUid, user PII, or unmoderated reports to public_pins. The real version will be enforced in Phase 3 backend Cloud Functions.
+   * It MUST NEVER copy reportedByUid, user PII, or unmoderated reports to public_pins.
    */
-  async syncPublicPins(): Promise<{ syncedCount: number }> {
-    const spotsQuery = query(
-      collection(db, 'black_spots'),
-      where('verifiedByAuthority', '==', true)
-    );
+  async syncPublicPins(options?: { forceFullScan?: boolean }): Promise<{ syncedCount: number; deletedCount?: number; cursor?: string }> {
+    try {
+      const callable = httpsCallable<{ forceFullScan?: boolean }, { syncedCount: number; deletedCount: number; cursor: string }>(
+        functions,
+        'syncPublicPins'
+      );
+      const res = await callable(options || {});
+      return res.data;
+    } catch (err) {
+      console.warn('[functionsService] syncPublicPins Cloud Function call failed, running local fallback:', err);
+      return await this.syncPublicPinsLocalFallback(options);
+    }
+  },
+
+  async syncPublicPinsLocalFallback(options?: { forceFullScan?: boolean }): Promise<{ syncedCount: number; deletedCount: number; cursor: string }> {
+    const currentRunTimestamp = new Date().toISOString();
+    let lastSyncedAt: string | null = null;
+
+    if (!options?.forceFullScan) {
+      try {
+        const cursorSnap = await getDoc(doc(db, 'system_config', 'public_pins_sync'));
+        if (cursorSnap.exists()) {
+          lastSyncedAt = (cursorSnap.data()?.lastSyncedAt as string) || null;
+        }
+      } catch (err) {
+        console.warn('[functionsService] Could not read public_pins_sync cursor:', err);
+      }
+    }
+
+    let spotsQuery;
+    if (lastSyncedAt) {
+      spotsQuery = query(
+        collection(db, 'black_spots'),
+        where('updatedAt', '>', lastSyncedAt)
+      );
+    } else {
+      spotsQuery = query(collection(db, 'black_spots'));
+    }
+
     const snap = await getDocs(spotsQuery);
     const batch = writeBatch(db);
-    let count = 0;
+    let syncedCount = 0;
+    let deletedCount = 0;
 
     for (const spotDoc of snap.docs) {
       const data = spotDoc.data();
       const pinRef = doc(db, 'public_pins', spotDoc.id);
-      batch.set(pinRef, {
-        id: spotDoc.id,
-        title: data.name || data.title || 'Hazardous Spot',
-        routeName: data.routeName || '',
-        latitude: data.latitude,
-        longitude: data.longitude,
-        severity: data.severity,
-        updatedAt: new Date().toISOString(),
-      });
-      count++;
+
+      if (data.status === 'published' || data.verifiedByAuthority === true) {
+        batch.set(
+          pinRef,
+          {
+            id: spotDoc.id,
+            title: data.name || data.title || 'Hazardous Spot',
+            routeName: data.routeName || '',
+            latitude: data.latitude,
+            longitude: data.longitude,
+            severity: data.severity || 'high',
+            updatedAt: data.updatedAt || currentRunTimestamp,
+          },
+          { merge: true }
+        );
+        syncedCount++;
+      } else {
+        batch.delete(pinRef);
+        deletedCount++;
+      }
     }
 
-    if (count > 0) {
+    // Save or update cursor in system_config/public_pins_sync
+    const cursorRef = doc(db, 'system_config', 'public_pins_sync');
+    batch.set(
+      cursorRef,
+      {
+        lastSyncedAt: currentRunTimestamp,
+        lastRunAt: currentRunTimestamp,
+        lastDeltaSynced: syncedCount,
+        lastDeltaDeleted: deletedCount,
+      },
+      { merge: true }
+    );
+
+    if (syncedCount > 0 || deletedCount > 0 || !lastSyncedAt) {
       await batch.commit();
     }
 
-    return { syncedCount: count };
+    return { syncedCount, deletedCount, cursor: currentRunTimestamp };
   },
 
   /**
@@ -831,6 +893,154 @@ export const functionsService = {
         fcmDispatchedCount: 0,
         dlqCount: 0,
         contactsSummary,
+      };
+    }
+  },
+
+  /**
+   * Generates a 1-2 sentence plain-language safety summary via the Gemini Cloud Function.
+   * Calls the backend Cloud Function callable so API keys remain server-side.
+   */
+  async generateTripSummary(payload: GenerateTripSummaryPayload): Promise<GenerateTripSummaryResult> {
+    const callable = httpsCallable<GenerateTripSummaryPayload, GenerateTripSummaryResult>(
+      functions,
+      'generateTripSummary'
+    );
+    try {
+      const result = await callable(payload);
+      return result.data;
+    } catch (err) {
+      console.warn('[functionsService] generateTripSummary callable error, falling back locally:', err);
+      const overspeed = payload.overspeedEventsCount ?? (payload.violations ? payload.violations.length : 0);
+      const maxSpeed = payload.maxSpeedKmH || 0;
+      const route = payload.routeName || 'this corridor';
+      const isHigh = maxSpeed > 90 || overspeed > 0;
+      return {
+        success: false,
+        summary: isHigh
+          ? `This trip had ${overspeed} overspeed event${overspeed === 1 ? '' : 's'} (peaking at ${maxSpeed} km/h) along ${route} — moderate risk.`
+          : `Compliant trip along ${route} with speeds safely maintained within legal thresholds — low risk.`,
+        riskTier: isHigh ? 'moderate' : 'low',
+        overspeedEventsCount: overspeed,
+        generatedBy: 'rule_engine',
+      };
+    }
+  },
+
+  /**
+   * Waze-style Black Spot Confirmation Mechanic
+   * Submits a confirm/dismiss document into black_spots/{spotId}/confirmations/{userId}
+   * Enforces 1 confirmation per user per 24 hours (backed by Firestore Security Rules).
+   */
+  async confirmBlackSpot(
+    spotId: string,
+    type: 'still_there' | 'resolved'
+  ): Promise<{ success: boolean; message: string; code?: string }> {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { success: false, message: 'Please sign in to confirm road hazards.' };
+    }
+
+    const confRef = doc(db, 'black_spots', spotId, 'confirmations', currentUser.uid);
+
+    try {
+      const existingSnap = await getDoc(confRef);
+      if (existingSnap.exists()) {
+        const data = existingSnap.data();
+        const rawTime = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : 0);
+        const hoursAgo = (Date.now() - rawTime) / (1000 * 60 * 60);
+        if (hoursAgo < 24) {
+          const hoursLeft = Math.ceil(24 - hoursAgo);
+          return {
+            success: false,
+            code: 'rate_limited',
+            message: `You have already confirmed this hazard. You can submit another confirmation in ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'}.`,
+          };
+        }
+      }
+
+      await setDoc(confRef, {
+        userId: currentUser.uid,
+        type,
+        timestamp: serverTimestamp(),
+        createdAt: new Date().toISOString(),
+      }, { merge: true });
+
+      return {
+        success: true,
+        message: type === 'still_there'
+          ? 'Hazard confirmed as still present.'
+          : 'Reported as no longer an issue.',
+      };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('permission-denied') || errMsg.includes('PERMISSION_DENIED')) {
+        return {
+          success: false,
+          code: 'rate_limited',
+          message: 'You can only submit one confirmation per report every 24 hours.',
+        };
+      }
+      return {
+        success: false,
+        message: 'Could not record confirmation. Please try again.',
+      };
+    }
+  },
+
+  /**
+   * Fetches confirmation totals and current user's status for a black spot.
+   */
+  async getBlackSpotConfirmations(spotId: string): Promise<{
+    total: number;
+    stillThere: number;
+    resolved: number;
+    lastConfirmedAt?: string | undefined;
+    userConfirmation?: 'still_there' | 'resolved' | null | undefined;
+    userCanConfirm: boolean;
+  }> {
+    const currentUser = auth.currentUser;
+    try {
+      const confCol = collection(db, 'black_spots', spotId, 'confirmations');
+      const snap = await getDocs(confCol);
+      let stillThere = 0;
+      let resolved = 0;
+      let latestMs = 0;
+      let userConf: 'still_there' | 'resolved' | null = null;
+      let userCanConfirm = true;
+
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data.type === 'still_there') stillThere++;
+        else if (data.type === 'resolved') resolved++;
+
+        const ms = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : (data.timestamp ? new Date(data.timestamp).getTime() : 0);
+        if (ms > latestMs) latestMs = ms;
+
+        if (currentUser && d.id === currentUser.uid) {
+          userConf = data.type as 'still_there' | 'resolved';
+          const hoursAgo = (Date.now() - ms) / (1000 * 60 * 60);
+          if (hoursAgo < 24) {
+            userCanConfirm = false;
+          }
+        }
+      });
+
+      return {
+        total: snap.size,
+        stillThere,
+        resolved,
+        lastConfirmedAt: latestMs > 0 ? new Date(latestMs).toISOString() : undefined,
+        userConfirmation: userConf,
+        userCanConfirm,
+      };
+    } catch (err) {
+      console.warn('[functionsService] Failed to load confirmations:', err);
+      return {
+        total: 0,
+        stillThere: 0,
+        resolved: 0,
+        userCanConfirm: true,
       };
     }
   },

@@ -39,11 +39,13 @@ const PermissionsWizardScreen = lazyWithRetry(() => import('../features/common/P
 const PassengerDashboard = lazyWithRetry(() => import('../features/passenger/PassengerDashboard').then((m) => ({ default: m.PassengerDashboard })));
 const ActiveTripScreen = lazyWithRetry(() => import('../features/passenger/ActiveTripScreen').then((m) => ({ default: m.ActiveTripScreen })));
 const TripHistoryScreen = lazyWithRetry(() => import('../features/passenger/TripHistoryScreen').then((m) => ({ default: m.TripHistoryScreen })));
+const TripSummaryScreen = lazyWithRetry(() => import('../features/passenger/TripSummaryScreen').then((m) => ({ default: m.TripSummaryScreen })));
 const SafetyMapScreen = lazyWithRetry(() => import('../features/passenger/SafetyMapScreen').then((m) => ({ default: m.SafetyMapScreen })));
 const ReportBlackSpotScreen = lazyWithRetry(() => import('../features/passenger/ReportBlackSpotScreen').then((m) => ({ default: m.ReportBlackSpotScreen })));
 const EmergencySosScreen = lazyWithRetry(() => import('../features/passenger/EmergencySosScreen').then((m) => ({ default: m.EmergencySosScreen })));
 const PassengerAlertsScreen = lazyWithRetry(() => import('../features/passenger/PassengerAlertsScreen').then((m) => ({ default: m.PassengerAlertsScreen })));
 const PassengerProfileScreen = lazyWithRetry(() => import('../features/passenger/PassengerProfileScreen').then((m) => ({ default: m.PassengerProfileScreen })));
+const SharedTripViewScreen = lazyWithRetry(() => import('../features/passenger/SharedTripViewScreen').then((m) => ({ default: m.SharedTripViewScreen })));
 
 // SACCO Feature Screens
 const SaccoDashboard = lazyWithRetry(() => import('../features/sacco/SaccoDashboard').then((m) => ({ default: m.SaccoDashboard })));
@@ -128,6 +130,10 @@ const router = createBrowserRouter([
   { path: '/update-required', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<UpdateRequiredScreen />) },
   { path: '/update-available', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<UpdateAvailableScreen />) },
 
+  // Public Live Trip Tracking Link (Read-only, no login required)
+  { path: '/track/:shareId', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SharedTripViewScreen />) },
+  { path: '/share/:shareId', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SharedTripViewScreen />) },
+
   // Passenger Shell & Routes
   {
     element: <RoleGuard allowedRoles={['passenger']} />,
@@ -140,6 +146,8 @@ const router = createBrowserRouter([
         { index: true, element: <PassengerDashboard /> },
         { path: 'start-trip', element: <ActiveTripScreen /> },
         { path: 'trips', element: <TripHistoryScreen /> },
+        { path: 'trip-summary', element: <TripSummaryScreen /> },
+        { path: 'trips/:tripId/summary', element: <TripSummaryScreen /> },
         { path: 'map', element: <SafetyMapScreen /> },
         { path: 'report-blackspot', element: <ReportBlackSpotScreen /> },
         { path: 'sos', element: <EmergencySosScreen /> },

@@ -134,9 +134,9 @@ describe('Cloud Functions — computeVehicleRisk (CF-002 & TEST-002)', () => {
       const mockDb = createMockDb() as any;
 
       // Seed initial vehicle
-      mockDbData['vehicles/KDA_123A'] = {
-        id: 'KDA_123A',
-        regNumber: 'KDA 123A',
+      mockDbData['vehicles/KDA123A'] = {
+        id: 'KDA123A',
+        regNumber: 'KDA123A',
         saccoId: 'sacco_metro',
         riskScore: 85,
         riskTier: 'medium',
@@ -161,7 +161,7 @@ describe('Cloud Functions — computeVehicleRisk (CF-002 & TEST-002)', () => {
       expect(mockDbData['processedEvents/evt_idempotent_999'].handler).toBe('computeVehicleRisk');
       expect(mockAuditLogs.length).toBe(1);
 
-      const computedScore = mockDbData['vehicles/KDA_123A'].riskScore;
+      const computedScore = mockDbData['vehicles/KDA123A'].riskScore;
 
       // 2nd Duplicate Invocation with the EXACT same eventId
       const secondResult = await processVehicleRiskLogic(mockDb, eventPayload);
@@ -172,7 +172,7 @@ describe('Cloud Functions — computeVehicleRisk (CF-002 & TEST-002)', () => {
       // Audit logs count must NOT have increased
       expect(mockAuditLogs.length).toBe(1);
       // Vehicle score must not have been mutated again
-      expect(mockDbData['vehicles/KDA_123A'].riskScore).toBe(computedScore);
+      expect(mockDbData['vehicles/KDA123A'].riskScore).toBe(computedScore);
     });
 
     it('creates provisional vehicle doc if vehicle did not previously exist in database', async () => {
@@ -190,17 +190,58 @@ describe('Cloud Functions — computeVehicleRisk (CF-002 & TEST-002)', () => {
       const result = await processVehicleRiskLogic(mockDb, eventPayload);
 
       expect(result.processed).toBe(true);
-      expect(mockDbData['vehicles/KCG_456Z']).toBeDefined();
-      expect(mockDbData['vehicles/KCG_456Z'].regNumber).toBe('KCG 456Z');
-      expect(mockDbData['vehicles/KCG_456Z'].saccoId).toBe('sacco_express');
+      expect(mockDbData['vehicles/KCG456Z']).toBeDefined();
+      expect(mockDbData['vehicles/KCG456Z'].regNumber).toBe('KCG456Z');
+      expect(mockDbData['vehicles/KCG456Z'].saccoId).toBe('sacco_express');
+    });
+
+    it('proves two whitespace variants of the same plate resolve to the same vehicle document ID', async () => {
+      const mockDb = createMockDb() as any;
+
+      // Event 1 with internal spaces "KAA 123B"
+      const event1: VehicleRiskEventPayload = {
+        eventId: 'evt_variant_1',
+        vehicleRegNumber: 'KAA 123B',
+        saccoId: 'sacco_metro',
+        eventType: 'violation',
+        severity: 'low',
+        timestamp: new Date().toISOString(),
+      };
+
+      await processVehicleRiskLogic(mockDb, event1);
+      expect(mockDbData['vehicles/KAA123B']).toBeDefined();
+      expect(mockDbData['vehicles/KAA123B'].id).toBe('KAA123B');
+      expect(mockDbData['vehicles/KAA_123B']).toBeUndefined();
+
+      // Mutate the record so we can verify the second variant updates the SAME document
+      mockDbData['vehicles/KAA123B'].notes = 'variant_1_recorded';
+
+      // Event 2 without spaces "KAA123B"
+      const event2: VehicleRiskEventPayload = {
+        eventId: 'evt_variant_2',
+        vehicleRegNumber: 'KAA123B',
+        saccoId: 'sacco_metro',
+        eventType: 'overspeed',
+        severity: 'medium',
+        recordedSpeedKmH: 88,
+        timestamp: new Date().toISOString(),
+      };
+
+      await processVehicleRiskLogic(mockDb, event2);
+
+      // Both resolved to vehicles/KAA123B
+      expect(mockDbData['vehicles/KAA123B']).toBeDefined();
+      expect(mockDbData['vehicles/KAA123B'].notes).toBe('variant_1_recorded');
+      // No duplicate or fragmented document created
+      expect(Object.keys(mockDbData).filter((k) => k.startsWith('vehicles/'))).toHaveLength(1);
     });
 
     it('filters out implausible speeds (>180 km/h) or unparseable timestamps from risk calculation', async () => {
       const mockDb = createMockDb() as any;
 
-      mockDbData['vehicles/KAA_001A'] = {
-        id: 'KAA_001A',
-        regNumber: 'KAA 001A',
+      mockDbData['vehicles/KAA001A'] = {
+        id: 'KAA001A',
+        regNumber: 'KAA001A',
         saccoId: 'sacco_metro',
         riskScore: 85,
         riskTier: 'medium',

@@ -1,3 +1,6 @@
+import { collection, query, where, orderBy, limit, onSnapshot, Query, getDocs } from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { normalizePlate } from '../lib/plate';
 import { BaseRepository } from './baseRepository';
 import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, AnalyticsDocument } from '../types';
 
@@ -25,15 +28,95 @@ export class BlackSpotRepository extends BaseRepository<BlackSpot> {
   }
 }
 
+export const SAFETY_ALERTS_COLLECTION = 'safety_alerts';
+
 export class AlertRepository extends BaseRepository<SafetyAlert> {
   constructor() {
-    super('safety_alerts');
+    super(SAFETY_ALERTS_COLLECTION);
+  }
+
+  getCollectionName(): string {
+    return this.collectionName;
+  }
+
+  getActiveAlertsQuery(limitCount = 50): Query {
+    return query(
+      collection(db, this.collectionName),
+      where('status', '==', 'active'),
+      orderBy('timestamp', 'desc'),
+      limit(limitCount)
+    );
+  }
+
+  subscribeToActive(
+    callback: (alerts: SafetyAlert[]) => void,
+    onError?: (error: unknown) => void,
+    limitCount = 50
+  ): () => void {
+    const q = this.getActiveAlertsQuery(limitCount);
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const fetched = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        })) as SafetyAlert[];
+        callback(fetched);
+      },
+      (error) => {
+        if (onError) onError(error);
+      }
+    );
   }
 }
 
 export class VehicleRepository extends BaseRepository<Vehicle> {
   constructor() {
     super('vehicles');
+  }
+
+  async findByNormalizedPlate(rawPlate: string): Promise<Vehicle | null> {
+    const normalized = normalizePlate(rawPlate);
+    if (!normalized) return null;
+
+    // 1. First check document keyed by normalized ID
+    const byId = await this.getById(normalized);
+    if (byId) return byId;
+
+    // 2. Query regNumber matching normalized
+    try {
+      const q = query(
+        collection(db, this.collectionName).withConverter(this.converter),
+        where('regNumber', '==', normalized),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty && snap.docs[0]) {
+        return snap.docs[0].data();
+      }
+    } catch (err) {
+      console.warn('[VehicleRepository] findByNormalizedPlate query error:', err);
+    }
+
+    return null;
+  }
+
+  async searchVehicles(prefix: string, maxResults = 5): Promise<Vehicle[]> {
+    const normalized = normalizePlate(prefix);
+    if (!normalized || normalized.length < 2) return [];
+
+    try {
+      const q = query(
+        collection(db, this.collectionName).withConverter(this.converter),
+        where('regNumber', '>=', normalized),
+        where('regNumber', '<=', normalized + '\uf8ff'),
+        limit(maxResults)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data());
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -53,11 +136,41 @@ export class ComplaintRepository extends BaseRepository<Complaint> {
   constructor() {
     super('complaints');
   }
+
+  async getRecentPending(limitCount = 3): Promise<Complaint[]> {
+    try {
+      const q = query(
+        this.getCollection(),
+        where('status', 'in', ['open', 'investigating']),
+        limit(limitCount)
+      );
+      const querySnap = await getDocs(q);
+      return querySnap.docs.map((docSnap) => docSnap.data());
+    } catch (err) {
+      console.warn('[ComplaintRepository] getRecentPending error:', err);
+      return [];
+    }
+  }
 }
 
 export class AuditLogRepository extends BaseRepository<AuditLog> {
   constructor() {
     super('audit_logs');
+  }
+
+  async getRecent(limitCount = 5): Promise<AuditLog[]> {
+    try {
+      const q = query(
+        this.getCollection(),
+        orderBy('timestamp', 'desc'),
+        limit(limitCount)
+      );
+      const querySnap = await getDocs(q);
+      return querySnap.docs.map((docSnap) => docSnap.data());
+    } catch (err) {
+      console.warn('[AuditLogRepository] getRecent error:', err);
+      return [];
+    }
   }
 }
 

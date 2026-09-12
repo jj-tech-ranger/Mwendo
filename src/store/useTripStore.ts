@@ -23,7 +23,7 @@ interface PersistedTripState {
 }
 
 interface TripState extends PersistedTripState {
-  startTrip: (params: { vehicleId?: string; plateNumber: string; saccoName?: string; saccoId?: string; routeName?: string }) => void;
+  startTrip: (params: { vehicleId?: string; plateNumber: string; saccoName?: string; saccoId?: string; routeName?: string; isProvisional?: boolean }) => void;
   updateTelemetry: (speed: number, gps?: GPSPoint) => void;
   pauseTrip: () => void;
   resumeTrip: () => void;
@@ -147,7 +147,7 @@ let lastTelemetryPersistence = 0;
 export const useTripStore = create<TripState>((set, get) => ({
   ...persistedTrip,
 
-  startTrip: ({ vehicleId, plateNumber, saccoName, saccoId, routeName = 'Standard Route' }) => {
+  startTrip: ({ vehicleId, plateNumber, saccoName, saccoId, routeName = 'Standard Route', isProvisional }) => {
     const state = get();
     if (state.activeTrip && state.isTracking) {
       throw new Error('TRIP001: An active trip is already in progress.');
@@ -162,14 +162,15 @@ export const useTripStore = create<TripState>((set, get) => ({
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const normalizedPlate = plateNumber.trim().toUpperCase();
+    const cleanPlate = plateNumber.trim().toUpperCase();
     const newTrip: Trip = {
       id: `trip_${uuid}`,
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
       ...(userId ? { userId } : {}),
       ...(vehicleId ? { vehicleId } : {}),
-      vehicleRegNumber: normalizedPlate,
-      plateNumber: normalizedPlate,
+      ...(typeof isProvisional === 'boolean' ? { isProvisional } : !vehicleId ? { isProvisional: true } : {}),
+      vehicleRegNumber: cleanPlate,
+      plateNumber: cleanPlate,
       saccoId,
       saccoName: saccoName || saccoId,
       routeName,
@@ -195,7 +196,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       durationSeconds: 0,
       overspeedCount: 0,
       routeCoordinates: [],
-      plateNumber: normalizedPlate,
+      plateNumber: cleanPlate,
       saccoId,
       saccoName: saccoName || saccoId,
       routeName,

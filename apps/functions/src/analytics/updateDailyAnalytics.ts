@@ -17,6 +17,10 @@ export interface DailyAnalyticsPayload {
     high: number;
     critical: number;
   };
+  userCount: number;
+  saccoCount: number;
+  auditLogCount: number;
+  complaintCount: number;
   updatedAt: string;
 }
 
@@ -47,30 +51,52 @@ export async function processUpdateDailyAnalyticsLogic(
   const startIso = startOfDay.toISOString();
   const endIso = endOfDay.toISOString();
 
-  const tripsSnap = await db
-    .collection('trips')
-    .where('startTime', '>=', startIso)
-    .where('startTime', '<=', endIso)
-    .get();
-
-  const violSnap = await db
-    .collection('violations')
-    .where('timestamp', '>=', startIso)
-    .where('timestamp', '<=', endIso)
-    .get();
-
-  const alertsSnap = await db
-    .collection('safety_alerts')
-    .where('timestamp', '>=', startIso)
-    .where('timestamp', '<=', endIso)
-    .get();
-
-  const vehiclesSnap = await db.collection('vehicles').get();
+  const [
+    tripsSnap,
+    violSnap,
+    alertsSnap,
+    vehiclesSnap,
+    usersSnap,
+    saccosSnap,
+    auditLogsSnap,
+    complaintsSnap,
+  ] = await Promise.all([
+    db
+      .collection('trips')
+      .where('startTime', '>=', startIso)
+      .where('startTime', '<=', endIso)
+      .get(),
+    db
+      .collection('violations')
+      .where('timestamp', '>=', startIso)
+      .where('timestamp', '<=', endIso)
+      .get(),
+    db
+      .collection('safety_alerts')
+      .where('timestamp', '>=', startIso)
+      .where('timestamp', '<=', endIso)
+      .get(),
+    db.collection('vehicles').get(),
+    db.collection('users').get(),
+    db.collection('saccos').get(),
+    db.collection('audit_logs').get(),
+    db.collection('complaints').get(),
+  ]);
 
   const totalTrips = tripsSnap.size;
   const totalViolations = violSnap.size;
   const activeAlerts = alertsSnap.docs.filter(
     (d: QueryDocumentSnapshot<DocumentData>) => d.data().status === 'active'
+  ).length;
+
+  const userCount = usersSnap.size;
+  const saccoCount = saccosSnap.size;
+  const auditLogCount = auditLogsSnap.size;
+  const complaintCount = complaintsSnap.docs.filter(
+    (d: QueryDocumentSnapshot<DocumentData>) => {
+      const status = d.data().status;
+      return !status || status === 'open' || status === 'investigating';
+    }
   ).length;
 
   let lowRiskCount = 0;
@@ -101,6 +127,10 @@ export async function processUpdateDailyAnalyticsLogic(
       high: highRiskCount,
       critical: criticalRiskCount,
     },
+    userCount,
+    saccoCount,
+    auditLogCount,
+    complaintCount,
     updatedAt: new Date().toISOString(),
   };
 

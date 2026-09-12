@@ -7,365 +7,187 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const messaging_1 = require("firebase-admin/messaging");
 const rateLimit_1 = require("../lib/rateLimit");
-/**
- * Default SMS Dispatcher (Optional future server-side SMS provider. No credentials required for MVP.)
- */
+function isEmulator() { return process.env.FUNCTIONS_EMULATOR === 'true' || !!process.env.FIREBASE_EMULATOR_HUB; }
+function validLocation(lat, lng) { return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -5.5 && lat <= 6.0 && lng >= 33.0 && lng <= 43.5; }
+function validSpeed(speed) { return Number.isFinite(speed) && speed >= 0 && speed <= 180; }
 class DefaultSmsProvider {
-    accountSid;
-    authToken;
-    fromNumber;
-    constructor() {
-        this.accountSid = process.env.TWILIO_ACCOUNT_SID;
-        this.authToken = process.env.TWILIO_AUTH_TOKEN;
-        this.fromNumber = process.env.TWILIO_FROM_NUMBER || '+15005550006';
-    }
+    accountSid = process.env.TWILIO_ACCOUNT_SID;
+    authToken = process.env.TWILIO_AUTH_TOKEN;
+    fromNumber = process.env.TWILIO_FROM_NUMBER;
     async sendSms(to, message) {
-        // If real Twilio credentials are provided, invoke Twilio REST API
-        if (this.accountSid && this.authToken && this.fromNumber) {
-            try {
-                const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
-                const body = new URLSearchParams({
-                    To: to,
-                    From: this.fromNumber,
-                    Body: message,
-                });
-                const authHeader = 'Basic ' + Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64');
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': authHeader,
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: body.toString(),
-                });
-                if (!response.ok) {
-                    const errBody = await response.text();
-                    throw new Error(`Twilio API HTTP ${response.status}: ${errBody}`);
-                }
-                const data = (await response.json());
-                return { messageId: data.sid || `sms_${Date.now()}`, success: true };
-            }
-            catch (err) {
-                console.warn(`[DefaultSmsProvider] Twilio API call failed for ${to}:`, err);
-                throw err;
-            }
+        if (!this.accountSid || !this.authToken || !this.fromNumber) {
+            if (isEmulator())
+                return { messageId: `emulator_sms_${Date.now()}`, success: true };
+            throw new Error('SMS provider is not configured in production.');
         }
-        // Default development/emulator fallback dispatcher
-        console.log(`[DefaultSmsProvider] (Emulator/Dev) Dispatched SMS to ${to}: ${message}`);
-        return {
-            messageId: `sim_sms_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-            success: true,
-        };
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
+        const body = new URLSearchParams({ To: to, From: this.fromNumber, Body: message });
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { Authorization: `Basic ${Buffer.from(`${this.accountSid}:${this.authToken}`).toString('base64')}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+        });
+        if (!response.ok)
+            throw new Error(`Twilio API HTTP ${response.status}`);
+        const data = await response.json();
+        return { messageId: data.sid || `sms_${Date.now()}`, success: true };
     }
 }
 exports.DefaultSmsProvider = DefaultSmsProvider;
-/**
- * Default FCM Messaging Provider
- */
 class DefaultMessagingProvider {
     async sendToTopic(topic, payload) {
         try {
-            const messaging = (0, messaging_1.getMessaging)();
-            return await messaging.send({
-                topic,
-                notification: payload.notification,
-                data: payload.data || {},
-            });
+            return await (0, messaging_1.getMessaging)().send({ topic, notification: payload.notification, data: payload.data || {} });
         }
         catch (err) {
-            console.warn(`[DefaultMessagingProvider] FCM send to topic '${topic}' failed:`, err);
-            // In local dev/emulator when no google credentials exist, log and simulate
-            return { messageId: `fcm_mock_${Date.now()}` };
+            if (isEmulator())
+                return { messageId: `emulator_fcm_${Date.now()}` };
+            throw err;
         }
     }
 }
 exports.DefaultMessagingProvider = DefaultMessagingProvider;
-/**
- * Route a notification failure to the Dead Letter Queue (dlq_notifications/{id})
- */
 async function writeToDLQ(db, entry) {
     try {
-        const dlqRef = db.collection('dlq_notifications').doc(entry.id);
-        await dlqRef.set({
-            id: entry.id,
-            topic: entry.topic,
-            type: entry.type,
-            alertId: entry.alertId,
-            userId: entry.userId || 'unknown',
-            targetRecipient: entry.targetRecipient || 'unknown',
+        await db.collection('dlq_notifications').doc(entry.id).set({
+            id: entry.id, topic: entry.topic, type: entry.type, alertId: entry.alertId,
+            userId: entry.userId || 'unknown', targetRecipient: entry.targetRecipient || 'unknown',
             payload: entry.payload || null,
             errorMessage: entry.error instanceof Error ? entry.error.message : String(entry.error),
-            failedAt: new Date().toISOString(),
-            status: 'failed_dead_letter',
-            retryAttempts: 3,
+            failedAt: new Date().toISOString(), status: 'failed_dead_letter', retryAttempts: 0,
         });
-        console.log(`[DLQ] Logged failed dispatch ${entry.id} to dlq_notifications/`);
-    }
-    catch (dlqErr) {
-        console.error(`[DLQ] Critical: Failed to record entry ${entry.id} to DLQ:`, dlqErr);
-    }
-}
-/**
- * Core Business Logic: processSendSosLogic
- * 1. Reads caller's real emergencyContacts from users/{userId}.
- * 2. Resolves saccoId / vehicle details.
- * 3. Formulates emergency SMS and attempts dispatch to each contact.
- * 4. Dispatches real-time FCM push notification to SACCO managers and Authority personnel.
- * 5. Routes any recipient dispatch failure to dlq_notifications.
- * 6. Authoritatively records the SafetyAlert document in Firestore without persisting raw contact PII.
- */
-async function processSendSosLogic(db, messagingProvider, smsProvider, payload) {
-    const alertId = payload.alertId || `sos_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const userId = payload.userId || 'anonymous';
-    const timestamp = payload.timestamp || new Date().toISOString();
-    const rawLat = payload.location?.lat ?? payload.latitude;
-    const rawLng = payload.location?.lng ?? payload.longitude;
-    if (typeof rawLat !== 'number' ||
-        typeof rawLng !== 'number' ||
-        !Number.isFinite(rawLat) ||
-        !Number.isFinite(rawLng)) {
-        throw new https_1.HttpsError('invalid-argument', 'A valid location is required.');
-    }
-    const location = { lat: rawLat, lng: rawLng };
-    const speedKmH = payload.speedKmH || 0;
-    // 0. SEC-005: Enforce per-user rate limit (Max 3 SOS triggers per hour)
-    if (typeof db.runTransaction === 'function' && userId && userId !== 'anonymous') {
-        await (0, rateLimit_1.enforceRateLimit)(db, userId, 'sos');
-    }
-    // 1. Fetch user's registered profile and emergency contacts
-    let userDisplayName = 'Passenger';
-    let emergencyContacts = [];
-    if (userId && userId !== 'anonymous') {
-        try {
-            const userSnap = await db.collection('users').doc(userId).get();
-            if (userSnap.exists) {
-                const userData = userSnap.data() || {};
-                userDisplayName = userData.displayName || 'Passenger';
-                const userPhone = userData.phoneNumber || '';
-                if (userPhone) {
-                    userDisplayName = `${userDisplayName} (${userPhone})`;
-                }
-                if (Array.isArray(userData.emergencyContacts) && userData.emergencyContacts.length > 0) {
-                    emergencyContacts = userData.emergencyContacts;
-                }
-            }
-        }
-        catch (err) {
-            console.warn(`[sendSOS] Unable to load profile for ${userId}:`, err);
-        }
-    }
-    // 2. Resolve SACCO ID and Vehicle details
-    let vehicleRegNumber = payload.vehicleRegNumber || '';
-    let saccoId = payload.saccoId || '';
-    if ((!saccoId || !vehicleRegNumber) && payload.tripId) {
-        try {
-            const tripSnap = await db.collection('trips').doc(payload.tripId).get();
-            if (tripSnap.exists) {
-                const tripData = tripSnap.data() || {};
-                saccoId = saccoId || tripData.saccoId || '';
-                vehicleRegNumber = vehicleRegNumber || tripData.vehicleRegNumber || '';
-            }
-        }
-        catch (err) {
-            console.warn(`[sendSOS] Unable to resolve trip ${payload.tripId}:`, err);
-        }
-    }
-    if (!saccoId && vehicleRegNumber) {
-        try {
-            const vehicleSnap = await db.collection('vehicles').doc(vehicleRegNumber.replace(/\s+/g, '_')).get();
-            if (vehicleSnap.exists) {
-                saccoId = vehicleSnap.data()?.saccoId || '';
-            }
-        }
-        catch (err) {
-            console.warn(`[sendSOS] Unable to resolve vehicle ${vehicleRegNumber}:`, err);
-        }
-    }
-    const effectiveSaccoId = saccoId || 'unassigned';
-    const effectiveVehicleReg = vehicleRegNumber || 'Vehicle In Transit';
-    // 3. Dispatch SMS to each saved emergency contact
-    const contactsSummary = [];
-    let successfulSmsCount = 0;
-    let dlqCount = 0;
-    const mapsLink = `https://www.google.com/maps?q=${location.lat},${location.lng}`;
-    const emergencySmsBody = `🚨 MWENDO SALAMA EMERGENCY SOS: ${userDisplayName} has triggered an urgent safety alert on PSV ${effectiveVehicleReg} near (${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}). Map: ${mapsLink}. Please check on them immediately or call NTSA (0800720822) / Police (999).`;
-    for (const contact of emergencyContacts) {
-        if (!contact.phone)
-            continue;
-        try {
-            await smsProvider.sendSms(contact.phone, emergencySmsBody);
-            successfulSmsCount++;
-            contactsSummary.push({
-                name: contact.name,
-                relationship: contact.relationship,
-                status: 'dispatched',
-            });
-        }
-        catch (smsErr) {
-            dlqCount++;
-            contactsSummary.push({
-                name: contact.name,
-                relationship: contact.relationship,
-                status: 'failed',
-            });
-            // Route failed SMS dispatch to DLQ
-            const dlqId = `dlq_sms_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-            await writeToDLQ(db, {
-                id: dlqId,
-                topic: 'safety-alerts',
-                type: 'sms_emergency_contact',
-                alertId,
-                userId,
-                targetRecipient: `${contact.name} (${contact.phone})`,
-                payload: { message: emergencySmsBody },
-                error: smsErr,
-            });
-        }
-    }
-    // 4. Dispatch FCM Push Notifications to SACCO manager & Authority channels
-    const fcmSummary = [];
-    let successfulFcmCount = 0;
-    const fcmNotificationPayload = {
-        notification: {
-            title: `🚨 EMERGENCY SOS: ${effectiveVehicleReg}`,
-            body: `${userDisplayName} triggered SOS. Location: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}. Immediate response required.`,
-        },
-        data: {
-            alertId,
-            tripId: payload.tripId || '',
-            vehicleRegNumber: effectiveVehicleReg,
-            saccoId: effectiveSaccoId,
-            latitude: String(location.lat),
-            longitude: String(location.lng),
-            type: 'sos',
-            severity: 'critical',
-            timestamp,
-        },
-    };
-    // Channel A: Relevant SACCO Manager Topic
-    if (effectiveSaccoId && effectiveSaccoId !== 'unassigned') {
-        const saccoTopic = `sacco_${effectiveSaccoId.replace(/\s+/g, '_')}`;
-        try {
-            await messagingProvider.sendToTopic(saccoTopic, fcmNotificationPayload);
-            successfulFcmCount++;
-            fcmSummary.push({ target: `SACCO Manager (${saccoTopic})`, status: 'dispatched' });
-        }
-        catch (fcmErr) {
-            dlqCount++;
-            fcmSummary.push({ target: `SACCO Manager (${saccoTopic})`, status: 'failed' });
-            const dlqId = `dlq_fcm_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-            await writeToDLQ(db, {
-                id: dlqId,
-                topic: 'safety-alerts',
-                type: 'fcm_push_notification',
-                alertId,
-                userId,
-                targetRecipient: saccoTopic,
-                payload: fcmNotificationPayload,
-                error: fcmErr,
-            });
-        }
-    }
-    // Channel B: Authority Personnel Channel
-    const authorityTopic = 'authority_alerts';
-    try {
-        await messagingProvider.sendToTopic(authorityTopic, fcmNotificationPayload);
-        successfulFcmCount++;
-        fcmSummary.push({ target: `Authority Dispatch (${authorityTopic})`, status: 'dispatched' });
-    }
-    catch (authFcmErr) {
-        dlqCount++;
-        fcmSummary.push({ target: `Authority Dispatch (${authorityTopic})`, status: 'failed' });
-        const dlqId = `dlq_fcm_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-        await writeToDLQ(db, {
-            id: dlqId,
-            topic: 'safety-alerts',
-            type: 'fcm_push_notification',
-            alertId,
-            userId,
-            targetRecipient: authorityTopic,
-            payload: fcmNotificationPayload,
-            error: authFcmErr,
-        });
-    }
-    // 5. Authoritative Firestore Document Write to safety_alerts/{alertId}
-    // NOTE (PII Security): Do NOT store raw emergency contact phone numbers in safety_alerts.
-    const safetyAlertData = {
-        id: alertId,
-        tripId: payload.tripId || `trip_sos_${Date.now()}`,
-        userId,
-        vehicleRegNumber: effectiveVehicleReg,
-        saccoId: effectiveSaccoId,
-        type: 'sos',
-        severity: 'critical',
-        message: payload.message || `Emergency SOS triggered by ${userDisplayName}`,
-        latitude: location.lat,
-        longitude: location.lng,
-        speedKmH,
-        timestamp,
-        status: 'active',
-        acknowledgedBySacco: false,
-        acknowledgedByAuthority: false,
-        smsDispatchedCount: successfulSmsCount,
-        fcmDispatchedCount: successfulFcmCount,
-        emergencyContactsCount: emergencyContacts.length,
-        updatedAt: new Date().toISOString(),
-    };
-    await db.collection('safety_alerts').doc(alertId).set(safetyAlertData, { merge: true });
-    // 6. Record Audit Log
-    await db.collection('audit_logs').doc(`audit_${alertId}`).set({
-        id: `audit_${alertId}`,
-        action: 'EMERGENCY_SOS_DISPATCHED',
-        actorName: userDisplayName,
-        actorRole: 'passenger',
-        saccoId: effectiveSaccoId,
-        target: `Alert ${alertId} (${effectiveVehicleReg})`,
-        timestamp: new Date().toISOString(),
-        details: {
-            alertId,
-            emergencyContactsConfigured: emergencyContacts.length,
-            smsDispatchedCount: successfulSmsCount,
-            fcmDispatchedCount: successfulFcmCount,
-            dlqCount,
-        },
-    });
-    return {
-        success: true,
-        alertId,
-        userId,
-        saccoId: effectiveSaccoId,
-        contactsNotifiedCount: successfulSmsCount,
-        fcmDispatchedCount: successfulFcmCount,
-        dlqCount,
-        contactsSummary,
-        fcmSummary,
-    };
-}
-/**
- * Cloud Function: sendSOS
- * Triggered via HTTPS Callable.
- */
-exports.sendSOS = (0, https_1.onCall)(async (request) => {
-    if (!request.auth) {
-        throw new https_1.HttpsError('unauthenticated', 'Caller must be authenticated to invoke sendSOS.');
-    }
-    const db = (0, firestore_1.getFirestore)();
-    const smsProvider = new DefaultSmsProvider();
-    const messagingProvider = new DefaultMessagingProvider();
-    const payload = {
-        ...request.data,
-        userId: request.auth.uid,
-    };
-    try {
-        return await processSendSosLogic(db, messagingProvider, smsProvider, payload);
     }
     catch (err) {
-        if (err instanceof https_1.HttpsError) {
-            throw err;
+        console.error('[DLQ] Failed to record notification failure:', err);
+    }
+}
+async function processSendSosLogic(db, messagingProvider, smsProvider, payload) {
+    const userId = payload.userId || 'anonymous';
+    if (!userId || userId === 'anonymous')
+        throw new https_1.HttpsError('unauthenticated', 'Authenticated passenger required.');
+    const rawLat = payload.location?.lat ?? payload.latitude;
+    const rawLng = payload.location?.lng ?? payload.longitude;
+    if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !validLocation(rawLat, rawLng))
+        throw new https_1.HttpsError('invalid-argument', 'A valid location is required.');
+    const speedKmH = payload.speedKmH ?? 0;
+    if (!validSpeed(speedKmH))
+        throw new https_1.HttpsError('invalid-argument', 'Speed must be between 0 and 180 km/h.');
+    if (payload.message && payload.message.length > 1000)
+        throw new https_1.HttpsError('invalid-argument', 'Message is too long.');
+    const alertId = payload.alertId && /^sos_[A-Za-z0-9_-]{1,100}$/.test(payload.alertId) ? payload.alertId : `sos_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const requestRef = db.collection('sos_requests').doc(alertId);
+    const existing = await requestRef.get();
+    if (existing.exists) {
+        const existingData = existing.data() || {};
+        if (existingData.status === 'completed' && existingData.result)
+            return existingData.result;
+        if (existingData.status === 'processing')
+            throw new https_1.HttpsError('aborted', 'This SOS request is already being processed.');
+    }
+    await requestRef.create({ alertId, userId, status: 'processing', createdAt: new Date().toISOString() }).catch(async (err) => {
+        if (existing.exists)
+            throw new https_1.HttpsError('aborted', 'This SOS request is already being processed.');
+        throw err;
+    });
+    try {
+        await (0, rateLimit_1.enforceRateLimit)(db, userId, 'sos');
+        const userSnap = await db.collection('users').doc(userId).get();
+        const userData = userSnap.data() || {};
+        const userDisplayName = typeof userData.displayName === 'string' ? userData.displayName.slice(0, 120) : 'Passenger';
+        const emergencyContacts = Array.isArray(userData.emergencyContacts) ? userData.emergencyContacts.filter((c) => !!c && typeof c.phone === 'string' && c.phone.length <= 30).slice(0, 5) : [];
+        // Never trust client-supplied vehicle/SACCO identity for alert routing. Resolve it
+        // from an owned active trip, or from the referenced vehicle record when available.
+        let vehicleRegNumber = '';
+        let saccoId = '';
+        if (payload.tripId) {
+            const tripSnap = await db.collection('trips').doc(payload.tripId).get();
+            if (!tripSnap.exists || tripSnap.data()?.userId !== userId) {
+                throw new https_1.HttpsError('permission-denied', 'The referenced trip does not belong to the caller.');
+            }
+            const trip = tripSnap.data() || {};
+            vehicleRegNumber = typeof trip.vehicleRegNumber === 'string' ? trip.vehicleRegNumber : '';
+            saccoId = typeof trip.saccoId === 'string' ? trip.saccoId : '';
         }
-        const message = err instanceof Error ? err.message : String(err);
+        else if (payload.vehicleRegNumber) {
+            const vehicleRefId = payload.vehicleRegNumber.replace(/\s+/g, '_');
+            const vehicleSnap = await db.collection('vehicles').doc(vehicleRefId).get();
+            if (!vehicleSnap.exists)
+                throw new https_1.HttpsError('not-found', 'The referenced vehicle was not found.');
+            const vehicle = vehicleSnap.data() || {};
+            vehicleRegNumber = typeof vehicle.registrationNumber === 'string' ? vehicle.registrationNumber : payload.vehicleRegNumber;
+            saccoId = typeof vehicle.saccoId === 'string' ? vehicle.saccoId : '';
+        }
+        // A client-provided SACCO id is deliberately ignored. It must be derived from
+        // trusted trip/vehicle data so a caller cannot broadcast an SOS to another SACCO.
+        const effectiveSaccoId = saccoId || 'unassigned';
+        const effectiveVehicleReg = vehicleRegNumber || 'Vehicle In Transit';
+        const timestamp = payload.timestamp || new Date().toISOString();
+        const mapsLink = `https://www.google.com/maps?q=${rawLat},${rawLng}`;
+        const smsBody = `MWENDO SALAMA EMERGENCY SOS: ${userDisplayName} has triggered an urgent safety alert on PSV ${effectiveVehicleReg}. Map: ${mapsLink}. Please check on them immediately.`;
+        const contactsSummary = [];
+        const fcmSummary = [];
+        let successfulSmsCount = 0;
+        let successfulFcmCount = 0;
+        let dlqCount = 0;
+        for (const contact of emergencyContacts) {
+            try {
+                const result = await smsProvider.sendSms(contact.phone, smsBody);
+                if (!result.success)
+                    throw new Error('SMS provider reported failure.');
+                successfulSmsCount++;
+                contactsSummary.push({ name: contact.name || 'Emergency contact', relationship: contact.relationship || '', status: 'dispatched' });
+            }
+            catch (err) {
+                dlqCount++;
+                contactsSummary.push({ name: contact.name || 'Emergency contact', relationship: contact.relationship || '', status: 'failed' });
+                await writeToDLQ(db, { id: `dlq_sms_${alertId}_${successfulSmsCount}_${Date.now()}`, topic: 'safety-alerts', type: 'sms_emergency_contact', alertId, userId, targetRecipient: `${contact.name || 'Emergency contact'} (${contact.phone})`, payload: { message: smsBody }, error: err });
+            }
+        }
+        const fcmPayload = { notification: { title: `EMERGENCY SOS: ${effectiveVehicleReg}`, body: `${userDisplayName} triggered SOS. Location ${rawLat.toFixed(4)}, ${rawLng.toFixed(4)}.` }, data: { alertId, tripId: payload.tripId || '', vehicleRegNumber: effectiveVehicleReg, saccoId: effectiveSaccoId, latitude: String(rawLat), longitude: String(rawLng), type: 'sos', severity: 'critical', timestamp } };
+        const topics = effectiveSaccoId !== 'unassigned' ? [`sacco_${effectiveSaccoId.replace(/\s+/g, '_')}`, 'authority_alerts'] : ['authority_alerts'];
+        for (const topic of topics) {
+            try {
+                await messagingProvider.sendToTopic(topic, fcmPayload);
+                successfulFcmCount++;
+                fcmSummary.push({ target: topic, status: 'dispatched' });
+            }
+            catch (err) {
+                dlqCount++;
+                fcmSummary.push({ target: topic, status: 'failed' });
+                await writeToDLQ(db, { id: `dlq_fcm_${alertId}_${Date.now()}`, topic: 'safety-alerts', type: 'fcm_push_notification', alertId, userId, targetRecipient: topic, payload: fcmPayload, error: err });
+            }
+        }
+        const safetyAlertData = {
+            id: alertId, tripId: payload.tripId || null, userId, vehicleRegNumber: effectiveVehicleReg, saccoId: effectiveSaccoId,
+            type: 'sos', severity: 'critical', message: payload.message || `Emergency SOS triggered by ${userDisplayName}`,
+            latitude: rawLat, longitude: rawLng, speedKmH, timestamp, status: 'active',
+            acknowledgedBySacco: false, acknowledgedByAuthority: false,
+            smsDispatchedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount,
+            emergencyContactsCount: emergencyContacts.length, updatedAt: new Date().toISOString(),
+        };
+        await db.collection('safety_alerts').doc(alertId).create(safetyAlertData);
+        const result = { success: true, alertId, userId, saccoId: effectiveSaccoId, contactsNotifiedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount, contactsSummary, fcmSummary };
+        await db.collection('audit_logs').doc(`audit_${alertId}`).set({ id: `audit_${alertId}`, action: 'EMERGENCY_SOS_DISPATCHED', actorUid: userId, actorName: userDisplayName, actorRole: 'passenger', saccoId: effectiveSaccoId, target: `Alert ${alertId} (${effectiveVehicleReg})`, timestamp: new Date().toISOString(), details: { alertId, emergencyContactsConfigured: emergencyContacts.length, smsDispatchedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount } });
+        await requestRef.update({ status: 'completed', result, completedAt: new Date().toISOString() });
+        return result;
+    }
+    catch (err) {
+        await requestRef.set({ status: 'failed', failedAt: new Date().toISOString(), error: err instanceof Error ? err.message : String(err) }, { merge: true });
+        throw err;
+    }
+}
+exports.sendSOS = (0, https_1.onCall)({ enforceAppCheck: true }, async (request) => {
+    if (!request.auth)
+        throw new https_1.HttpsError('unauthenticated', 'Caller must be authenticated to invoke sendSOS.');
+    const payload = { ...request.data, userId: request.auth.uid };
+    try {
+        return await processSendSosLogic((0, firestore_1.getFirestore)(), new DefaultMessagingProvider(), new DefaultSmsProvider(), payload);
+    }
+    catch (err) {
+        if (err instanceof https_1.HttpsError)
+            throw err;
         console.error('[sendSOS] Execution failed:', err);
-        throw new https_1.HttpsError('internal', message || 'Emergency SOS dispatch failed.');
+        throw new https_1.HttpsError('internal', 'Emergency SOS dispatch failed.');
     }
 });
 //# sourceMappingURL=sendSOS.js.map

@@ -18,6 +18,10 @@ describe('DM-002: Analytics Types and Repository Validation', () => {
         high: 8,
         critical: 2,
       },
+      userCount: 450,
+      saccoCount: 18,
+      auditLogCount: 120,
+      complaintCount: 7,
       updatedAt: '2026-08-13T10:00:00Z',
     };
 
@@ -25,6 +29,10 @@ describe('DM-002: Analytics Types and Repository Validation', () => {
     expect(platformDoc.totalTrips).toBe(125);
     expect(platformDoc.totalViolations).toBe(8);
     expect(platformDoc.activeAlerts).toBe(2);
+    expect(platformDoc.userCount).toBe(450);
+    expect(platformDoc.saccoCount).toBe(18);
+    expect(platformDoc.auditLogCount).toBe(120);
+    expect(platformDoc.complaintCount).toBe(7);
     expect(platformDoc.riskDistribution.low).toBe(80);
     expect(platformDoc.riskDistribution.critical).toBe(2);
 

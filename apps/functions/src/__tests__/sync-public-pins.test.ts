@@ -4,25 +4,51 @@ import { syncPublicPins, processSyncPublicPinsLogic } from '../pins/syncPublicPi
 describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
   let mockDbData: Record<string, any>;
 
+  function matchesFilter(actual: any, op: string, target: any) {
+    if (op === '==') return actual === target;
+    if (op === '!=') return actual !== target;
+    if (op === '<') return actual < target;
+    if (op === '<=') return actual <= target;
+    if (op === '>') return actual > target;
+    if (op === '>=') return actual >= target;
+    return actual === target;
+  }
+
   function createMockDb() {
     return {
-      collection: (colName: string) => ({
-        doc: (docId: string) => ({
-          id: docId,
-          path: `${colName}/${docId}`,
+      collection: (colName: string) => {
+        const createQuery = (filters: Array<{ field: string; op: string; val: any }>) => ({
+          where: (f: string, op: string, val: any) =>
+            createQuery([...filters, { field: f, op, val }]),
+          doc: (docId: string) => ({
+            id: docId,
+            path: `${colName}/${docId}`,
+            get: async () => {
+              const data = mockDbData[`${colName}/${docId}`];
+              return {
+                id: docId,
+                path: `${colName}/${docId}`,
+                exists: !!data,
+                data: () => data || {},
+              };
+            },
+            set: async (data: any, options?: { merge: boolean }) => {
+              const key = `${colName}/${docId}`;
+              if (options?.merge && mockDbData[key]) {
+                mockDbData[key] = { ...mockDbData[key], ...data };
+              } else {
+                mockDbData[key] = data;
+              }
+            },
+          }),
           get: async () => {
-            const data = mockDbData[`${colName}/${docId}`];
-            return {
-              id: docId,
-              exists: !!data,
-              data: () => data || {},
-            };
-          },
-        }),
-        get: async () => {
-          const docs = Object.entries(mockDbData)
-            .filter(([k]) => k.startsWith(`${colName}/`))
-            .map(([k, d]) => {
+            const matches = Object.entries(mockDbData).filter(([k, d]) => {
+              if (!k.startsWith(`${colName}/`)) return false;
+              return filters.every((filter) =>
+                matchesFilter(d[filter.field], filter.op, filter.val)
+              );
+            });
+            const docs = matches.map(([k, d]) => {
               const docId = k.slice(`${colName}/`.length);
               return {
                 id: docId,
@@ -30,16 +56,17 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
                 data: () => d,
               };
             });
-          return { docs, size: docs.length };
-        },
-      }),
+            return { docs, size: docs.length, empty: docs.length === 0 };
+          },
+        });
+        return createQuery([]);
+      },
       batch: () => {
         const operations: Array<() => void> = [];
         return {
           set: (docRef: any, data: any, options?: { merge: boolean }) => {
             operations.push(() => {
-              const docId = docRef.id || 'unknown';
-              const key = `public_pins/${docId}`;
+              const key = docRef.path || (docRef.id ? `public_pins/${docRef.id}` : 'unknown');
               if (options?.merge && mockDbData[key]) {
                 mockDbData[key] = { ...mockDbData[key], ...data };
               } else {
@@ -49,7 +76,7 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
           },
           delete: (docRef: any) => {
             operations.push(() => {
-              const key = docRef.path || `public_pins/${docRef.id}`;
+              const key = docRef.path || (docRef.id ? `public_pins/${docRef.id}` : 'unknown');
               delete mockDbData[key];
             });
           },
@@ -157,7 +184,7 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
     expect(mockDbData['public_pins/spot_stale_retracted']).toBeUndefined();
   });
 
-  it('is idempotent when run repeatedly without changes to source black_spots', async () => {
+  it('uses cursor to prevent re-scanning or re-syncing unchanged records on subsequent runs', async () => {
     const mockDb = createMockDb() as any;
 
     mockDbData['black_spots/spot_1'] = {
@@ -166,15 +193,88 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
       status: 'published',
       latitude: -1.28,
       longitude: 36.82,
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    };
+
+    // First run establishes the cursor and syncs spot_1
+    const firstRun = await processSyncPublicPinsLogic(mockDb);
+    expect(firstRun.syncedCount).toBe(1);
+    expect(firstRun.deletedCount).toBe(0);
+    expect(mockDbData['public_pins/spot_1'].title).toBe('Spot 1');
+    expect(mockDbData['system_config/public_pins_sync']?.lastSyncedAt).toBeDefined();
+
+    // Second run has no updated records: cursor ensures 0 records are re-synced!
+    const secondRun = await processSyncPublicPinsLogic(mockDb);
+    expect(secondRun.syncedCount).toBe(0);
+    expect(secondRun.deletedCount).toBe(0);
+    expect(mockDbData['public_pins/spot_1'].title).toBe('Spot 1');
+
+    // Add a new spot with updatedAt > cursor
+    mockDbData['black_spots/spot_2'] = {
+      id: 'spot_2',
+      name: 'Spot 2',
+      status: 'published',
+      latitude: -1.30,
+      longitude: 36.85,
+      updatedAt: new Date(Date.now() + 60000).toISOString(),
+    };
+
+    // Third run: only spot_2 is processed and synced, spot_1 is NOT re-synced
+    const thirdRun = await processSyncPublicPinsLogic(mockDb);
+    expect(thirdRun.syncedCount).toBe(1);
+    expect(mockDbData['public_pins/spot_2'].title).toBe('Spot 2');
+    expect(mockDbData['public_pins/spot_1'].title).toBe('Spot 1');
+  });
+
+  it('purges unverified or rejected spots during incremental cursor sync', async () => {
+    const mockDb = createMockDb() as any;
+
+    // Initially published spot
+    mockDbData['black_spots/spot_to_reject'] = {
+      id: 'spot_to_reject',
+      name: 'Under Review Hazard',
+      status: 'published',
+      verifiedByAuthority: true,
+      latitude: -1.25,
+      longitude: 36.80,
+      updatedAt: '2026-09-12T00:00:00.000Z',
     };
 
     const firstRun = await processSyncPublicPinsLogic(mockDb);
     expect(firstRun.syncedCount).toBe(1);
-    expect(firstRun.deletedCount).toBe(0);
+    expect(mockDbData['public_pins/spot_to_reject']).toBeDefined();
+
+    // Inspector rejects or unpublishes the hazard, bumping updatedAt
+    mockDbData['black_spots/spot_to_reject'] = {
+      ...mockDbData['black_spots/spot_to_reject'],
+      status: 'rejected',
+      verifiedByAuthority: false,
+      updatedAt: new Date(Date.now() + 60000).toISOString(),
+    };
 
     const secondRun = await processSyncPublicPinsLogic(mockDb);
-    expect(secondRun.syncedCount).toBe(1);
-    expect(secondRun.deletedCount).toBe(0);
-    expect(mockDbData['public_pins/spot_1'].title).toBe('Spot 1');
+    expect(secondRun.deletedCount).toBe(1);
+    expect(mockDbData['public_pins/spot_to_reject']).toBeUndefined();
+  });
+
+  it('supports forceFullScan: true to re-scan and sync all records on demand', async () => {
+    const mockDb = createMockDb() as any;
+
+    mockDbData['black_spots/spot_alpha'] = {
+      id: 'spot_alpha',
+      name: 'Alpha Hazard',
+      status: 'published',
+      latitude: -1.28,
+      longitude: 36.82,
+      updatedAt: '2026-09-12T00:00:00.000Z',
+    };
+
+    const firstRun = await processSyncPublicPinsLogic(mockDb);
+    expect(firstRun.syncedCount).toBe(1);
+
+    // With forceFullScan, it bypasses the cursor and rescans the collection
+    const forceRun = await processSyncPublicPinsLogic(mockDb, { forceFullScan: true });
+    expect(forceRun.syncedCount).toBe(1);
+    expect(mockDbData['public_pins/spot_alpha'].title).toBe('Alpha Hazard');
   });
 });

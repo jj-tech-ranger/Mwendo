@@ -208,6 +208,7 @@ export const EmergencySosScreen: React.FC = () => {
           timestamp: new Date().toISOString(),
           type: 'sos',
           status: 'queued',
+          retryCount: 0,
         });
         await offlineSyncService.updatePendingCount();
       } catch (queueErr) {

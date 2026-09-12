@@ -10,6 +10,7 @@ import { Dialog } from '../../components/ui/Dialog';
 import { publicPinRepository } from '../../repositories';
 import { useToast } from '../../components/ui/Toast';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
+import { HazardConfirmationSheet } from './components/HazardConfirmationSheet';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 interface HazardPin {
@@ -230,13 +231,27 @@ export const SafetyMapScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Hazard / Service Inspector Dialog */}
-      <Dialog
-        isOpen={!!selectedHazard}
-        onClose={() => setSelectedHazard(null)}
-        title={selectedHazard?.title || 'Location Info'}
-      >
-        {selectedHazard && (
+      {/* Waze-style Crowdsourced Confirmation Sheet for Black Spots / Hazards */}
+      {selectedHazard && selectedHazard.type !== 'hospital' && selectedHazard.type !== 'police' && (
+        <HazardConfirmationSheet
+          isOpen={!!selectedHazard}
+          onClose={() => setSelectedHazard(null)}
+          hazardId={selectedHazard.id}
+          hazardTitle={selectedHazard.title}
+          locationName={selectedHazard.locationName}
+          severity={selectedHazard.severity}
+          description={selectedHazard.description}
+          distanceKm={selectedHazard.distanceKm}
+        />
+      )}
+
+      {/* Emergency Facility (Hospital / Police) Inspector Dialog */}
+      {selectedHazard && (selectedHazard.type === 'hospital' || selectedHazard.type === 'police') && (
+        <Dialog
+          isOpen={!!selectedHazard}
+          onClose={() => setSelectedHazard(null)}
+          title={selectedHazard?.title || 'Emergency Facility'}
+        >
           <div className="space-y-4 text-xs text-on-surface">
             <div className="bg-surface-container p-3 rounded-xl space-y-1">
               <div className="font-bold text-sm text-primary">{selectedHazard.locationName}</div>
@@ -246,13 +261,6 @@ export const SafetyMapScreen: React.FC = () => {
             </div>
 
             <p className="text-on-surface-variant leading-relaxed">{selectedHazard.description}</p>
-
-            {selectedHazard.corroborationCount > 0 && (
-              <div className="flex items-center gap-2 p-2 bg-emerald-500/10 rounded-lg text-emerald-800 font-medium">
-                <span className="material-symbols-outlined text-base">verified</span>
-                {t('passenger.map.corroborations')}: {selectedHazard.corroborationCount}
-              </div>
-            )}
 
             <div className="flex gap-2 pt-2">
               <Button
@@ -273,8 +281,8 @@ export const SafetyMapScreen: React.FC = () => {
               </Button>
             </div>
           </div>
-        )}
-      </Dialog>
+        </Dialog>
+      )}
     </div>
   );
 };

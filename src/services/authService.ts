@@ -17,7 +17,8 @@ import {
   getMultiFactorResolver,
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { auth, db, functions } from '../lib/firebase';
 import { UserProfile, UserRole, UserClaims } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { useLanguageStore } from '../store/useLanguageStore';
@@ -393,6 +394,25 @@ export const authService = {
   async logout() {
     await signOut(auth);
     useAuthStore.getState().logout();
+  },
+
+  /**
+   * Secure Account Deletion (Kenya DPA 2019 / Anonymize-and-Retain)
+   * Dispatches the privileged deleteOwnAccount Cloud Function to strip PII from Firestore,
+   * purge rate limits, de-identify safety records, delete Firebase Auth user, and log out.
+   */
+  async deleteOwnAccount() {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('User must be signed in to delete their account.');
+    }
+    const callable = httpsCallable<void, { success: boolean; userId: string; retentionPolicy: string }>(
+      functions,
+      'deleteOwnAccount'
+    );
+    const result = await callable();
+    await this.logout();
+    return result.data;
   },
 
   async updateProfileData(data: Partial<UserProfile>) {

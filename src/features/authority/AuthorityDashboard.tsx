@@ -9,9 +9,8 @@ import {
   vehicleRepository,
   saccoRepository,
   analyticsRepository,
+  alertRepository,
 } from '../../repositories';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { Trip, Violation, BlackSpot, SafetyAlert, Vehicle, SACCO, PlatformAnalyticsDaily } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
@@ -50,24 +49,15 @@ export const AuthorityDashboard: React.FC = () => {
 
   // Real-time onSnapshot listener for emergency feed
   useEffect(() => {
-    const q = query(collection(db, 'alerts'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const fetched = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-          })) as SafetyAlert[];
-          setRealtimeAlerts(fetched);
-        } else {
-          setRealtimeAlerts([]);
-        }
+    const unsubscribe = alertRepository.subscribeToActive(
+      (fetched) => {
+        setRealtimeAlerts(fetched);
       },
       (error) => {
         console.warn('[AuthorityDashboard] Real-time alerts error:', error);
         setRealtimeAlerts([]);
-      }
+      },
+      50
     );
 
     return () => unsubscribe();

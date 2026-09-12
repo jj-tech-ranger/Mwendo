@@ -11,6 +11,7 @@ if (!getApps().length) {
 export { suspendUser, reactivateUser } from './admin/suspendUser';
 export { healthCheck } from './admin/healthCheck';
 export { verifyTotpChallenge } from './auth/verifyTotpChallenge';
+export { deleteOwnAccount } from './auth/deleteOwnAccount';
 export { computeVehicleRisk } from './risk/computeVehicleRisk';
 export { rebuildSaccoAnalytics } from './analytics/rebuildSaccoAnalytics';
 export { updateDailyAnalytics, dailyAnalyticsScheduled } from './analytics/updateDailyAnalytics';
@@ -21,3 +22,5 @@ export { createInspection } from './inspections/createInspection';
 export { dailyPurge } from './scheduled/dailyPurge';
 export { weeklyReport } from './scheduled/weeklyReport';
 export { monthlyArchival } from './scheduled/monthlyArchival';
+export { generateTripSummary } from './risk/generateTripSummary';
+export { decayStaleBlackSpots, decayBlackSpotsScheduled } from './reports/decayStaleBlackSpots';

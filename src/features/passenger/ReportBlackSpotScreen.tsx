@@ -10,6 +10,7 @@ import { offlineStorage } from '../../services/offlineStorage';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { functionsService } from '../../services/functionsService';
 import { storageService } from '../../services/storageService';
+import { pointsService } from '../../services/pointsService';
 import { useAuthStore } from '../../store/useAuthStore';
 
 export const ReportBlackSpotScreen: React.FC = () => {
@@ -146,9 +147,16 @@ export const ReportBlackSpotScreen: React.FC = () => {
           }
         }
 
+        if (user?.uid) {
+          void pointsService.awardPoints(user.uid, 'black_spot_reported');
+        }
+
         setStep(4);
       } else {
-        await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
+        if (user?.uid) {
+          void pointsService.awardPoints(user.uid, 'black_spot_reported');
+        }
+        await offlineStorage.setItem(`offline_report_${reportId}`, { ...newReport, retryCount: 0 });
         await offlineSyncService.updatePendingCount();
         setStep(4);
       }
@@ -159,7 +167,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
         return;
       }
       console.warn('Network write failed, saving to offline buffer:', err);
-      await offlineStorage.setItem(`offline_report_${reportId}`, newReport);
+      await offlineStorage.setItem(`offline_report_${reportId}`, { ...newReport, retryCount: 0 });
       await offlineSyncService.updatePendingCount();
       setStep(4);
     } finally {
@@ -178,9 +186,14 @@ export const ReportBlackSpotScreen: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          <Badge className="bg-emerald-600 text-white font-bold px-3 py-1">
-            +10 Trust Score Earned
-          </Badge>
+          <div className="flex items-center justify-center gap-2">
+            <Badge className="bg-emerald-600 text-white font-bold px-3 py-1">
+              +25 Safety Points
+            </Badge>
+            <Badge className="bg-emerald-800 text-white font-bold px-3 py-1">
+              +10 Trust Score
+            </Badge>
+          </div>
           <h1 className="text-2xl font-black text-on-surface">Report Submitted — Thank You!</h1>
           <p className="text-xs text-on-surface-variant max-w-xs mx-auto">
             Your hazard report helps keep fellow Kenyan commuters safe. Our authority team will review and corroborate it.

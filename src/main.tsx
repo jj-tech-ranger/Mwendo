@@ -5,6 +5,17 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { serviceWorkerService } from './services/serviceWorkerService';
 import './index.css';
 
+// Root-level runtime error capture before any code runs
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    console.error('[Root Runtime Error]', event.error ?? event.message, event);
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('[Root Unhandled Rejection]', event.reason, event);
+  });
+}
+
 /**
  * Material Symbols are delivered by Google Fonts. Hide their ligature text
  * until the font is ready so names such as "menu" or "shield" never flash

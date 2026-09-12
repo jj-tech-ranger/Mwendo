@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { auditLogRepository, userRepository, saccoRepository, tripRepository, complaintRepository, analyticsRepository } from '../../repositories';
+import { auditLogRepository, complaintRepository, analyticsRepository } from '../../repositories';
 import { AuditLog, Complaint, PlatformAnalyticsDaily } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { EmptyState } from '../../components/ui/EmptyState';
@@ -17,34 +17,48 @@ export const AdminDashboard: React.FC = () => {
   const { data: dashboardData, isError, error, refetch } = useQuery<{
     logs: AuditLog[];
     complaints: Complaint[];
-    stats: { userCount: number; saccoCount: number; tripCount: number };
+    stats: {
+      userCount: number;
+      saccoCount: number;
+      tripCount: number;
+      complaintCount: number;
+    };
   }>({
     queryKey: ['adminDashboardData'],
     queryFn: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
-      const [fetchedLogs, fetchedUsers, fetchedSaccos, precomputedDoc, fetchedComplaints] = await Promise.all([
-        auditLogRepository.getAll(),
-        userRepository.getAll(),
-        saccoRepository.getAll(),
-        analyticsRepository.getById(`daily_${todayStr}`).catch(() => null),
-        complaintRepository.getAll(),
+      const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+      const [precomputedDoc, recentLogs, recentComplaints] = await Promise.all([
+        analyticsRepository
+          .getById(`daily_${todayStr}`)
+          .catch(() => null)
+          .then(async (doc) => {
+            if (doc) return doc;
+            return analyticsRepository.getById(`daily_${yesterdayStr}`).catch(() => null);
+          }),
+        auditLogRepository.getRecent(5).catch(() => []),
+        complaintRepository.getRecentPending(3).catch(() => []),
       ]);
 
-      let tripCount = 0;
-      if (precomputedDoc && 'totalTrips' in precomputedDoc && typeof (precomputedDoc as PlatformAnalyticsDaily).totalTrips === 'number') {
-        tripCount = (precomputedDoc as PlatformAnalyticsDaily).totalTrips;
-      } else {
-        const fallbackTrips = await tripRepository.getAll();
-        tripCount = fallbackTrips.length;
-      }
+      const analytics = precomputedDoc as PlatformAnalyticsDaily | null;
+
+      const userCount = typeof analytics?.userCount === 'number' ? analytics.userCount : 0;
+      const saccoCount = typeof analytics?.saccoCount === 'number' ? analytics.saccoCount : 0;
+      const tripCount = typeof analytics?.totalTrips === 'number' ? analytics.totalTrips : 0;
+      const complaintCount =
+        typeof analytics?.complaintCount === 'number'
+          ? analytics.complaintCount
+          : recentComplaints.length;
 
       return {
-        logs: fetchedLogs,
-        complaints: fetchedComplaints.filter((c: Complaint) => c.status === 'open' || c.status === 'investigating'),
+        logs: recentLogs,
+        complaints: recentComplaints,
         stats: {
-          userCount: fetchedUsers.length,
-          saccoCount: fetchedSaccos.length,
+          userCount,
+          saccoCount,
           tripCount,
+          complaintCount,
         },
       };
     },
@@ -53,7 +67,7 @@ export const AdminDashboard: React.FC = () => {
 
   const logs: AuditLog[] = dashboardData?.logs || [];
   const complaints: Complaint[] = dashboardData?.complaints || [];
-  const stats = dashboardData?.stats || { userCount: 0, saccoCount: 0, tripCount: 0 };
+  const stats = dashboardData?.stats || { userCount: 0, saccoCount: 0, tripCount: 0, complaintCount: 0 };
 
   if (isError) {
     return (
@@ -132,7 +146,7 @@ export const AdminDashboard: React.FC = () => {
           <span className="font-label-mono text-[11px] text-on-surface-variant uppercase">
             Pending Moderation
           </span>
-          <p className="font-headline-lg-mobile text-2xl text-amber-600 font-bold">{complaints.length}</p>
+          <p className="font-headline-lg-mobile text-2xl text-amber-600 font-bold">{stats.complaintCount}</p>
           <span className="font-label-mono text-[10px] text-on-surface-variant">Reports awaiting review</span>
         </div>
       </motion.div>
@@ -181,7 +195,7 @@ export const AdminDashboard: React.FC = () => {
                 <span className="material-symbols-outlined text-amber-600 text-xl">gavel</span>
                 Moderation Queue Snapshot
               </h3>
-              <Badge variant="warning">{complaints.length} Pending Reviews</Badge>
+              <Badge variant="warning">{stats.complaintCount} Pending Reviews</Badge>
             </div>
 
             <div className="space-y-sm">

@@ -6,7 +6,18 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-mwendo-salama-rules';
 const FIRESTORE_EMULATOR_HOST = process.env.FIRESTORE_EMULATOR_HOST ?? '127.0.0.1:8080';
@@ -153,6 +164,66 @@ describe('Firestore security rules', () => {
     await assertFails(updateDoc(doc(db, 'safety_alerts/alert-b'), { status: 'acknowledged' }));
   });
 
+  it('denies reads from unregistered alerts collection for all users including authority (reproducing fail-closed permission-denied)', async () => {
+    const db = authedDb('authority-1', 'authority');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'alerts/legacy-alert-1'), {
+        status: 'active',
+        message: 'Emergency SOS in alerts collection',
+      });
+    });
+
+    // Both single doc read and collection query fail with PERMISSION_DENIED under firestore.rules
+    await assertFails(getDoc(doc(db, 'alerts/legacy-alert-1')));
+    await assertFails(getDocs(query(collection(db, 'alerts'))));
+  });
+
+  it('allows authenticated authority user to query real-time safety_alerts with active status filter and recency ordering', async () => {
+    const db = authedDb('authority-1', 'authority');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const fs = ctx.firestore();
+      await setDoc(doc(fs, 'safety_alerts/alert-active-1'), {
+        userId: 'passenger-1',
+        saccoId: 'sacco-a',
+        status: 'active',
+        type: 'sos',
+        severity: 'critical',
+        message: 'Accident reported on Thika Road',
+        timestamp: '2026-09-12T10:00:00Z',
+      });
+      await setDoc(doc(fs, 'safety_alerts/alert-resolved-1'), {
+        userId: 'passenger-2',
+        saccoId: 'sacco-b',
+        status: 'resolved',
+        type: 'sos',
+        severity: 'critical',
+        message: 'Resolved incident on Mombasa Road',
+        timestamp: '2026-09-12T09:00:00Z',
+      });
+    });
+
+    const activeQuery = query(
+      collection(db, 'safety_alerts'),
+      where('status', '==', 'active'),
+      orderBy('timestamp', 'desc'),
+      limit(50)
+    );
+
+    const snapshot = await assertSucceeds(getDocs(activeQuery));
+    expect(snapshot.docs.length).toBe(1);
+    expect(snapshot.docs[0].id).toBe('alert-active-1');
+    expect(snapshot.docs[0].data().status).toBe('active');
+
+    // Authority can acknowledge / resolve active alert
+    await assertSucceeds(
+      updateDoc(doc(db, 'safety_alerts/alert-active-1'), {
+        status: 'resolved',
+        acknowledgedByAuthority: true,
+        resolvedAt: new Date().toISOString(),
+      })
+    );
+  });
+
   it('denies clients from modifying an existing trip', async () => {
     const db = authedDb('passenger-1', 'passenger', 'sacco-a');
     const tripRef = doc(db, 'trips/trip-1');
@@ -185,6 +256,44 @@ describe('Firestore security rules', () => {
     await assertFails(setDoc(doc(db, 'trips/trip-invalid-speed'), {
       userId: 'passenger-1',
       currentSpeedKmH: 181,
+    }));
+  });
+
+  it('allows registered user to submit black spot confirmation under their own UID', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    const confRef = doc(db, 'black_spots/spot-1/confirmations/passenger-1');
+
+    await assertSucceeds(setDoc(confRef, {
+      userId: 'passenger-1',
+      type: 'still_there',
+      timestamp: new Date(),
+    }));
+  });
+
+  it('denies user submitting a black spot confirmation under someone else UID', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    const confRef = doc(db, 'black_spots/spot-1/confirmations/passenger-2');
+
+    await assertFails(setDoc(confRef, {
+      userId: 'passenger-2',
+      type: 'still_there',
+      timestamp: new Date(),
+    }));
+  });
+
+  it('denies updating a confirmation within 24 hours (rate-limit)', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    const confRef = doc(db, 'black_spots/spot-1/confirmations/passenger-1');
+
+    await assertSucceeds(setDoc(confRef, {
+      userId: 'passenger-1',
+      type: 'still_there',
+      timestamp: new Date(),
+    }));
+
+    // Trying to update immediately should fail 24h rule
+    await assertFails(updateDoc(confRef, {
+      type: 'resolved',
     }));
   });
 });

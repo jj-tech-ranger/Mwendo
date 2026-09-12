@@ -1,5 +1,8 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { normalizePlate } from './plate';
+
+export { normalizePlate };
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -7,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatPlateNumber(plate: string): string {
   if (!plate) return '';
-  const cleaned = plate.replace(/\s+/g, '').toUpperCase();
+  const cleaned = normalizePlate(plate);
   if (cleaned.length === 7) {
     return `${cleaned.slice(0, 3)} ${cleaned.slice(3)}`;
   }

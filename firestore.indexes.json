@@ -35,6 +35,14 @@
       ]
     },
     {
+      "collectionGroup": "safety_alerts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "violations",
       "queryScope": "COLLECTION",
       "fields": [

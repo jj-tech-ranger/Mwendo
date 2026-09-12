@@ -9,13 +9,14 @@
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "vitest run"
+    "test": "vitest run src/__tests__"
   },
   "engines": {
     "node": "22"
   },
   "main": "lib/index.js",
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^7.3.2"
   },

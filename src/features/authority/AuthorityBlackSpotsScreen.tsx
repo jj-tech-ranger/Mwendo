@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { blackSpotRepository, auditLogRepository } from '../../repositories';
+import { functionsService } from '../../services/functionsService';
 import { BlackSpot, SeverityLevel, HazardType } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -31,6 +32,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
   const [selectedSeverity, setSelectedSeverity] = useState('all');
   const [activeTab, setActiveTab] = useState<'map' | 'list' | 'queue'>('map');
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [isSyncingPins, setIsSyncingPins] = useState(false);
 
   const { data: blackSpots = [], isLoading } = useQuery({
     queryKey: ['blackSpots'],

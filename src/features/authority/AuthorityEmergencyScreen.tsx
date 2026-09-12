@@ -6,8 +6,6 @@ import { Button } from '../../components/ui/Button';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 
 export const AuthorityEmergencyScreen: React.FC = () => {
   const { showToast } = useToast();
@@ -19,27 +17,17 @@ export const AuthorityEmergencyScreen: React.FC = () => {
 
   useEffect(() => {
     setIsLoading(true);
-    const q = query(collection(db, 'alerts'));
-
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        if (!snapshot.empty) {
-          const fetchedAlerts = snapshot.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-          })) as SafetyAlert[];
-          setAlerts(fetchedAlerts);
-        } else {
-          setAlerts([]);
-        }
+    const unsubscribe = alertRepository.subscribeToActive(
+      (fetchedAlerts) => {
+        setAlerts(fetchedAlerts);
         setIsLoading(false);
       },
       (error) => {
         console.warn('[AuthorityEmergencyScreen] onSnapshot error:', error);
         setAlerts([]);
         setIsLoading(false);
-      }
+      },
+      50
     );
 
     return () => unsubscribe();

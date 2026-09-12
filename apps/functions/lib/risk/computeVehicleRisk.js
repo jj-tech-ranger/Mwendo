@@ -6,6 +6,7 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const engine_1 = require("../lib/engine");
 const env_1 = require("../lib/env");
+const plate_1 = require("../lib/plate");
 function parseSeverity(val) {
     if (val === 'medium' || val === 'high' || val === 'critical') {
         return val;
@@ -31,13 +32,14 @@ async function processVehicleRiskLogic(db, event) {
     if (!shouldProcess) {
         return { processed: false, riskScore: 0, riskTier: 'existing' };
     }
-    const vehicleId = event.vehicleId || event.vehicleRegNumber.replace(/\s+/g, '_');
+    const normPlate = (0, plate_1.normalizePlate)(event.vehicleRegNumber);
+    const vehicleId = event.vehicleId || normPlate;
     const vehicleRef = db.collection('vehicles').doc(vehicleId);
     const vehicleSnap = await vehicleRef.get();
     if (!vehicleSnap.exists) {
         await vehicleRef.set({
             id: vehicleId,
-            regNumber: event.vehicleRegNumber,
+            regNumber: normPlate,
             saccoId: event.saccoId || 'unassigned',
             saccoName: event.saccoId === 'unassigned' ? 'Independent / Unassigned' : event.saccoId,
             capacity: 14,

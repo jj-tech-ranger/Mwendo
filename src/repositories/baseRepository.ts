@@ -51,7 +51,7 @@ export function createConverter<T extends { id: string }>(): FirestoreDataConver
 }
 
 export class BaseRepository<T extends { id: string }> {
-  protected collectionName: string;
+  public readonly collectionName: string;
   protected converter: FirestoreDataConverter<T>;
 
   constructor(collectionName: string) {

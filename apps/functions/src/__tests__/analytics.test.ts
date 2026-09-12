@@ -243,6 +243,14 @@ describe('Cloud Functions — rebuildSaccoAnalytics & updateDailyAnalytics (CF-0
       mockDbData['safety_alerts/a_other_day'] = { id: 'a_other', status: 'active', timestamp: '2026-08-14T12:00:00.000Z' };
       mockDbData['vehicles/veh1'] = { id: 'veh1', riskTier: 'low' };
       mockDbData['vehicles/veh2'] = { id: 'veh2', riskTier: 'critical' };
+      mockDbData['users/u1'] = { id: 'u1', displayName: 'Passenger Alice' };
+      mockDbData['users/u2'] = { id: 'u2', displayName: 'Driver Bob' };
+      mockDbData['saccos/s1'] = { id: 's1', name: 'Super Metro' };
+      mockDbData['audit_logs/l1'] = { id: 'l1', action: 'SUSPEND_USER', timestamp: '2026-08-16T10:00:00.000Z' };
+      mockDbData['audit_logs/l2'] = { id: 'l2', action: 'REACTIVATE_USER', timestamp: '2026-08-16T11:00:00.000Z' };
+      mockDbData['complaints/c1'] = { id: 'c1', status: 'open', title: 'Speeding complaint' };
+      mockDbData['complaints/c2'] = { id: 'c2', status: 'investigating', title: 'Route violation' };
+      mockDbData['complaints/c3'] = { id: 'c3', status: 'resolved', title: 'Resolved complaint' };
 
       const result = await processUpdateDailyAnalyticsLogic(mockDb, '2026-08-16');
 
@@ -250,6 +258,10 @@ describe('Cloud Functions — rebuildSaccoAnalytics & updateDailyAnalytics (CF-0
       expect(result.totalTrips).toBe(2);
       expect(result.totalViolations).toBe(1);
       expect(result.activeAlerts).toBe(1);
+      expect(result.userCount).toBe(2);
+      expect(result.saccoCount).toBe(1);
+      expect(result.auditLogCount).toBe(2);
+      expect(result.complaintCount).toBe(2);
       expect(result.riskDistribution).toEqual({
         low: 1,
         medium: 0,
@@ -257,6 +269,10 @@ describe('Cloud Functions — rebuildSaccoAnalytics & updateDailyAnalytics (CF-0
         critical: 1,
       });
       expect(mockDbData['analytics/daily_2026-08-16']).toBeDefined();
+      expect(mockDbData['analytics/daily_2026-08-16'].userCount).toBe(2);
+      expect(mockDbData['analytics/daily_2026-08-16'].saccoCount).toBe(1);
+      expect(mockDbData['analytics/daily_2026-08-16'].auditLogCount).toBe(2);
+      expect(mockDbData['analytics/daily_2026-08-16'].complaintCount).toBe(2);
     });
 
     it('converges repeated executions onto the same deterministic analytics document', async () => {

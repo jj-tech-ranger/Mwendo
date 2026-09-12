@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { db } from '../../lib/firebase';
+import { normalizePlate } from '../../lib/plate';
+import { vehicleRepository } from '../../repositories';
+import { Vehicle } from '../../types';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -13,6 +16,15 @@ import { SosButton } from '../../components/ui/SosButton';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
 import { useMotionPresets } from '../../lib/motion';
+
+const DEFAULT_SACCOS = [
+  { id: 'sacco_metrolink', name: 'MetroLink SACCO' },
+  { id: 'sacco_greenline', name: 'GreenLine SACCO' },
+  { id: 'sacco_transitstar', name: 'TransitStar SACCO' },
+  { id: 'sacco_cityride', name: 'CityRide SACCO' },
+  { id: 'sacco_metro', name: 'Super Metro SACCO' },
+  { id: 'sacco_2nk', name: '2NK Sacco' },
+];
 
 export const PassengerDashboard: React.FC = () => {
   const { t } = useTranslation();
@@ -25,33 +37,148 @@ export const PassengerDashboard: React.FC = () => {
   const isGuestMode = !!user?.isAnonymous;
   const [plateNumber, setPlateNumber] = useState('');
   const [sacco, setSacco] = useState('');
+  const [saccoId, setSaccoId] = useState('');
   const [route, setRoute] = useState('');
 
-  const handleStartTrip = async () => {
-    if (!plateNumber.trim()) return;
-    const cleanPlate = plateNumber.trim().toUpperCase();
-    const vehicleDocId = cleanPlate.replace(/\s+/g, '_');
+  // Lookup & autocomplete state
+  const [isSearching, setIsSearching] = useState(false);
+  const [matchedVehicle, setMatchedVehicle] = useState<Vehicle | null>(null);
+  const [suggestions, setSuggestions] = useState<Vehicle[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [lookupDone, setLookupDone] = useState(false);
+  const autocompleteContainerRef = useRef<HTMLDivElement>(null);
 
-    let resolvedSaccoId = 'unassigned';
-    let resolvedSaccoName = sacco || 'Independent / Unassigned';
-
-    try {
-      const vehicleDoc = await getDoc(doc(db, 'vehicles', vehicleDocId));
-      if (vehicleDoc.exists()) {
-        const vData = vehicleDoc.data();
-        if (vData.saccoId) resolvedSaccoId = vData.saccoId;
-        if (vData.saccoName) resolvedSaccoName = vData.saccoName;
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        autocompleteContainerRef.current &&
+        !autocompleteContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
       }
-    } catch (err) {
-      console.warn('[PassengerDashboard] Vehicle lookup failed or restricted, falling back to provisional:', err);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Debounced lookup against /vehicles
+  useEffect(() => {
+    const normalized = normalizePlate(plateNumber);
+    if (!normalized || normalized.length < 2) {
+      setMatchedVehicle(null);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setLookupDone(false);
+      setIsSearching(false);
+      return;
     }
 
-    startTrip({
-      plateNumber: cleanPlate,
-      saccoId: resolvedSaccoId,
-      saccoName: resolvedSaccoName,
-      routeName: route || 'Standard Route',
-    });
+    let isCurrent = true;
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        // 1. Direct getDoc check by canonical normalized doc ID
+        const docRef = doc(db, 'vehicles', normalized);
+        const docSnap = await getDoc(docRef);
+
+        if (!isCurrent) return;
+
+        if (docSnap.exists()) {
+          const vData = { id: docSnap.id, ...docSnap.data() } as Vehicle;
+          setMatchedVehicle(vData);
+          setSacco(vData.saccoName || vData.saccoId);
+          setSaccoId(vData.saccoId);
+          setSuggestions([]);
+          setShowSuggestions(false);
+          setLookupDone(true);
+          setIsSearching(false);
+          return;
+        }
+
+        // 2. Search vehicles in collection for prefix autocomplete
+        const results = await vehicleRepository.searchVehicles(normalized, 5);
+        if (!isCurrent) return;
+
+        const exactMatch = results.find(
+          (v) => normalizePlate(v.regNumber) === normalized || normalizePlate(v.id) === normalized
+        );
+
+        if (exactMatch) {
+          setMatchedVehicle(exactMatch);
+          setSacco(exactMatch.saccoName || exactMatch.saccoId);
+          setSaccoId(exactMatch.saccoId);
+          setSuggestions([]);
+          setShowSuggestions(false);
+        } else {
+          setMatchedVehicle(null);
+          setSuggestions(results);
+          setShowSuggestions(results.length > 0);
+        }
+        setLookupDone(true);
+      } catch (err) {
+        console.warn('[PassengerDashboard] Vehicle lookup failed, falling back to manual entry:', err);
+        if (isCurrent) {
+          setMatchedVehicle(null);
+          setSuggestions([]);
+          setLookupDone(true);
+        }
+      } finally {
+        if (isCurrent) setIsSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      isCurrent = false;
+      clearTimeout(timer);
+    };
+  }, [plateNumber]);
+
+  const handleSelectVehicle = (v: Vehicle) => {
+    setPlateNumber(v.regNumber || v.id);
+    setMatchedVehicle(v);
+    setSacco(v.saccoName || v.saccoId);
+    setSaccoId(v.saccoId);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    setLookupDone(true);
+  };
+
+  const handleClearMatchedVehicle = () => {
+    setMatchedVehicle(null);
+    setSacco('');
+    setSaccoId('');
+  };
+
+  const handleStartTrip = async () => {
+    const cleanPlate = normalizePlate(plateNumber);
+    if (!cleanPlate) return;
+
+    if (matchedVehicle) {
+      startTrip({
+        vehicleId: matchedVehicle.id,
+        plateNumber: matchedVehicle.regNumber || cleanPlate,
+        saccoId: matchedVehicle.saccoId,
+        saccoName: matchedVehicle.saccoName || sacco || matchedVehicle.saccoId,
+        routeName: route || 'Standard Route',
+        isProvisional: !!matchedVehicle.isProvisional,
+      });
+    } else {
+      // Unregistered / provisional trip: do NOT attach a bogus vehicleId!
+      const effectiveSaccoId =
+        saccoId ||
+        DEFAULT_SACCOS.find((s) => s.name === sacco)?.id ||
+        (sacco ? sacco.toLowerCase().replace(/\s+/g, '_') : 'sacco_metrolink');
+
+      startTrip({
+        plateNumber: cleanPlate,
+        saccoId: effectiveSaccoId,
+        saccoName: sacco || 'Independent / Unassigned',
+        routeName: route || 'Standard Route',
+        isProvisional: true,
+      });
+    }
+
     navigate('/passenger/start-trip');
   };
 
@@ -127,35 +254,142 @@ export const PassengerDashboard: React.FC = () => {
           </div>
 
           <div className="space-y-3">
-            <div>
-              <label htmlFor="psv-plate-input" className="text-xs font-bold text-on-surface mb-1 block">
-                {t('passenger.dashboard.enterPsvPlate')}
+            <div ref={autocompleteContainerRef} className="relative">
+              <label htmlFor="psv-plate-input" className="text-xs font-bold text-on-surface mb-1 flex items-center justify-between">
+                <span>{t('passenger.dashboard.enterPsvPlate')}</span>
+                {isSearching && (
+                  <span className="text-[10px] font-mono text-primary flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    Searching registry...
+                  </span>
+                )}
               </label>
-              <Input
-                id="psv-plate-input"
-                value={plateNumber}
-                onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
-                placeholder={t('passenger.dashboard.platePlaceholder')}
-                className="font-mono text-base font-bold uppercase tracking-wider"
-              />
+              <div className="relative">
+                <Input
+                  id="psv-plate-input"
+                  value={plateNumber}
+                  onChange={(e) => {
+                    setPlateNumber(e.target.value.toUpperCase());
+                    setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (suggestions.length > 0 && !matchedVehicle) setShowSuggestions(true);
+                  }}
+                  placeholder={t('passenger.dashboard.platePlaceholder')}
+                  className="font-mono text-base font-bold uppercase tracking-wider pr-10"
+                />
+                {matchedVehicle ? (
+                  <button
+                    type="button"
+                    onClick={handleClearMatchedVehicle}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
+                    title="Clear matched vehicle"
+                  >
+                    <span className="material-symbols-outlined text-lg">close</span>
+                  </button>
+                ) : null}
+              </div>
+
+              {/* Autocomplete dropdown suggestions */}
+              {showSuggestions && suggestions.length > 0 && !matchedVehicle && (
+                <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-container-high border border-outline-variant/50 rounded-xl shadow-xl overflow-hidden max-h-52 overflow-y-auto divide-y divide-outline-variant/20">
+                  <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-on-surface-variant bg-surface-container font-semibold">
+                    Matching Registered Vehicles
+                  </div>
+                  {suggestions.map((v) => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => handleSelectVehicle(v)}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-primary/10 flex items-center justify-between transition-colors group"
+                    >
+                      <div>
+                        <div className="font-mono font-bold text-on-surface group-hover:text-primary">
+                          {v.regNumber || v.id}
+                        </div>
+                        <div className="text-[11px] text-on-surface-variant">{v.saccoName || v.saccoId}</div>
+                      </div>
+                      <Badge variant={v.isProvisional ? 'warning' : 'success'} className="text-[9px]">
+                        {v.isProvisional ? 'Provisional' : 'Verified'}
+                      </Badge>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Status Banner: Matched Registered Vehicle */}
+              {matchedVehicle && (
+                <div className="mt-2 flex items-center justify-between p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-950 dark:text-emerald-200 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-emerald-600 text-lg">verified</span>
+                    <div>
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>Registered Vehicle Verified</span>
+                        <Badge variant={matchedVehicle.isProvisional ? 'warning' : 'success'} className="text-[9px]">
+                          {matchedVehicle.isProvisional ? 'Provisional' : 'Active'}
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-on-surface-variant">
+                        Plate: <span className="font-mono font-bold text-on-surface">{matchedVehicle.regNumber}</span> · SACCO: <span className="font-semibold text-on-surface">{matchedVehicle.saccoName}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Status Banner: Unregistered / Provisional Vehicle */}
+              {!matchedVehicle && lookupDone && normalizePlate(plateNumber).length >= 3 && !isSearching && (
+                <div className="mt-2 flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 text-xs">
+                  <span className="material-symbols-outlined text-amber-500 text-base shrink-0 mt-0.5">info</span>
+                  <div className="flex-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>Unregistered / Provisional Vehicle</span>
+                      <Badge variant="warning" className="text-[9px]">Provisional</Badge>
+                    </div>
+                    <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 mt-0.5">
+                      Plate <span className="font-mono font-bold">{normalizePlate(plateNumber)}</span> is not yet registered. You can still start tracking — select your SACCO manually below.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label htmlFor="sacco-org-select" className="text-xs font-medium text-on-surface-variant mb-1 block">
-                  {t('passenger.dashboard.saccoOrg')}
+                <label htmlFor="sacco-org-select" className="text-xs font-medium text-on-surface-variant mb-1 flex items-center justify-between">
+                  <span>{t('passenger.dashboard.saccoOrg')}</span>
+                  {matchedVehicle && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-0.5">
+                      <span className="material-symbols-outlined text-xs">lock</span>
+                      Locked to vehicle
+                    </span>
+                  )}
                 </label>
                 <select
                   id="sacco-org-select"
                   value={sacco}
-                  onChange={(e) => setSacco(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none"
+                  disabled={!!matchedVehicle}
+                  onChange={(e) => {
+                    const selectedName = e.target.value;
+                    const found = DEFAULT_SACCOS.find((s) => s.name === selectedName);
+                    setSacco(selectedName);
+                    setSaccoId(found?.id || (selectedName ? selectedName.toLowerCase().replace(/\s+/g, '_') : ''));
+                  }}
+                  className={`w-full h-10 px-3 rounded-lg border border-outline-variant/50 bg-surface text-on-surface text-xs focus:ring-2 focus:ring-primary focus:outline-none ${
+                    matchedVehicle ? 'opacity-80 cursor-not-allowed bg-surface-container-low font-semibold' : ''
+                  }`}
                 >
                   <option value="">{t('passenger.dashboard.selectSacco')}</option>
-                  <option value="MetroLink SACCO">MetroLink SACCO</option>
-                  <option value="GreenLine SACCO">GreenLine SACCO</option>
-                  <option value="TransitStar SACCO">TransitStar SACCO</option>
-                  <option value="CityRide SACCO">CityRide SACCO</option>
+                  {DEFAULT_SACCOS.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
+                  {matchedVehicle && !DEFAULT_SACCOS.some((s) => s.name === (matchedVehicle.saccoName || matchedVehicle.saccoId)) && (
+                    <option value={matchedVehicle.saccoName || matchedVehicle.saccoId}>
+                      {matchedVehicle.saccoName || matchedVehicle.saccoId}
+                    </option>
+                  )}
                 </select>
               </div>
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { offlineStorage } from '../services/offlineStorage';
-import { offlineSyncService } from '../services/offlineSyncService';
+import { offlineSyncService, OfflineSyncService } from '../services/offlineSyncService';
 import { useOfflineStore } from '../store/useOfflineStore';
 import { tripRepository, blackSpotRepository } from '../repositories';
 
@@ -148,8 +148,8 @@ describe('VT-004: Offline Storage Queue & Reconnect Drain Synchronization', () =
     expect(drainResult.failedTrips).toBe(1);
     expect(drainResult.remainingCount).toBe(1);
 
-    // Item must still remain in active storage
-    expect(store[`offline_trip_${mockTrip.id}`]).toEqual(mockTrip);
+    // Item must still remain in active storage with incremented retryCount
+    expect(store[`offline_trip_${mockTrip.id}`]).toEqual({ ...mockTrip, retryCount: 1 });
     expect(useOfflineStore.getState().queuedActionsCount).toBe(1);
   });
 
@@ -172,9 +172,9 @@ describe('VT-004: Offline Storage Queue & Reconnect Drain Synchronization', () =
       await offlineSyncService.drainQueue();
     }
 
-    // Active key must be deleted and dead-letter key populated
+    // Active key must be deleted and dead-letter key populated with retryCount = 5
     expect(store[key]).toBeUndefined();
-    expect(store[`offline_failed_${key}`]).toEqual(mockTrip);
+    expect(store[`offline_failed_${key}`]).toEqual({ ...mockTrip, retryCount: 5 });
 
     // Store state: queued is 0, failed is 1
     expect(useOfflineStore.getState().queuedActionsCount).toBe(0);
@@ -189,6 +189,97 @@ describe('VT-004: Offline Storage Queue & Reconnect Drain Synchronization', () =
     expect(store[key]).toBeUndefined(); // Successfully synced and removed
     expect(useOfflineStore.getState().failedActionsCount).toBe(0);
     expect(useOfflineStore.getState().queuedActionsCount).toBe(0);
+  });
+
+  it('BUG-004 verification: retry count is durable across app restarts (3 fails -> restart -> 2 fails -> dead-letter)', async () => {
+    vi.spyOn(tripRepository, 'save').mockRejectedValue(new Error('Persistent Network Partition Error'));
+
+    const mockTrip = {
+      id: 'trip_offline_durable_bug004',
+      userId: 'user_p1',
+      plateNumber: 'KDA 333R',
+      status: 'completed',
+      retryCount: 0,
+    };
+
+    const key = `offline_trip_${mockTrip.id}`;
+    await offlineStorage.setItem(key, mockTrip);
+    await offlineSyncService.updatePendingCount();
+
+    // Session 1: Fail 3 times
+    for (let i = 0; i < 3; i++) {
+      await offlineSyncService.drainQueue();
+    }
+
+    // Persisted item in storage must reflect retryCount: 3
+    expect(store[key]).toBeDefined();
+    expect(store[key].retryCount).toBe(3);
+    expect(store[`offline_failed_${key}`]).toBeUndefined();
+
+    // Simulate app restart / page reload:
+    // A new service instance is created without previous in-memory state
+    const restartedService = new OfflineSyncService();
+
+    // Session 2: 4th attempt fails
+    const drain4 = await restartedService.drainQueue();
+    expect(drain4.failedTrips).toBe(1);
+    expect(store[key]?.retryCount).toBe(4);
+    expect(store[`offline_failed_${key}`]).toBeUndefined();
+
+    // Session 2: 5th attempt fails -> reaches MAX_RETRIES (5) -> moves to dead-letter queue
+    const drain5 = await restartedService.drainQueue();
+    expect(drain5.failedTrips).toBe(1);
+
+    // Active key must be deleted, dead-letter key populated with retryCount = 5
+    expect(store[key]).toBeUndefined();
+    expect(store[`offline_failed_${key}`]).toBeDefined();
+    expect(store[`offline_failed_${key}`].retryCount).toBe(5);
+    expect(store[`offline_failed_${key}`].id).toBe(mockTrip.id);
+
+    // Further drain attempts must NOT retry dead-lettered items indefinitely
+    const drain6 = await restartedService.drainQueue();
+    expect(drain6.syncedTrips).toBe(0);
+    expect(drain6.failedTrips).toBe(0);
+    expect(drain6.remainingCount).toBe(0);
+    expect(useOfflineStore.getState().queuedActionsCount).toBe(0);
+    expect(useOfflineStore.getState().failedActionsCount).toBe(1);
+  });
+
+  it('durable retry count across app restarts for offline hazard reports', async () => {
+    vi.spyOn(blackSpotRepository, 'save').mockRejectedValue(new Error('Firestore Error'));
+
+    const mockReport = {
+      id: 'bs_offline_durable_restart',
+      name: 'Dangerous Bump',
+      routeName: 'Thika Road',
+      severity: 'high' as const,
+      hazardDescription: 'Unmarked speed bump',
+      reportedByUid: 'user_p1',
+      createdAt: new Date().toISOString(),
+      retryCount: 0,
+    };
+
+    const key = `offline_report_${mockReport.id}`;
+    await offlineStorage.setItem(key, mockReport);
+    await offlineSyncService.updatePendingCount();
+
+    // Session 1: Fail 3 times
+    for (let i = 0; i < 3; i++) {
+      await offlineSyncService.drainQueue();
+    }
+    expect(store[key]?.retryCount).toBe(3);
+
+    // Simulate app restart
+    const restartedService = new OfflineSyncService();
+
+    // Session 2: Fail 2 more times (total 5)
+    await restartedService.drainQueue(); // 4
+    expect(store[key]?.retryCount).toBe(4);
+
+    await restartedService.drainQueue(); // 5 -> moves to dead-letter
+    expect(store[key]).toBeUndefined();
+    expect(store[`offline_failed_${key}`]).toBeDefined();
+    expect(store[`offline_failed_${key}`].retryCount).toBe(5);
   });
 
   it('triggers drainQueue automatically on window "online" event', async () => {

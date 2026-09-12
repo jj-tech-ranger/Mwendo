@@ -2,6 +2,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore, QueryDocumentSnapshot, DocumentData } from 'firebase-admin/firestore';
 import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+import { normalizePlate } from '../lib/plate';
 
 export interface VehicleRiskEventPayload {
   eventId: string;
@@ -52,14 +53,15 @@ export async function processVehicleRiskLogic(
     return { processed: false, riskScore: 0, riskTier: 'existing' };
   }
 
-  const vehicleId = event.vehicleId || event.vehicleRegNumber.replace(/\s+/g, '_');
+  const normPlate = normalizePlate(event.vehicleRegNumber);
+  const vehicleId = event.vehicleId || normPlate;
   const vehicleRef = db.collection('vehicles').doc(vehicleId);
   const vehicleSnap = await vehicleRef.get();
 
   if (!vehicleSnap.exists) {
     await vehicleRef.set({
       id: vehicleId,
-      regNumber: event.vehicleRegNumber,
+      regNumber: normPlate,
       saccoId: event.saccoId || 'unassigned',
       saccoName: event.saccoId === 'unassigned' ? 'Independent / Unassigned' : event.saccoId,
       capacity: 14,

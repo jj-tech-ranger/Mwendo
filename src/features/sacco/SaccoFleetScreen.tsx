@@ -10,6 +10,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Vehicle } from '../../types';
+import { normalizePlate } from '../../lib/plate';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
@@ -79,14 +80,16 @@ export const SaccoFleetScreen: React.FC = () => {
   const handleSaveVehicle = async () => {
     if (!formPlate || !saccoId) return;
 
-    const vehicleId = editingVehicle ? editingVehicle.id : `v_${Date.now()}`;
+    const cleanPlate = normalizePlate(formPlate);
+    const vehicleId = editingVehicle ? editingVehicle.id : cleanPlate;
     const newVehicle: Vehicle = {
       id: vehicleId,
-      regNumber: formPlate.toUpperCase(),
+      regNumber: cleanPlate,
       saccoId,
       saccoName,
       capacity: Number(formCapacity) || 33,
       status: editingVehicle ? editingVehicle.status : 'active',
+      isProvisional: editingVehicle ? editingVehicle.isProvisional : false,
       insuranceExpiry: '2027-12-31',
       inspectionExpiry: '2027-12-31',
     };
@@ -106,13 +109,15 @@ export const SaccoFleetScreen: React.FC = () => {
     setIsClaiming(true);
     setTimeout(async () => {
       if (claimingVehicle) {
+        const cleanPlate = normalizePlate(claimingVehicle.plate);
         const claimed: Vehicle = {
-          id: `v_claimed_${Date.now()}`,
-          regNumber: claimingVehicle.plate,
+          id: cleanPlate,
+          regNumber: cleanPlate,
           saccoId,
           saccoName,
           capacity: 33,
           status: 'active',
+          isProvisional: false,
           insuranceExpiry: '2027-08-01',
           inspectionExpiry: '2027-08-01',
         };
@@ -130,7 +135,9 @@ export const SaccoFleetScreen: React.FC = () => {
   };
 
   const filteredVehicles = vehicles.filter((v) => {
-    const matchesSearch = v.regNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = normalizePlate(searchTerm);
+    const vPlate = normalizePlate(v.regNumber);
+    const matchesSearch = !term || vPlate.includes(term) || v.regNumber.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
 
@@ -201,7 +208,23 @@ export const SaccoFleetScreen: React.FC = () => {
           <Card className="overflow-hidden p-0"><div className="overflow-x-auto"><table className="w-full text-left text-xs">
             <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant"><tr><th className="p-3.5">Plate Number</th><th className="p-3.5">Capacity</th><th className="p-3.5">SACCO Tenant</th><th className="p-3.5">Status</th><th className="p-3.5">Inspection Expiry</th><th className="p-3.5 text-right">Actions</th></tr></thead>
             <tbody className="divide-y divide-outline-variant/20 font-medium">{filteredVehicles.map((v) => (
-              <tr key={v.id} className="hover:bg-surface-container/50"><td className="p-3.5 font-mono font-bold text-primary">{v.regNumber}</td><td className="p-3.5">{v.capacity} seats</td><td className="p-3.5 font-mono">{v.saccoName}</td><td className="p-3.5"><Badge variant={v.status === 'active' ? 'success' : v.status === 'maintenance' ? 'warning' : 'danger'} className="capitalize text-[10px]">{v.status}</Badge></td><td className="p-3.5 font-mono">{v.inspectionExpiry}</td><td className="p-3.5 text-right space-x-2"><Button variant="ghost" className="h-8 text-[11px] px-2" onClick={() => setSelectedVehicle(v)}>View</Button><Button variant="outline" className="h-8 text-[11px] px-2" onClick={() => handleOpenEdit(v)}>Edit</Button></td></tr>
+              <tr key={v.id} className="hover:bg-surface-container/50">
+                <td className="p-3.5 font-mono font-bold text-primary">
+                  <div className="flex items-center gap-1.5">
+                    <span>{v.regNumber}</span>
+                    {v.isProvisional && (
+                      <Badge variant="warning" className="text-[9px] uppercase font-mono py-0 px-1">
+                        Provisional
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td className="p-3.5">{v.capacity} seats</td>
+                <td className="p-3.5 font-mono">{v.saccoName}</td>
+                <td className="p-3.5"><Badge variant={v.status === 'active' ? 'success' : v.status === 'maintenance' ? 'warning' : 'danger'} className="capitalize text-[10px]">{v.status}</Badge></td>
+                <td className="p-3.5 font-mono">{v.inspectionExpiry}</td>
+                <td className="p-3.5 text-right space-x-2"><Button variant="ghost" className="h-8 text-[11px] px-2" onClick={() => setSelectedVehicle(v)}>View</Button><Button variant="outline" className="h-8 text-[11px] px-2" onClick={() => handleOpenEdit(v)}>Edit</Button></td>
+              </tr>
             ))}</tbody>
           </table></div></Card>
         </div>
