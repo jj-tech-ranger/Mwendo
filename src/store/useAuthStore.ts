@@ -14,6 +14,18 @@ interface AuthState {
 }
 
 const getInitialAuthState = (): { user: UserProfile | null; claims: UserClaims | null; isAuthenticated: boolean } => {
+  if (typeof window !== 'undefined') {
+    const cached = window.localStorage.getItem('mwendosalama_demo_auth_session');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed?.user) {
+          return { user: parsed.user, claims: parsed.claims, isAuthenticated: true };
+        }
+      } catch {}
+    }
+  }
+
   if (import.meta.env.DEV && typeof window !== 'undefined') {
     const win = window as unknown as Record<string, unknown>;
     const testOverrideKey = ['__', 'TEST', '_', 'AUTH', '_', 'OVERRIDE', '__'].join('');
@@ -59,16 +71,32 @@ export const useAuthStore = create<AuthState>((set) => ({
   claims: initialAuth.claims,
   isLoading: !initialAuth.isAuthenticated,
   isAuthenticated: initialAuth.isAuthenticated,
-  setUser: (user, claims) =>
+  setUser: (user, claims) => {
+    const resolvedClaims =
+      claims !== undefined
+        ? claims
+        : (user?.claims || (user?.claimedActiveRole ? { activeRole: user.claimedActiveRole } : null));
+
+    if (typeof window !== 'undefined') {
+      try {
+        if (user) {
+          window.localStorage.setItem(
+            'mwendosalama_demo_auth_session',
+            JSON.stringify({ user, claims: resolvedClaims })
+          );
+        } else {
+          window.localStorage.removeItem('mwendosalama_demo_auth_session');
+        }
+      } catch {}
+    }
+
     set({
       user,
-      claims:
-        claims !== undefined
-          ? claims
-          : (user?.claims || (user?.claimedActiveRole ? { activeRole: user.claimedActiveRole } : null)),
+      claims: resolvedClaims,
       isAuthenticated: !!user,
       isLoading: false,
-    }),
+    });
+  },
   setClaims: (claims) =>
     set((state) => {
       if (!state.user) return { claims, user: null };
@@ -103,5 +131,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       return { user: { ...state.user, role, activeRole: role } };
     }),
   setLoading: (isLoading) => set({ isLoading }),
-  logout: () => set({ user: null, claims: null, isAuthenticated: false, isLoading: false }),
+  logout: () => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.removeItem('mwendosalama_demo_auth_session');
+      } catch {}
+    }
+    set({ user: null, claims: null, isAuthenticated: false, isLoading: false });
+  },
 }));

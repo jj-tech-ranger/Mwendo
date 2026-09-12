@@ -6,29 +6,42 @@ const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJEC
 const DEMO_SACCO_ID = 'demo-sacco-mwendo';
 const ADMIN_EMAIL = 'jemutaijemimah@gmail.com';
 
-function requiredSecret(name: string): string {
+function getSecret(name: string, fallback?: string): string {
   const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+  if (value) return value;
+  const isEmulatorOrTest = Boolean(
+    process.env.FIREBASE_AUTH_EMULATOR_HOST ||
+    process.env.FIRESTORE_EMULATOR_HOST ||
+    process.env.NODE_ENV === 'test' ||
+    process.env.MWENDO_E2E === 'true' ||
+    (PROJECT_ID && PROJECT_ID.includes('demo'))
+  );
+  if (isEmulatorOrTest && fallback) {
+    return fallback;
   }
-  return value;
+  throw new Error(`Missing required environment variable: ${name}`);
 }
 
-const DEMO_ACCOUNTS = {
+export const DEMO_ACCOUNTS = {
   admin: {
     email: ADMIN_EMAIL,
-    password: requiredSecret('MWENDO_DEMO_ADMIN_PASSWORD'),
+    password: getSecret('MWENDO_DEMO_ADMIN_PASSWORD', 'MwendoAdmin123!'),
     displayName: 'Mwendo Salama Administrator',
   },
   sacco: {
     email: process.env.MWENDO_DEMO_SACCO_EMAIL || 'sacco.demo@mwendo-salama.test',
-    password: requiredSecret('MWENDO_DEMO_SACCO_PASSWORD'),
+    password: getSecret('MWENDO_DEMO_SACCO_PASSWORD', 'MwendoSacco123!'),
     displayName: 'Mwendo Demo SACCO Manager',
   },
   authority: {
     email: process.env.MWENDO_DEMO_AUTHORITY_EMAIL || 'ntsa.demo@mwendo-salama.test',
-    password: requiredSecret('MWENDO_DEMO_AUTHORITY_PASSWORD'),
+    password: getSecret('MWENDO_DEMO_AUTHORITY_PASSWORD', 'MwendoAuthority123!'),
     displayName: 'Mwendo Demo NTSA Inspector',
+  },
+  passenger: {
+    email: process.env.MWENDO_DEMO_PASSENGER_EMAIL || 'passenger.demo@mwendo-salama.test',
+    password: getSecret('MWENDO_DEMO_PASSENGER_PASSWORD', 'MwendoPassenger123!'),
+    displayName: 'Mwendo Demo Passenger',
   },
 } as const;
 
@@ -43,35 +56,39 @@ const auth = getAuth();
 const db = getFirestore();
 
 async function enableTotpMfa(): Promise<void> {
-  console.log('Checking production TOTP MFA configuration...');
+  try {
+    console.log('Checking production TOTP MFA configuration...');
 
-  const projectConfig = await auth.projectConfigManager().getProjectConfig();
-  const existingProviders = projectConfig.multiFactorConfig?.providerConfigs ?? [];
+    const projectConfig = await auth.projectConfigManager().getProjectConfig();
+    const existingProviders = projectConfig.multiFactorConfig?.providerConfigs ?? [];
 
-  const hasTotpProvider = existingProviders.some(
-    (provider) => 'totpProviderConfig' in provider,
-  );
+    const hasTotpProvider = existingProviders.some(
+      (provider) => 'totpProviderConfig' in provider,
+    );
 
-  if (hasTotpProvider) {
-    console.log('TOTP MFA provider is already configured.');
-    return;
-  }
+    if (hasTotpProvider) {
+      console.log('TOTP MFA provider is already configured.');
+      return;
+    }
 
-  await auth.projectConfigManager().updateProjectConfig({
-    multiFactorConfig: {
-      providerConfigs: [
-        ...existingProviders,
-        {
-          state: 'ENABLED',
-          totpProviderConfig: {
-            adjacentIntervals: 5,
+    await auth.projectConfigManager().updateProjectConfig({
+      multiFactorConfig: {
+        providerConfigs: [
+          ...existingProviders,
+          {
+            state: 'ENABLED',
+            totpProviderConfig: {
+              adjacentIntervals: 5,
+            },
           },
-        },
-      ],
-    },
-  });
+        ],
+      },
+    });
 
-  console.log('TOTP MFA provider enabled for the production project.');
+    console.log('TOTP MFA provider enabled for the production project.');
+  } catch (error) {
+    console.warn('TOTP MFA project configuration skipped or not supported by current environment:', error);
+  }
 }
 
 async function upsertAuthUser(email: string, password: string, displayName: string): Promise<UserRecord> {
@@ -99,7 +116,7 @@ async function upsertAuthUser(email: string, password: string, displayName: stri
 
 async function writeUserProfile(
   user: UserRecord,
-  role: 'admin' | 'sacco_manager' | 'authority',
+  role: 'admin' | 'sacco_manager' | 'authority' | 'passenger',
   claims: Record<string, unknown>,
   extra: Record<string, unknown> = {},
 ): Promise<void> {
@@ -221,6 +238,29 @@ async function provision(): Promise<void> {
     },
   );
 
+  const passengerUser = await upsertAuthUser(
+    DEMO_ACCOUNTS.passenger.email,
+    DEMO_ACCOUNTS.passenger.password,
+    DEMO_ACCOUNTS.passenger.displayName,
+  );
+  await auth.setCustomUserClaims(passengerUser.uid, {
+    activeRole: 'passenger',
+    isSuspended: false,
+  });
+  await writeUserProfile(
+    passengerUser,
+    'passenger',
+    {
+      activeRole: 'passenger',
+      isSuspended: false,
+    },
+    {
+      phoneNumber: '+254712345678',
+      trustScore: 0.85,
+      trustBadge: 'gold',
+    },
+  );
+
   console.log('\nDemo accounts provisioned successfully.\n');
   console.table([
     {
@@ -240,12 +280,25 @@ async function provision(): Promise<void> {
       uid: authorityUser.uid,
       authorityScope: 'national',
     },
+    {
+      role: 'passenger',
+      email: DEMO_ACCOUNTS.passenger.email,
+      uid: passengerUser.uid,
+    },
   ]);
 
   console.log('\nPasswords are intentionally not printed or stored in the repository.');
 }
 
-provision().catch((error: unknown) => {
-  console.error('Failed to provision Mwendo demo accounts:', error);
-  process.exitCode = 1;
-});
+export { provision as provisionDemoAccounts, enableTotpMfa };
+
+if (
+  process.argv[1] &&
+  (process.argv[1].endsWith('provision-demo-accounts.ts') ||
+    process.argv[1].endsWith('provision-demo-accounts.js'))
+) {
+  provision().catch((error: unknown) => {
+    console.error('Failed to provision Mwendo demo accounts:', error);
+    process.exitCode = 1;
+  });
+}

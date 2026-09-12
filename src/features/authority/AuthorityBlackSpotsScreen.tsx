@@ -73,9 +73,11 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
   // Handle Verify & Publish
   const handleVerifySpot = async (spotId: string, isApproved: boolean) => {
     try {
+      const now = new Date().toISOString();
       await blackSpotRepository.update(spotId, {
         verifiedByAuthority: isApproved,
         status: isApproved ? 'published' : 'rejected',
+        updatedAt: now,
       });
 
       await queryClient.invalidateQueries({ queryKey: ['blackSpots'] });
@@ -87,14 +89,38 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
         actorRole: 'NTSA Inspector',
         action: isApproved ? 'Verified & Published Black Spot Hazard' : 'Rejected User Black Spot Report',
         target: `BlackSpot ${spotId}`,
-        timestamp: new Date().toISOString(),
+        timestamp: now,
       });
+
+      // Synchronize public safety map layer immediately
+      setIsSyncingPins(true);
+      try {
+        await functionsService.syncPublicPins();
+      } catch (syncErr) {
+        console.warn('Failed to sync public pins after verification:', syncErr);
+      } finally {
+        setIsSyncingPins(false);
+      }
 
       setActionMessage(isApproved ? 'Black spot hazard officially verified and published!' : 'Report rejected.');
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error('Failed to verify black spot:', err);
       showToast('error', 'Update Failed', 'Error updating black spot status.');
+    }
+  };
+
+  // Manual Trigger for Public Safety Pins Sync
+  const handleManualSync = async () => {
+    setIsSyncingPins(true);
+    try {
+      const res = await functionsService.syncPublicPins();
+      showToast('success', 'Sync Completed', `Synced ${res.syncedCount} pin(s) to public safety map layer.`);
+    } catch (err) {
+      console.error('Failed to sync public pins:', err);
+      showToast('error', 'Sync Failed', 'Failed to synchronize public safety map layer.');
+    } finally {
+      setIsSyncingPins(false);
     }
   };
 
@@ -106,6 +132,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
       return;
     }
 
+    const now = new Date().toISOString();
     const newSpot: BlackSpot = {
       id: `bs-${Date.now()}`,
       name: formName,
@@ -123,7 +150,8 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
       verifiedByAuthority: true,
       status: 'published',
       confidenceScore: 1.0,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     try {
@@ -135,6 +163,16 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
       setFormName('');
       setFormRoute('');
       setFormDescription('');
+
+      // Synchronize public safety map layer immediately
+      setIsSyncingPins(true);
+      try {
+        await functionsService.syncPublicPins();
+      } catch (syncErr) {
+        console.warn('Failed to sync public pins after creating official spot:', syncErr);
+      } finally {
+        setIsSyncingPins(false);
+      }
 
       setActionMessage('Official Black Spot Advisory published successfully!');
       setTimeout(() => setActionMessage(null), 3500);
@@ -158,6 +196,16 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleManualSync}
+            disabled={isSyncingPins}
+            className="gap-2"
+          >
+            <span className={`material-symbols-outlined text-base ${isSyncingPins ? 'animate-spin' : ''}`}>sync</span>
+            {isSyncingPins ? 'Syncing...' : 'Sync Public Pins'}
+          </Button>
           <Button
             variant="primary"
             size="sm"

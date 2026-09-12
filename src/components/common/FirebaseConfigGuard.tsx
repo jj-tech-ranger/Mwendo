@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertTriangle, Key, RefreshCw, FileCode } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, Key, RefreshCw, FileCode, Play, ExternalLink } from 'lucide-react';
 import { firebaseConfigStatus } from '../../lib/firebase';
 
 interface FirebaseConfigGuardProps {
@@ -7,8 +7,47 @@ interface FirebaseConfigGuardProps {
 }
 
 export const FirebaseConfigGuard: React.FC<FirebaseConfigGuardProps> = ({ children }) => {
-  if (firebaseConfigStatus.isValid) {
-    return <>{children}</>;
+  const [demoMode, setDemoMode] = useState(() => {
+    return typeof window !== 'undefined' && (
+      window.sessionStorage.getItem('mwendo_demo_mode') === 'true' ||
+      window.location.search.includes('demo=true')
+    );
+  });
+
+  const handleEnterDemoMode = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('mwendo_demo_mode', 'true');
+    }
+    setDemoMode(true);
+  };
+
+  if (firebaseConfigStatus.isValid || demoMode) {
+    return (
+      <>
+        {!firebaseConfigStatus.isValid && (
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 text-xs text-amber-900 dark:text-amber-200 flex items-center justify-between z-50 relative">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span><strong>Interactive Demo Mode:</strong> Firebase environment variables not configured. Running with simulated local data.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.sessionStorage.removeItem('mwendo_demo_mode');
+                }
+                setDemoMode(false);
+              }}
+              className="text-xs font-semibold underline hover:text-amber-700 dark:hover:text-amber-100 flex items-center gap-1"
+            >
+              <span>Setup Firebase</span>
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+        )}
+        {children}
+      </>
+    );
   }
 
   const { missingKeys } = firebaseConfigStatus;
@@ -31,7 +70,7 @@ export const FirebaseConfigGuard: React.FC<FirebaseConfigGuardProps> = ({ childr
               Firebase Configuration Required
             </h1>
             <p className="text-sm text-slate-600">
-              The application could not connect to Firebase because required environment variables are missing.
+              The application requires Firebase to store and sync live trips and reports. You can configure Firebase environment variables or explore immediately in interactive demo mode.
             </p>
           </div>
         </div>
@@ -61,20 +100,29 @@ export const FirebaseConfigGuard: React.FC<FirebaseConfigGuardProps> = ({ childr
               <strong>Local Development:</strong> Copy variables from <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">.env.example</code> to <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">.env</code> and provide your Firebase Web App credentials.
             </li>
             <li>
-              <strong>Production / Hosting:</strong> Ensure your deployment CI/CD workflow passes these variables during <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-800">npm run build</code>.
+              <strong>AI Studio Integration:</strong> Use the Settings menu to add your Firebase credentials or provision a project.
             </li>
           </ul>
         </div>
 
-        <div className="pt-2 flex justify-end">
+        <div className="pt-2 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            id="continue-demo-btn"
+            onClick={handleEnterDemoMode}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 active:bg-emerald-900 rounded-xl shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+          >
+            <Play className="w-4 h-4 fill-white" aria-hidden="true" />
+            <span>Explore App in Demo Mode</span>
+          </button>
           <button
             type="button"
             id="reload-page-btn"
             onClick={() => window.location.reload()}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 active:bg-slate-950 rounded-lg shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2"
           >
             <RefreshCw className="w-4 h-4" aria-hidden="true" />
-            <span>Reload Application</span>
+            <span>Reload</span>
           </button>
         </div>
       </div>

@@ -5,8 +5,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { db } from '../../lib/firebase';
 import { normalizePlate } from '../../lib/plate';
-import { vehicleRepository } from '../../repositories';
-import { Vehicle } from '../../types';
+import { vehicleRepository, vehiclePublicSummaryRepository } from '../../repositories';
+import { Vehicle, VehiclePublicSummary } from '../../types';
 import { BrandMark } from '../../components/assets/BrandAssets';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -78,14 +78,48 @@ export const PassengerDashboard: React.FC = () => {
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
-        // 1. Direct getDoc check by canonical normalized doc ID
-        const docRef = doc(db, 'vehicles', normalized);
-        const docSnap = await getDoc(docRef);
+        // 1. Check vehicle_public_summary (safe for signed-in passengers)
+        let summary = await vehiclePublicSummaryRepository.findByNormalizedPlate(normalized);
+
+        // 2. Fallback to vehicleRepository if accessible (e.g. admins or sacco managers)
+        if (!summary) {
+          try {
+            const v = await vehicleRepository.findByNormalizedPlate(normalized);
+            if (v) {
+              summary = {
+                id: v.id,
+                vehicleId: v.id,
+                regNumber: v.regNumber,
+                saccoId: v.saccoId,
+                saccoName: v.saccoName,
+                riskTier: v.riskTier,
+                riskScore: v.riskScore,
+                isProvisional: v.isProvisional,
+                status: v.status,
+              };
+            }
+          } catch {
+            // Expected permission denied for passengers reading /vehicles directly
+          }
+        }
 
         if (!isCurrent) return;
 
-        if (docSnap.exists()) {
-          const vData = { id: docSnap.id, ...docSnap.data() } as Vehicle;
+        if (summary) {
+          const vData = {
+            id: summary.id,
+            regNumber: summary.regNumber,
+            saccoId: summary.saccoId,
+            saccoName: summary.saccoName,
+            capacity: summary.capacity ?? 14,
+            status: summary.status ?? 'active',
+            insuranceExpiry: '',
+            inspectionExpiry: '',
+            riskScore: summary.riskScore,
+            riskTier: summary.riskTier,
+            isProvisional: summary.isProvisional,
+          } as Vehicle;
+
           setMatchedVehicle(vData);
           setSacco(vData.saccoName || vData.saccoId);
           setSaccoId(vData.saccoId);
@@ -96,8 +130,15 @@ export const PassengerDashboard: React.FC = () => {
           return;
         }
 
-        // 2. Search vehicles in collection for prefix autocomplete
-        const results = await vehicleRepository.searchVehicles(normalized, 5);
+        // 3. Search vehicles in public summary collection for prefix autocomplete
+        let results: Array<VehiclePublicSummary | Vehicle> = await vehiclePublicSummaryRepository.searchVehicles(normalized, 5);
+        if (results.length === 0) {
+          try {
+            results = await vehicleRepository.searchVehicles(normalized, 5);
+          } catch {
+            // ignore
+          }
+        }
         if (!isCurrent) return;
 
         const exactMatch = results.find(
@@ -105,15 +146,42 @@ export const PassengerDashboard: React.FC = () => {
         );
 
         if (exactMatch) {
-          setMatchedVehicle(exactMatch);
-          setSacco(exactMatch.saccoName || exactMatch.saccoId);
-          setSaccoId(exactMatch.saccoId);
+          const vData = {
+            id: exactMatch.id,
+            regNumber: exactMatch.regNumber,
+            saccoId: exactMatch.saccoId,
+            saccoName: exactMatch.saccoName,
+            capacity: 14,
+            status: 'active',
+            insuranceExpiry: '',
+            inspectionExpiry: '',
+            riskScore: exactMatch.riskScore,
+            riskTier: exactMatch.riskTier,
+            isProvisional: exactMatch.isProvisional,
+          } as Vehicle;
+
+          setMatchedVehicle(vData);
+          setSacco(vData.saccoName || vData.saccoId);
+          setSaccoId(vData.saccoId);
           setSuggestions([]);
           setShowSuggestions(false);
         } else {
           setMatchedVehicle(null);
-          setSuggestions(results);
-          setShowSuggestions(results.length > 0);
+          const mappedSuggestions: Vehicle[] = results.map((r) => ({
+            id: r.id,
+            regNumber: r.regNumber,
+            saccoId: r.saccoId,
+            saccoName: r.saccoName,
+            capacity: 14,
+            status: 'active',
+            insuranceExpiry: '',
+            inspectionExpiry: '',
+            riskScore: r.riskScore,
+            riskTier: r.riskTier,
+            isProvisional: r.isProvisional,
+          }));
+          setSuggestions(mappedSuggestions);
+          setShowSuggestions(mappedSuggestions.length > 0);
         }
         setLookupDone(true);
       } catch (err) {
@@ -243,6 +311,29 @@ export const PassengerDashboard: React.FC = () => {
       )}
 
       <motion.div variants={variants.staggerItem}>
+        <Card className="p-4 sm:p-5 bg-gradient-to-r from-primary/10 via-surface-container-high/40 to-primary/5 border border-primary/20 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary text-xl">shield</span>
+              <h2 className="text-sm font-bold text-on-surface">Check Vehicle Before Boarding</h2>
+              <Badge variant="primary" className="text-[10px] uppercase font-mono">Differentiator</Badge>
+            </div>
+            <p className="text-xs text-on-surface-variant max-w-md leading-relaxed">
+              Look up any matatu's safety rating, SACCO standing, and risk tier before getting on board.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => navigate('/passenger/lookup')}
+            className="font-bold text-xs shrink-0 w-full sm:w-auto"
+            id="btn-nav-vehicle-lookup"
+          >
+            Check Vehicle Standing →
+          </Button>
+        </Card>
+      </motion.div>
+
+      <motion.div variants={variants.staggerItem}>
         <Card className="p-5 space-y-4 shadow-sm border border-outline-variant/30">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
@@ -334,6 +425,13 @@ export const PassengerDashboard: React.FC = () => {
                       </p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/passenger/lookup?plate=${normalizePlate(matchedVehicle.regNumber)}`)}
+                    className="text-[11px] font-bold text-primary hover:underline flex items-center gap-0.5 ml-2 shrink-0"
+                  >
+                    Safety Standing →
+                  </button>
                 </div>
               )}
 

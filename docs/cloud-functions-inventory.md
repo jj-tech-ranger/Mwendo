@@ -22,6 +22,7 @@ Authoritative export inventory is taken from `apps/functions/src/index.ts`. This
 | `decayStaleBlackSpots` | `reports/decayStaleBlackSpots.ts` | Callable | Crowdsourced confirmation tally, severity decay/archival; covered by tests in `decay-black-spots.test.ts` |
 | `decayBlackSpotsScheduled` | `reports/decayStaleBlackSpots.ts` | Scheduled | Scheduled cron for crowdsourced black spot decay; covered by tests in `decay-black-spots.test.ts` |
 | `createInspection` | `inspections/createInspection.ts` | Callable | Authority/admin authorization, SACCO tenant match, certificate generation, and transactional audit log covered in `create-inspection.test.ts` |
+| `updateReporterTrust` | `trust/updateReporterTrust.ts` | Callable | Caller identity strictly locked to `request.auth.uid`, App Check, complaint resolution tally, dynamic trust calculation, Admin SDK user update, audit log; covered by tests in `update-reporter-trust.test.ts` |
 | `dailyPurge` | `scheduled/dailyPurge.ts` | Scheduled | Batch deletion of expired processedEvents and DLQ notifications (> 30 days) covered in `scheduled-jobs.test.ts` |
 | `weeklyReport` | `scheduled/weeklyReport.ts` | Scheduled | Aggregated compliance summary and SACCO breakdown generation covered in `scheduled-jobs.test.ts` |
 | `monthlyArchival` | `scheduled/monthlyArchival.ts` | Scheduled | Batch archival of trips (> 1 yr) and violations (> 2 yrs) covered in `scheduled-jobs.test.ts` |
@@ -32,4 +33,4 @@ Every export in `index.ts` must have a row here and must have evidence for authe
 
 ## Current status
 
-All 19 authoritative Cloud Function exports in `apps/functions/src/index.ts` have documented security reviews and targeted automated test coverage across unit, authorization, input validation, rate limiting, and idempotency test suites.
+All 20 authoritative Cloud Function exports in `apps/functions/src/index.ts` have documented security reviews and targeted automated test coverage across unit, authorization, input validation, rate limiting, and idempotency test suites.

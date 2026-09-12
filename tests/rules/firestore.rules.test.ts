@@ -107,6 +107,85 @@ describe('Firestore security rules', () => {
     await assertFails(getDoc(doc(db, 'vehicles/vehicle-b')));
   });
 
+  it('denies passengers direct read access to full /vehicles documents containing operational secrets', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'vehicles/KDA123A'), {
+        id: 'KDA123A',
+        regNumber: 'KDA 123A',
+        saccoId: 'sacco-a',
+        saccoName: 'Metro SACCO',
+        capacity: 33,
+        status: 'active',
+        insuranceExpiry: '2027-12-31',
+        inspectionExpiry: '2027-12-31',
+        riskScore: 35,
+        riskTier: 'low',
+      });
+    });
+
+    // Passenger MUST be denied direct read of full vehicle doc
+    await assertFails(getDoc(doc(db, 'vehicles/KDA123A')));
+  });
+
+  it('allows signed-in passengers read access to /vehicle_public_summary safe projections', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'vehicle_public_summary/KDA123A'), {
+        id: 'KDA123A',
+        vehicleId: 'KDA123A',
+        regNumber: 'KDA 123A',
+        saccoId: 'sacco-a',
+        saccoName: 'Metro SACCO',
+        riskTier: 'low',
+        riskScore: 35,
+        isProvisional: false,
+        status: 'active',
+      });
+    });
+
+    // Signed-in passenger can safely read public standing summary
+    await assertSucceeds(getDoc(doc(db, 'vehicle_public_summary/KDA123A')));
+  });
+
+  it('denies unauthenticated users read access to /vehicle_public_summary', async () => {
+    const unauthedDb = testEnv.unauthenticatedContext().firestore();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'vehicle_public_summary/KDA123A'), {
+        id: 'KDA123A',
+        regNumber: 'KDA 123A',
+        saccoId: 'sacco-a',
+        saccoName: 'Metro SACCO',
+        riskTier: 'low',
+      });
+    });
+
+    await assertFails(getDoc(doc(unauthedDb, 'vehicle_public_summary/KDA123A')));
+  });
+
+  it('denies passengers write access to /vehicle_public_summary', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+    await assertFails(setDoc(doc(db, 'vehicle_public_summary/KDA123A'), {
+      regNumber: 'KDA 123A',
+      saccoId: 'sacco-a',
+      riskTier: 'low',
+    }));
+  });
+
+  it('allows authority to write and update /vehicle_public_summary', async () => {
+    const db = authedDb('authority-1', 'authority');
+    await assertSucceeds(setDoc(doc(db, 'vehicle_public_summary/KDA123A'), {
+      id: 'KDA123A',
+      regNumber: 'KDA 123A',
+      saccoId: 'sacco-a',
+      saccoName: 'Metro SACCO',
+      riskTier: 'low',
+      riskScore: 30,
+      isProvisional: false,
+      status: 'active',
+    }));
+  });
+
   it('denies a SACCO manager from moving a vehicle into another SACCO', async () => {
     const db = authedDb('manager-a', 'sacco_manager', 'sacco-a');
     await testEnv.withSecurityRulesDisabled(async (ctx) => {

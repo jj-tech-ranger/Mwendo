@@ -277,4 +277,57 @@ describe('Cloud Functions — syncPublicPins (CF-005 & TEST-002)', () => {
     expect(forceRun.syncedCount).toBe(1);
     expect(mockDbData['public_pins/spot_alpha'].title).toBe('Alpha Hazard');
   });
+
+  it('verifying a black spot (authority verification action) triggers incremental sync to public_pins without re-scanning older spots', async () => {
+    const mockDb = createMockDb() as any;
+
+    // Pre-existing spot already synced
+    mockDbData['black_spots/existing_spot'] = {
+      id: 'existing_spot',
+      name: 'Existing Spot',
+      status: 'published',
+      verifiedByAuthority: true,
+      latitude: -1.20,
+      longitude: 36.80,
+      updatedAt: '2026-09-10T10:00:00.000Z',
+    };
+
+    // Pre-existing pending spot not yet verified
+    mockDbData['black_spots/spot_pending_review'] = {
+      id: 'spot_pending_review',
+      name: 'Dangerous Overpass Dip',
+      status: 'pending',
+      verifiedByAuthority: false,
+      latitude: -1.29,
+      longitude: 36.83,
+      updatedAt: '2026-09-10T11:00:00.000Z',
+    };
+
+    // Initial sync
+    const initialSync = await processSyncPublicPinsLogic(mockDb);
+    expect(initialSync.syncedCount).toBe(1);
+    expect(mockDbData['public_pins/existing_spot']).toBeDefined();
+    expect(mockDbData['public_pins/spot_pending_review']).toBeUndefined();
+
+    // Inspector verifies and publishes spot_pending_review (simulating AuthorityBlackSpotsScreen.tsx)
+    const verificationTime = '2026-09-12T12:00:00.000Z';
+    mockDbData['black_spots/spot_pending_review'] = {
+      ...mockDbData['black_spots/spot_pending_review'],
+      status: 'published',
+      verifiedByAuthority: true,
+      updatedAt: verificationTime,
+    };
+
+    // Incremental sync runs immediately after verification
+    const afterVerifySync = await processSyncPublicPinsLogic(mockDb);
+
+    // Only 1 spot was synced (spot_pending_review), existing_spot was skipped due to cursor
+    expect(afterVerifySync.syncedCount).toBe(1);
+    expect(afterVerifySync.deletedCount).toBe(0);
+
+    // Both spots are now in public_pins
+    expect(mockDbData['public_pins/existing_spot']).toBeDefined();
+    expect(mockDbData['public_pins/spot_pending_review']).toBeDefined();
+    expect(mockDbData['public_pins/spot_pending_review'].title).toBe('Dangerous Overpass Dip');
+  });
 });

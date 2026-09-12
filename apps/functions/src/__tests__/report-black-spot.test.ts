@@ -210,13 +210,63 @@ describe('Cloud Functions — reportBlackSpot (HAZ-001, RATE-001 & AUDIT-002)', 
       expect(spotDoc.reportedByUid).toBe('user_kamau_1');
       expect(spotDoc.status).toBe('pending');
       expect(spotDoc.corroborationCount).toBe(1);
-      expect(spotDoc.confidenceScore).toBe(0.8);
+      // Default baseline trust 0.5 with no photo: 0.4*(1/3) + 0.4*0.5 + 0.2*0 = 0.333
+      expect(spotDoc.confidenceScore).toBe(0.333);
 
       // Verify audit log document
       const auditDoc = mockDbData[`audit_logs/audit_${result拼.spotId}`];
       expect(auditDoc).toBeDefined();
       expect(auditDoc.action).toBe('REPORT_BLACK_SPOT');
       expect(auditDoc.actorUid).toBe('user_kamau_1');
+    });
+
+    it('calculates dynamic confidenceScore based on reporter trust score and photo presence', async () => {
+      const mockDb = createMockDb() as any;
+
+      // Seed user profiles with different trust scores
+      mockDbData['users/high_trust_user'] = { uid: 'high_trust_user', trustScore: 0.9 };
+      mockDbData['users/low_trust_user'] = { uid: 'low_trust_user', trustScore: 0.2 };
+      mockDbData['users/percent_scale_user'] = { uid: 'percent_scale_user', trustScore: 80 }; // 0-100 scale
+
+      const basePayload: ReportBlackSpotPayload = {
+        title: 'Oil Spill on Dual Carriageway',
+        location: { lat: -1.28, lng: 36.82 },
+      };
+
+      // 1. High trust user without photo: 0.4*(1/3) + 0.4*0.9 = 0.493
+      const resHigh = await processReportBlackSpotLogic(mockDb, basePayload, 'high_trust_user');
+      const spotHigh = mockDbData[`black_spots/${resHigh.spotId}`];
+
+      // 2. Low trust user without photo: 0.4*(1/3) + 0.4*0.2 = 0.213
+      const resLow = await processReportBlackSpotLogic(mockDb, basePayload, 'low_trust_user');
+      const spotLow = mockDbData[`black_spots/${resLow.spotId}`];
+
+      // 3. High trust user WITH photo: 0.4*(1/3) + 0.4*0.9 + 0.2 = 0.693
+      const resPhoto = await processReportBlackSpotLogic(
+        mockDb,
+        { ...basePayload, photoUrl: 'https://example.com/evidence.jpg' },
+        'high_trust_user'
+      );
+      const spotPhoto = mockDbData[`black_spots/${resPhoto.spotId}`];
+
+      // 4. Percentage-scale user (80% -> 0.8): 0.4*(1/3) + 0.4*0.8 = 0.453
+      const resPercent = await processReportBlackSpotLogic(mockDb, basePayload, 'percent_scale_user');
+      const spotPercent = mockDbData[`black_spots/${resPercent.spotId}`];
+
+      expect(spotHigh.confidenceScore).toBe(0.493);
+      expect(spotLow.confidenceScore).toBe(0.213);
+      expect(spotPhoto.confidenceScore).toBe(0.693);
+      expect(spotPercent.confidenceScore).toBe(0.453);
+
+      // Verify acceptance criteria:
+      // Reports from different trust scores produce different confidence scores
+      expect(spotHigh.confidenceScore).not.toBe(spotLow.confidenceScore);
+      // Photo presence increases confidence score
+      expect(spotPhoto.confidenceScore).toBeGreaterThan(spotHigh.confidenceScore);
+      // corroborationCount remains 1 pending deduplication
+      expect(spotHigh.corroborationCount).toBe(1);
+      expect(spotLow.corroborationCount).toBe(1);
+      expect(spotPhoto.corroborationCount).toBe(1);
     });
 
     it('enforces rate limit of max 10 hazard reports per 24 hours per user', async () => {

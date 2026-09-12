@@ -24,3 +24,4 @@ export { weeklyReport } from './scheduled/weeklyReport';
 export { monthlyArchival } from './scheduled/monthlyArchival';
 export { generateTripSummary } from './risk/generateTripSummary';
 export { decayStaleBlackSpots, decayBlackSpotsScheduled } from './reports/decayStaleBlackSpots';
+export { updateReporterTrust } from './trust/updateReporterTrust';

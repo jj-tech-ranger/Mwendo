@@ -59,6 +59,21 @@
       },
       "required": ["regNumber", "saccoId", "capacity", "status"]
     },
+    "VehiclePublicSummary": {
+      "title": "VehiclePublicSummary",
+      "description": "Passenger-safe public projection of vehicle registration, SACCO standing, and risk tier without operational/insurance secrets",
+      "type": "object",
+      "properties": {
+        "regNumber": { "type": "string", "maxLength": 20 },
+        "saccoId": { "type": "string" },
+        "saccoName": { "type": "string" },
+        "riskTier": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "riskScore": { "type": "number" },
+        "isProvisional": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "maintenance", "suspended"] }
+      },
+      "required": ["regNumber", "saccoId", "saccoName"]
+    },
     "SACCO": {
       "title": "SACCO",
       "description": "Savings and Credit Cooperative Organization",
@@ -177,6 +192,10 @@
     "/vehicles/{vehicleId}": {
       "schema": { "$ref": "#/entities/Vehicle" },
       "description": "Vehicle records and risk profiles"
+    },
+    "/vehicle_public_summary/{vehicleId}": {
+      "schema": { "$ref": "#/entities/VehiclePublicSummary" },
+      "description": "Public-safe vehicle summary accessible to passengers"
     },
     "/saccos/{saccoId}": {
       "schema": { "$ref": "#/entities/SACCO" },

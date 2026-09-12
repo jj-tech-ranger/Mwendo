@@ -9,6 +9,7 @@ import {
   calculateReporterTrustScore,
   getTrustBadgeLevel,
   detectOverspeedViolations,
+  ConfidenceScorer,
   GPSSample,
   RiskEvent,
 } from '../lib/engine';
@@ -177,6 +178,26 @@ export const functionsService = {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+
+      // Sync public-safe projection
+      try {
+        const summaryRef = doc(db, 'vehicle_public_summary', vehicleId);
+        await setDoc(summaryRef, {
+          id: vehicleId,
+          vehicleId,
+          regNumber: normPlate,
+          saccoId,
+          saccoName: saccoId === 'unassigned' ? 'Independent / Unassigned' : saccoId,
+          capacity: 14,
+          status: 'active',
+          isProvisional: true,
+          riskScore: 85,
+          riskTier: 'medium',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[VehicleResolution] Could not sync public summary:', err);
+      }
       console.log(`[VehicleResolution] Provisioned provisional vehicle for ${normPlate}`);
     }
   },
@@ -200,6 +221,18 @@ export const functionsService = {
         updatedAt: new Date().toISOString(),
       });
       totalOps++;
+
+      try {
+        const summaryRef = doc(db, 'vehicle_public_summary', vehicleId);
+        await setDoc(summaryRef, {
+          saccoId: targetSaccoId,
+          saccoName: targetSaccoName,
+          isProvisional: false,
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } catch (err) {
+        console.warn('[onVehicleClaimed] Could not update public summary:', err);
+      }
     }
 
     // Loop 1: Trips backfill
@@ -493,43 +526,24 @@ export const functionsService = {
 
   /**
    * Trust Engine: update user reporter trust score and badge (§8.2)
+   * Invokes the authoritative updateReporterTrust Cloud Function callable.
+   * Target user identity is strictly derived from the caller's auth context server-side.
    */
-  async updateReporterTrust(userId: string): Promise<{ trustScore: number; trustBadge: string }> {
-    const complaintsQuery = query(collection(db, 'complaints'), where('reportedByUid', '==', userId));
-    const complaintsSnap = await getDocs(complaintsQuery);
-
-    let confirmedCount = 0;
-    let falseCount = 0;
-
-    complaintsSnap.docs.forEach((d) => {
-      const st = d.data().status;
-      if (st === 'resolved' || st === 'verified') confirmedCount++;
-      if (st === 'dismissed' || st === 'false') falseCount++;
-    });
-
-    const userRef = doc(db, 'users', userId);
-    const userSnap = await getDoc(userRef);
-    let accountAgeDays = 30;
-
-    if (userSnap.exists()) {
-      const createdAt = userSnap.data().createdAt;
-      if (createdAt) {
-        accountAgeDays = Math.max(0, (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24));
-      }
+  async updateReporterTrust(_userId?: string): Promise<{ trustScore: number; trustBadge: 'bronze' | 'silver' | 'gold' | 'verified_guardian' }> {
+    try {
+      const callable = httpsCallable<void, { trustScore: number; trustBadge: 'bronze' | 'silver' | 'gold' | 'verified_guardian' }>(
+        functions,
+        'updateReporterTrust'
+      );
+      const res = await callable();
+      return {
+        trustScore: res.data.trustScore,
+        trustBadge: res.data.trustBadge,
+      };
+    } catch (err) {
+      console.warn('[functionsService] updateReporterTrust callable invocation failed:', err);
+      throw err;
     }
-
-    const trustScore = calculateReporterTrustScore(confirmedCount, falseCount, accountAgeDays);
-    const trustBadge = getTrustBadgeLevel(trustScore);
-
-    if (userSnap.exists()) {
-      await updateDoc(userRef, {
-        trustScore,
-        trustBadge,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
-    return { trustScore, trustBadge };
   },
 
   /**
@@ -753,6 +767,30 @@ export const functionsService = {
         throw new Error('A valid location is required.');
       }
 
+      let reporterTrustScore = 0.5;
+      try {
+        const userSnap = await getDoc(doc(db, 'users', userId));
+        if (userSnap.exists()) {
+          const rawTrust = userSnap.data()?.trustScore;
+          if (typeof rawTrust === 'number' && Number.isFinite(rawTrust)) {
+            reporterTrustScore = rawTrust > 1.0
+              ? Math.min(1.0, Math.max(0.0, rawTrust / 100))
+              : Math.min(1.0, Math.max(0.0, rawTrust));
+          }
+        }
+      } catch (err) {
+        console.warn('[functionsService] Could not load user trustScore, using default:', err);
+      }
+
+      const hasEvidencePhoto = Boolean(
+        payload.photoUrl && typeof payload.photoUrl === 'string' && payload.photoUrl.trim().length > 0
+      );
+      const confidenceScore = ConfidenceScorer.calculateHazardConfidence(
+        1,
+        reporterTrustScore,
+        hasEvidencePhoto
+      );
+
       const newReport = {
         id: spotId,
         spotId,
@@ -775,7 +813,7 @@ export const functionsService = {
         status: 'pending',
         corroborationCount: 1,
         corroborationsCount: 1,
-        confidenceScore: 0.8,
+        confidenceScore,
         createdAt: now,
         updatedAt: now,
       };

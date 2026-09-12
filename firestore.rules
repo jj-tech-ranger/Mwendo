@@ -31,12 +31,16 @@ service cloud.firestore {
     match /users/{userId} { allow read: if isSignedIn() && (isOwner(userId) || isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && resource.data.saccoId == request.auth.token.saccoId)); allow create: if isSignedIn() && isOwner(userId) && (!('role' in request.resource.data) || request.resource.data.role == 'passenger') && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger'] && !('saccoId' in request.resource.data) && !('authorityId' in request.resource.data) && !('authorityScope' in request.resource.data) && !('badgeNumber' in request.resource.data) && (!('isActive' in request.resource.data) || request.resource.data.isActive == true); allow update: if isAdmin() || (isOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','phoneNumber','notificationPreferences','theme','language','photoURL','emergencyContacts','updatedAt','analyticsConsent','analyticsConsentAt','role','activeRole','roles']) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role','activeRole','roles']) || (request.resource.data.role == 'passenger' && request.resource.data.activeRole == 'passenger' && request.resource.data.roles == ['passenger']))); allow delete: if isAdmin(); }
     match /trips/{tripId} { allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || (resource.data.saccoId != null && isSaccoManager(resource.data.saccoId)) || isAuthority()); allow create: if isRegisteredUser() && isValidTripData(request.resource.data) && validVehicleReference(request.resource.data); allow update: if isAuthority() && isValidTripData(request.resource.data) && validVehicleReference(request.resource.data) && resource.data.status != 'completed' && resource.data.status != 'auto_completed' && resource.data.status != 'incomplete_signal_lost'; allow delete: if isAdmin(); }
     match /vehicles/{vehicleId} {
-      allow read: if isSignedIn() && (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') ? isSaccoManager(resource.data.saccoId) : true));
+      allow read: if isSignedIn() && (isAdmin() || isAuthority() || (hasActiveRole('sacco_manager') && isSaccoManager(resource.data.saccoId)));
       allow create: if isAuthority() || isAdmin() || isSaccoManager(request.resource.data.saccoId);
       allow update: if isAuthority()
         || isAdmin()
         || managerVehicleUpdate();
       allow delete: if isAdmin();
+    }
+    match /vehicle_public_summary/{vehicleId} {
+      allow read: if isSignedIn();
+      allow write: if isAuthority() || isAdmin() || (isSignedIn() && hasActiveRole('sacco_manager') && isSaccoManager(request.resource.data.saccoId));
     }
     match /saccos/{saccoId} { allow read: if isSignedIn(); allow create: if isAuthority(); allow update: if isAuthority() || (isSaccoManager(saccoId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['contactEmail','contactPhone','settings','updatedAt'])); allow delete: if isAdmin(); }
     match /authorities/{authorityId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

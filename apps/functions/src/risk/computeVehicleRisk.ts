@@ -135,6 +135,24 @@ export async function processVehicleRiskLogic(
     { merge: true }
   );
 
+  // Sync minimal public-safe projection to vehicle_public_summary (accessible to passengers)
+  const publicSummaryRef = db.collection('vehicle_public_summary').doc(vehicleId);
+  await publicSummaryRef.set(
+    {
+      id: vehicleId,
+      vehicleId,
+      regNumber: normPlate,
+      saccoId: event.saccoId || 'unassigned',
+      saccoName: event.saccoId === 'unassigned' ? 'Independent / Unassigned' : event.saccoId,
+      riskScore,
+      riskTier,
+      isProvisional: vehicleSnap.exists ? !!vehicleSnap.data()?.isProvisional : true,
+      status: 'active',
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+
   // Record audit log
   await db.collection('audit_logs').add({
     action: 'COMPUTE_VEHICLE_RISK',

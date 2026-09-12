@@ -2,7 +2,7 @@ import { collection, query, where, orderBy, limit, onSnapshot, Query, getDocs } 
 import { db } from '../lib/firebase';
 import { normalizePlate } from '../lib/plate';
 import { BaseRepository } from './baseRepository';
-import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, AnalyticsDocument } from '../types';
+import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, VehiclePublicSummary, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, AnalyticsDocument } from '../types';
 
 export class UserRepository extends BaseRepository<UserProfile> {
   constructor() {
@@ -204,6 +204,56 @@ export class PublicPinRepository extends BaseRepository<{ id: string; title: str
   }
 }
 
+export class VehiclePublicSummaryRepository extends BaseRepository<VehiclePublicSummary> {
+  constructor() {
+    super('vehicle_public_summary');
+  }
+
+  async findByNormalizedPlate(rawPlate: string): Promise<VehiclePublicSummary | null> {
+    const normalized = normalizePlate(rawPlate);
+    if (!normalized) return null;
+
+    // 1. Direct getDoc by canonical normalized doc ID
+    const byId = await this.getById(normalized);
+    if (byId) return byId;
+
+    // 2. Query regNumber matching normalized
+    try {
+      const q = query(
+        collection(db, this.collectionName).withConverter(this.converter),
+        where('regNumber', '==', normalized),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty && snap.docs[0]) {
+        return snap.docs[0].data();
+      }
+    } catch (err) {
+      console.warn('[VehiclePublicSummaryRepository] query error:', err);
+    }
+
+    return null;
+  }
+
+  async searchVehicles(prefix: string, maxResults = 5): Promise<VehiclePublicSummary[]> {
+    const normalized = normalizePlate(prefix);
+    if (!normalized || normalized.length < 2) return [];
+
+    try {
+      const q = query(
+        collection(db, this.collectionName).withConverter(this.converter),
+        where('regNumber', '>=', normalized),
+        where('regNumber', '<=', normalized + '\uf8ff'),
+        limit(maxResults)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data());
+    } catch {
+      return [];
+    }
+  }
+}
+
 export const userRepository = new UserRepository();
 export const saccoRepository = new SaccoRepository();
 export const tripRepository = new TripRepository();
@@ -211,6 +261,7 @@ export const blackSpotRepository = new BlackSpotRepository();
 export const alertRepository = new AlertRepository();
 export const safetyAlertRepository = alertRepository;
 export const vehicleRepository = new VehicleRepository();
+export const vehiclePublicSummaryRepository = new VehiclePublicSummaryRepository();
 export const driverRepository = new DriverRepository();
 export const violationRepository = new ViolationRepository();
 export const complaintRepository = new ComplaintRepository();

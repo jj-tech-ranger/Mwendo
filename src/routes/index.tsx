@@ -46,6 +46,7 @@ const EmergencySosScreen = lazyWithRetry(() => import('../features/passenger/Eme
 const PassengerAlertsScreen = lazyWithRetry(() => import('../features/passenger/PassengerAlertsScreen').then((m) => ({ default: m.PassengerAlertsScreen })));
 const PassengerProfileScreen = lazyWithRetry(() => import('../features/passenger/PassengerProfileScreen').then((m) => ({ default: m.PassengerProfileScreen })));
 const SharedTripViewScreen = lazyWithRetry(() => import('../features/passenger/SharedTripViewScreen').then((m) => ({ default: m.SharedTripViewScreen })));
+const VehicleLookupScreen = lazyWithRetry(() => import('../features/passenger/VehicleLookupScreen').then((m) => ({ default: m.VehicleLookupScreen })));
 
 // SACCO Feature Screens
 const SaccoDashboard = lazyWithRetry(() => import('../features/sacco/SaccoDashboard').then((m) => ({ default: m.SaccoDashboard })));
@@ -144,6 +145,9 @@ const router = createBrowserRouter([
       errorElement: <RouteErrorElement />,
       children: [
         { index: true, element: <PassengerDashboard /> },
+        { path: 'lookup', element: <VehicleLookupScreen /> },
+        { path: 'check-vehicle', element: <VehicleLookupScreen /> },
+        { path: 'vehicle-lookup', element: <VehicleLookupScreen /> },
         { path: 'start-trip', element: <ActiveTripScreen /> },
         { path: 'trips', element: <TripHistoryScreen /> },
         { path: 'trip-summary', element: <TripSummaryScreen /> },

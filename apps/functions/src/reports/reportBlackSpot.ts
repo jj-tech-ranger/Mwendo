@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { enforceRateLimit } from '../lib/rateLimit';
+import { ConfidenceScorer } from '../lib/engine';
 
 export interface ReportBlackSpotPayload {
   id?: string;
@@ -73,6 +74,35 @@ export async function processReportBlackSpotLogic(
 
   await enforceRateLimit(db, userId, 'black_spot');
 
+  // Fetch reporter's trustScore from users collection to calculate dynamic hazard confidence
+  let reporterTrustScore = 0.5; // default sane baseline
+  try {
+    const userDocSnap = await db.collection('users').doc(userId).get();
+    if (userDocSnap.exists) {
+      const userData = userDocSnap.data();
+      const rawTrust = userData?.trustScore;
+      if (typeof rawTrust === 'number' && Number.isFinite(rawTrust)) {
+        // Normalize 0-100 scale down to 0-1 if necessary
+        reporterTrustScore = rawTrust > 1.0
+          ? Math.min(1.0, Math.max(0.0, rawTrust / 100))
+          : Math.min(1.0, Math.max(0.0, rawTrust));
+      }
+    }
+  } catch (err) {
+    console.warn(`[reportBlackSpot] Could not load trustScore for user ${userId}, using default:`, err);
+  }
+
+  const hasEvidencePhoto = Boolean(
+    payload.photoUrl && typeof payload.photoUrl === 'string' && payload.photoUrl.trim().length > 0
+  );
+
+  // Use ConfidenceScorer.calculateHazardConfidence with corroborationCount = 1 (pending deduplication feature)
+  const confidenceScore = ConfidenceScorer.calculateHazardConfidence(
+    1,
+    reporterTrustScore,
+    hasEvidencePhoto
+  );
+
   const spotId = payload.id && /^bs_[A-Za-z0-9_-]{1,100}$/.test(payload.id)
     ? payload.id
     : `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -100,7 +130,7 @@ export async function processReportBlackSpotLogic(
     status: 'pending',
     corroborationCount: 1,
     corroborationsCount: 1,
-    confidenceScore: 0.8,
+    confidenceScore,
     createdAt: now,
     updatedAt: now,
   };

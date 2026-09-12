@@ -12,6 +12,7 @@ import { analyticsService } from '../../services/analyticsService';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { computeRewardTier } from '../../services/pointsService';
+import { functionsService } from '../../services/functionsService';
 
 export const PassengerProfileScreen: React.FC = () => {
   const { t } = useTranslation();
@@ -31,6 +32,36 @@ export const PassengerProfileScreen: React.FC = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isRefreshingTrust, setIsRefreshingTrust] = useState(false);
+  const [trustFeedback, setTrustFeedback] = useState<string | null>(null);
+
+  const handleRefreshTrust = async () => {
+    if (isRefreshingTrust) return;
+    setIsRefreshingTrust(true);
+    setTrustFeedback(null);
+    try {
+      const res = await functionsService.updateReporterTrust();
+      useAuthStore.setState((s) => {
+        if (!s.user) return s;
+        return {
+          ...s,
+          user: {
+            ...s.user,
+            trustScore: Math.round(res.trustScore * 100),
+            trustBadge: res.trustBadge,
+          },
+        };
+      });
+      setTrustFeedback(t('common.success', 'Updated'));
+      setTimeout(() => setTrustFeedback(null), 3000);
+    } catch (err) {
+      console.warn('[PassengerProfile] Failed to refresh trust score:', err);
+      setTrustFeedback(t('common.error', 'Offline'));
+      setTimeout(() => setTrustFeedback(null), 3000);
+    } finally {
+      setIsRefreshingTrust(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -106,13 +137,37 @@ export const PassengerProfileScreen: React.FC = () => {
             {t('passenger.profile.tripsCount')}
           </div>
         </div>
-        <div>
-          <div className="text-xl font-black text-emerald-700">
-            {user?.trustScore !== undefined ? `${user.trustScore}%` : '--'}
+        <div className="relative group flex flex-col items-center justify-center">
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xl font-black text-emerald-700">
+              {user?.trustScore !== undefined ? `${user.trustScore}%` : '--'}
+            </span>
+            <button
+              type="button"
+              onClick={handleRefreshTrust}
+              disabled={isRefreshingTrust}
+              aria-label="Refresh Trust Score"
+              title="Refresh Trust Score"
+              className="text-on-surface-variant hover:text-primary transition-colors disabled:opacity-50 p-0.5"
+            >
+              <span className={`material-symbols-outlined text-[14px] ${isRefreshingTrust ? 'animate-spin text-primary' : ''}`}>
+                refresh
+              </span>
+            </button>
           </div>
           <div className="text-[10px] text-on-surface-variant uppercase tracking-wider">
             {t('passenger.profile.trustScore')}
           </div>
+          {user?.trustBadge && (
+            <span className="text-[9px] font-bold uppercase tracking-wider text-primary mt-0.5">
+              {user.trustBadge.replace('_', ' ')}
+            </span>
+          )}
+          {trustFeedback && (
+            <span className="text-[9px] text-emerald-600 block absolute -bottom-3.5 whitespace-nowrap">
+              {trustFeedback}
+            </span>
+          )}
         </div>
         <div>
           <div className="text-xl font-black text-on-surface">
