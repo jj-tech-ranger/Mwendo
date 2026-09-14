@@ -8,6 +8,7 @@ Authoritative export inventory is taken from `apps/functions/src/index.ts`. This
 |---|---|---|---|
 | `suspendUser` | `admin/suspendUser.ts` | Callable | Admin claim, suspension check, App Check, audit log; covered by tests in `suspend-reactivate.test.ts` |
 | `reactivateUser` | `admin/suspendUser.ts` | Callable | Admin claim, suspension check, App Check, audit log; covered by tests in `suspend-reactivate.test.ts` |
+| `assignUserRole` | `admin/assignUserRole.ts` | Callable | Admin claim, self-demotion lockout safeguard, App Check, Auth custom claims merging, refresh token revocation, Firestore sync, rate limit, audit log; covered by tests in `assign-user-role.test.ts` |
 | `healthCheck` | `admin/healthCheck.ts` | Callable | Admin role check, Firestore probe write, latency logging; covered by tests in `health-check.test.ts` |
 | `verifyTotpChallenge` | `auth/verifyTotpChallenge.ts` | Callable | MFA challenge validation; covered by MFA security tests in `mfa-security.test.tsx` |
 | `deleteOwnAccount` | `auth/deleteOwnAccount.ts` | Callable | Caller identity strictly locked to `request.auth.uid`, App Check, Kenya DPA 2019 anonymize-and-retain PII stripping, Auth user deletion, audit log, idempotency; covered by tests in `delete-own-account.test.ts` |
@@ -33,4 +34,4 @@ Every export in `index.ts` must have a row here and must have evidence for authe
 
 ## Current status
 
-All 20 authoritative Cloud Function exports in `apps/functions/src/index.ts` have documented security reviews and targeted automated test coverage across unit, authorization, input validation, rate limiting, and idempotency test suites.
+All 21 authoritative Cloud Function exports in `apps/functions/src/index.ts` have documented security reviews and targeted automated test coverage across unit, authorization, input validation, rate limiting, and idempotency test suites.

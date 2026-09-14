@@ -2,11 +2,13 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+import { requireMfaVerification, TokenWithMfa } from '../lib/auth';
 
-interface AuthContextToken {
+interface AuthContextToken extends TokenWithMfa {
   activeRole?: string;
   isSuspended?: boolean;
   name?: string;
+  mfaVerifiedAt?: unknown;
   [key: string]: unknown;
 }
 
@@ -38,6 +40,9 @@ async function verifyAdminCaller(auth: AuthContext | undefined): Promise<{ uid: 
   if (tokenClaimRole !== 'admin') {
     throw new HttpsError('permission-denied', 'Caller does not possess administrative privileges.');
   }
+
+  // SEC-MFA: Authoritative backend MFA check for sensitive administrative operations
+  requireMfaVerification(auth.token);
 
   let displayName = typeof auth.token?.name === 'string' ? auth.token.name : 'System Admin';
 

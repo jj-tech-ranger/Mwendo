@@ -174,25 +174,60 @@ export const mfaService = {
       }
     }
 
-    // Mark current user as MFA verified in local auth store
-    const currentStoreUser = useAuthStore.getState().user;
-    if (currentStoreUser) {
-      useAuthStore.getState().setUser({
-        ...currentStoreUser,
-        isMfaVerified: true,
-      });
+    // Mark current user as MFA verified in local auth store and refresh token claims
+    if (auth.currentUser) {
+      try {
+        const idTokenResult = await auth.currentUser.getIdTokenResult(true);
+        const verifiedAt = typeof idTokenResult.claims.mfaVerifiedAt === 'number'
+          ? idTokenResult.claims.mfaVerifiedAt
+          : Date.now();
 
-      // Also persist isMfaVerified state in Firestore if resolver was used
-      if (resolver) {
-        try {
-          const userRef = doc(db, 'users', currentStoreUser.uid);
-          await updateDoc(userRef, {
+        const currentStoreUser = useAuthStore.getState().user;
+        if (currentStoreUser) {
+          useAuthStore.getState().setUser({
+            ...currentStoreUser,
             isMfaVerified: true,
-            updatedAt: new Date().toISOString(),
+            mfaVerifiedAt: verifiedAt,
+            claims: {
+              ...currentStoreUser.claims,
+              ...idTokenResult.claims,
+              mfaVerifiedAt: verifiedAt,
+            },
           });
-        } catch (e) {
-          console.warn('[mfaService] Failed to write isMfaVerified to Firestore:', e);
         }
+      } catch (tokenErr) {
+        console.warn('[mfaService] Failed to force-refresh ID token after MFA verification:', tokenErr);
+        const currentStoreUser = useAuthStore.getState().user;
+        if (currentStoreUser) {
+          useAuthStore.getState().setUser({
+            ...currentStoreUser,
+            isMfaVerified: true,
+            mfaVerifiedAt: Date.now(),
+          });
+        }
+      }
+    } else {
+      const currentStoreUser = useAuthStore.getState().user;
+      if (currentStoreUser) {
+        useAuthStore.getState().setUser({
+          ...currentStoreUser,
+          isMfaVerified: true,
+          mfaVerifiedAt: Date.now(),
+        });
+      }
+    }
+
+    // Also persist isMfaVerified state in Firestore if resolver was used
+    if (resolver && auth.currentUser) {
+      try {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          isMfaVerified: true,
+          mfaVerifiedAt: Date.now(),
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('[mfaService] Failed to write isMfaVerified to Firestore:', e);
       }
     }
 

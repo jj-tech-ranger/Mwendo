@@ -9,6 +9,7 @@ if (!getApps().length) {
 }
 
 export { suspendUser, reactivateUser } from './admin/suspendUser';
+export { assignUserRole } from './admin/assignUserRole';
 export { healthCheck } from './admin/healthCheck';
 export { verifyTotpChallenge } from './auth/verifyTotpChallenge';
 export { deleteOwnAccount } from './auth/deleteOwnAccount';
@@ -25,3 +26,4 @@ export { monthlyArchival } from './scheduled/monthlyArchival';
 export { generateTripSummary } from './risk/generateTripSummary';
 export { decayStaleBlackSpots, decayBlackSpotsScheduled } from './reports/decayStaleBlackSpots';
 export { updateReporterTrust } from './trust/updateReporterTrust';
+export { processTripCompletion } from './trips/processTripCompletion';

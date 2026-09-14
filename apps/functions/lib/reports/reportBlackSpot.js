@@ -6,9 +6,7 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const rateLimit_1 = require("../lib/rateLimit");
 const engine_1 = require("../lib/engine");
-function validKenyaLocation(lat, lng) {
-    return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -5.5 && lat <= 6.0 && lng >= 33.0 && lng <= 43.5;
-}
+const constants_1 = require("../lib/constants");
 function boundedText(value, max) {
     return typeof value === 'string' && value.length <= max;
 }
@@ -18,7 +16,7 @@ async function processReportBlackSpotLogic(db, payload, userId) {
     }
     const lat = payload.location?.lat ?? payload.latitude;
     const lng = payload.location?.lng ?? payload.longitude;
-    if (typeof lat !== 'number' || typeof lng !== 'number' || !validKenyaLocation(lat, lng)) {
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !(0, constants_1.isWithinKenya)(lat, lng)) {
         throw new https_1.HttpsError('invalid-argument', 'A valid location is required.');
     }
     if (payload.title !== undefined && !boundedText(payload.title, 120)) {

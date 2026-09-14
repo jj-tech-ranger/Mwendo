@@ -7,9 +7,8 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const messaging_1 = require("firebase-admin/messaging");
 const rateLimit_1 = require("../lib/rateLimit");
+const constants_1 = require("../lib/constants");
 function isEmulator() { return process.env.FUNCTIONS_EMULATOR === 'true' || !!process.env.FIREBASE_EMULATOR_HUB; }
-function validLocation(lat, lng) { return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -5.5 && lat <= 6.0 && lng >= 33.0 && lng <= 43.5; }
-function validSpeed(speed) { return Number.isFinite(speed) && speed >= 0 && speed <= 180; }
 class DefaultSmsProvider {
     accountSid = process.env.TWILIO_ACCOUNT_SID;
     authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -67,10 +66,10 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
         throw new https_1.HttpsError('unauthenticated', 'Authenticated passenger required.');
     const rawLat = payload.location?.lat ?? payload.latitude;
     const rawLng = payload.location?.lng ?? payload.longitude;
-    if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !validLocation(rawLat, rawLng))
+    if (typeof rawLat !== 'number' || typeof rawLng !== 'number' || !(0, constants_1.isWithinKenya)(rawLat, rawLng))
         throw new https_1.HttpsError('invalid-argument', 'A valid location is required.');
     const speedKmH = payload.speedKmH ?? 0;
-    if (!validSpeed(speedKmH))
+    if (!(0, constants_1.isPlausibleSpeed)(speedKmH))
         throw new https_1.HttpsError('invalid-argument', 'Speed must be between 0 and 180 km/h.');
     if (payload.message && payload.message.length > 1000)
         throw new https_1.HttpsError('invalid-argument', 'Message is too long.');

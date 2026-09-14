@@ -14,6 +14,11 @@ exports.RATE_LIMIT_CONFIGS = {
         windowMs: 24 * 60 * 60 * 1000, // 24 hours (1 day)
         errorMessage: 'RATE_LIMIT_EXCEEDED: Maximum 10 hazard reports permitted per 24 hours.',
     },
+    role_assignment: {
+        maxAllowed: 20,
+        windowMs: 60 * 60 * 1000, // 1 hour
+        errorMessage: 'RATE_LIMIT_EXCEEDED: Maximum 20 role assignments permitted per hour.',
+    },
 };
 /**
  * Transactionally checks and records rate limiting in Firestore rate_limits/{userId}
@@ -33,7 +38,11 @@ async function enforceRateLimit(db, userId, action, nowMs = Date.now()) {
     return await db.runTransaction(async (transaction) => {
         const snap = await transaction.get(rateLimitRef);
         const data = snap.exists ? snap.data() || {} : {};
-        const fieldKey = action === 'sos' ? 'sosTimestamps' : 'blackSpotTimestamps';
+        const fieldKey = action === 'sos'
+            ? 'sosTimestamps'
+            : action === 'black_spot'
+                ? 'blackSpotTimestamps'
+                : 'roleAssignmentTimestamps';
         const rawTimestamps = Array.isArray(data[fieldKey]) ? data[fieldKey] : [];
         const cutoff = nowMs - config.windowMs;
         const validTimestamps = rawTimestamps.filter((ts) => typeof ts === 'number' && ts > cutoff);

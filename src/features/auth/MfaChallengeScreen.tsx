@@ -16,7 +16,11 @@ export const MfaChallengeScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const resolver = (location.state as { resolver?: MultiFactorResolver } | null)?.resolver;
+  const locationState = location.state as {
+    resolver?: MultiFactorResolver;
+    from?: { pathname?: string; search?: string };
+  } | null;
+  const resolver = locationState?.resolver;
 
   async function handleVerifyChallenge(e: React.FormEvent) {
     e.preventDefault();
@@ -27,6 +31,15 @@ export const MfaChallengeScreen: React.FC = () => {
     try {
       await mfaService.verifyChallenge(code, resolver);
       if (user) setUser({ ...user, isMfaVerified: true });
+
+      const fromPath = locationState?.from?.pathname
+        ? `${locationState.from.pathname}${locationState.from.search || ''}`
+        : null;
+
+      if (fromPath && !fromPath.includes('/auth/')) {
+        navigate(fromPath, { replace: true });
+        return;
+      }
 
       const role = user?.activeRole || user?.role;
       if (role === 'admin') navigate('/admin');

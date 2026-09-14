@@ -1,6 +1,7 @@
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+import { requireMfaVerification } from '../lib/auth';
 
 const CERTIFICATE_VALIDITY_DAYS = 365;
 
@@ -143,6 +144,10 @@ export const createInspection = onCall(
     }
 
     const inspectorRole = resolveAuthorityRole(request.auth.token as Record<string, unknown> | undefined);
+    if (inspectorRole === 'authority' || inspectorRole === 'admin') {
+      requireMfaVerification(request.auth.token);
+    }
+
     return processCreateInspectionLogic(
       getFirestore(),
       request.data as CreateInspectionPayload,

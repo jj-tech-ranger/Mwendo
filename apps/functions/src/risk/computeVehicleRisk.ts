@@ -4,6 +4,7 @@ import { calculateVehicleRiskScore, RiskEvent } from '../lib/engine';
 import { APP_CHECK_ENFORCED } from '../lib/env';
 import { normalizePlate } from '../lib/plate';
 import { isPlausibleSpeed } from '../lib/constants';
+import { requireMfaVerification } from '../lib/auth';
 
 export interface VehicleRiskEventPayload {
   eventId: string;
@@ -86,9 +87,15 @@ export async function processVehicleRiskLogic(
   const eventsList: RiskEvent[] = violSnap.docs
     .map((d: QueryDocumentSnapshot<DocumentData>): ViolationCandidate => {
       const data = d.data();
+      const rawTs = data.timestamp;
+      const formattedTs = typeof rawTs === 'string'
+        ? rawTs
+        : rawTs && typeof rawTs.toDate === 'function'
+        ? rawTs.toDate().toISOString()
+        : new Date().toISOString();
       return {
         severity: parseSeverity(data.severity),
-        timestamp: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
+        timestamp: formattedTs,
         confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
         recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
       };
@@ -182,6 +189,11 @@ export const computeVehicleRisk = onCall(
     // Role and tenancy authorization check
     const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger') as string;
     const userSaccoId = request.auth.token?.saccoId as string | undefined;
+
+    // SEC-MFA: Authoritative backend MFA check for privileged operations
+    if (role === 'admin' || role === 'authority') {
+      requireMfaVerification(request.auth.token);
+    }
 
     if (role === 'sacco_manager' && userSaccoId && event.saccoId && userSaccoId !== event.saccoId) {
       throw new HttpsError('permission-denied', 'Cannot compute risk for a different SACCO.');

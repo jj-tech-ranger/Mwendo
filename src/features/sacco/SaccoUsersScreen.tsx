@@ -111,40 +111,53 @@ export const SaccoUsersScreen: React.FC = () => {
       </div>
 
       {activeSubTab === 'users' ? (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
-                <tr>
-                  <th className="p-3.5">Name</th>
-                  <th className="p-3.5">Email</th>
-                  <th className="p-3.5">Role</th>
-                  <th className="p-3.5">Status</th>
-                  <th className="p-3.5 font-mono text-right">Last Active</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/20 font-medium">
-                {teamUsers.map((u) => (
-                  <tr key={u.id} className="hover:bg-surface-container/50">
-                    <td className="p-3.5 font-bold text-on-surface">{u.name}</td>
-                    <td className="p-3.5 font-mono text-on-surface-variant">{u.email}</td>
-                    <td className="p-3.5 capitalize">
-                      <Badge variant="neutral" className="font-mono text-[10px]">
-                        {u.role.replace('_', ' ')}
-                      </Badge>
-                    </td>
-                    <td className="p-3.5">
-                      <Badge variant={u.status === 'active' ? 'success' : 'warning'} className="capitalize text-[10px]">
-                        {u.status}
-                      </Badge>
-                    </td>
-                    <td className="p-3.5 text-right font-mono text-on-surface-variant">{u.lastActive}</td>
+        <div className="space-y-4">
+          {teamUsers.some((u) => u.status === 'invited') && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-base text-amber-500">pending_actions</span>
+                <span>
+                  <strong>Pending Invites:</strong> One or more team members are awaiting platform administrator custom claim authorization.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <Card className="p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
+                  <tr>
+                    <th className="p-3.5">Name</th>
+                    <th className="p-3.5">Email</th>
+                    <th className="p-3.5">Role</th>
+                    <th className="p-3.5">Status</th>
+                    <th className="p-3.5 font-mono text-right">Last Active</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+                </thead>
+                <tbody className="divide-y divide-outline-variant/20 font-medium">
+                  {teamUsers.map((u) => (
+                    <tr key={u.id} className="hover:bg-surface-container/50">
+                      <td className="p-3.5 font-bold text-on-surface">{u.name}</td>
+                      <td className="p-3.5 font-mono text-on-surface-variant">{u.email}</td>
+                      <td className="p-3.5 capitalize">
+                        <Badge variant="neutral" className="font-mono text-[10px]">
+                          {u.role.replace('_', ' ')}
+                        </Badge>
+                      </td>
+                      <td className="p-3.5">
+                        <Badge variant={u.status === 'active' ? 'success' : 'warning'} className="text-[10px]">
+                          {u.status === 'invited' ? 'Pending Admin Approval' : u.status}
+                        </Badge>
+                      </td>
+                      <td className="p-3.5 text-right font-mono text-on-surface-variant">{u.lastActive}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
       ) : (
         <Card className="p-6 space-y-4">
           <h3 className="font-bold text-sm text-on-surface">Team Permissions Matrix</h3>
@@ -201,6 +214,16 @@ export const SaccoUsersScreen: React.FC = () => {
               <option value="operations">Operations / Dispatch</option>
               <option value="viewer">Viewer (Read-only)</option>
             </select>
+          </div>
+
+          <div className="p-3 rounded-xl bg-surface-container-high border border-outline-variant/20 text-[11px] text-on-surface-variant space-y-1">
+            <span className="font-semibold text-on-surface flex items-center gap-1">
+              <span className="material-symbols-outlined text-sm text-primary">verified_user</span>
+              Server-Authoritative Role Provisioning
+            </span>
+            <p>
+              Sending an invitation creates a pending invite. A platform administrator will authorize the request and provision the required Firebase Auth custom claims for tenant access.
+            </p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

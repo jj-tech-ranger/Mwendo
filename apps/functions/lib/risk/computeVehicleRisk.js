@@ -7,6 +7,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const engine_1 = require("../lib/engine");
 const env_1 = require("../lib/env");
 const plate_1 = require("../lib/plate");
+const constants_1 = require("../lib/constants");
 function parseSeverity(val) {
     if (val === 'medium' || val === 'high' || val === 'critical') {
         return val;
@@ -61,16 +62,22 @@ async function processVehicleRiskLogic(db, event) {
     const eventsList = violSnap.docs
         .map((d) => {
         const data = d.data();
+        const rawTs = data.timestamp;
+        const formattedTs = typeof rawTs === 'string'
+            ? rawTs
+            : rawTs && typeof rawTs.toDate === 'function'
+                ? rawTs.toDate().toISOString()
+                : new Date().toISOString();
         return {
             severity: parseSeverity(data.severity),
-            timestamp: typeof data.timestamp === 'string' ? data.timestamp : new Date().toISOString(),
+            timestamp: formattedTs,
             confidenceScore: typeof data.confidenceScore === 'number' ? data.confidenceScore : 1.0,
             recordedSpeedKmH: typeof data.recordedSpeedKmH === 'number' ? data.recordedSpeedKmH : undefined,
         };
     })
         .filter((e) => {
         // VT-003: Plausibility checks - discard physically impossible speeds (>180 km/h) or invalid timestamps
-        if (e.recordedSpeedKmH !== undefined && (e.recordedSpeedKmH < 0 || e.recordedSpeedKmH > 180)) {
+        if (e.recordedSpeedKmH !== undefined && !(0, constants_1.isPlausibleSpeed)(e.recordedSpeedKmH)) {
             return false;
         }
         const t = new Date(e.timestamp).getTime();
@@ -79,7 +86,7 @@ async function processVehicleRiskLogic(db, event) {
     // Validate incoming event plausibility
     const incomingTimeMs = new Date(event.timestamp).getTime();
     if (Number.isFinite(incomingTimeMs) &&
-        (event.recordedSpeedKmH === undefined || (event.recordedSpeedKmH >= 0 && event.recordedSpeedKmH <= 180))) {
+        (event.recordedSpeedKmH === undefined || (0, constants_1.isPlausibleSpeed)(event.recordedSpeedKmH))) {
         eventsList.push({
             severity: parseSeverity(event.severity),
             timestamp: event.timestamp,

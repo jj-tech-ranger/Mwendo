@@ -100,7 +100,10 @@ export const SaccoShell: React.FC = () => {
               <span className="font-bold text-primary truncate">{currentSaccoName}</span>
             </div>
           )}
-          <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
+          <nav
+            aria-label={t('sacco.shell.mobileNavLabel', 'Mobile navigation')}
+            className="p-2 space-y-0.5 flex-1 overflow-y-auto"
+          >
             {navItems.map((item) => (
               <NavLink
                 key={item.path}
@@ -166,7 +169,10 @@ export const SaccoShell: React.FC = () => {
               <span className="font-bold text-primary truncate">{currentSaccoName}</span>
             </div>
           )}
-          <nav className="p-2 space-y-0.5 flex-1 overflow-y-auto">
+          <nav
+            aria-label={t('sacco.shell.primaryNavLabel', 'Primary navigation')}
+            className="p-2 space-y-0.5 flex-1 overflow-y-auto"
+          >
             {navItems.map((item) => (
               <NavLink
                 key={item.path}

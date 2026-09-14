@@ -4,8 +4,6 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 
 const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'mwendo-salama-prod';
 const DEMO_SACCO_ID = 'demo-sacco-mwendo';
-const ADMIN_EMAIL = 'jemutaijemimah@gmail.com';
-
 function getSecret(name: string, fallback?: string): string {
   const value = process.env[name];
   if (value) return value;
@@ -21,6 +19,11 @@ function getSecret(name: string, fallback?: string): string {
   }
   throw new Error(`Missing required environment variable: ${name}`);
 }
+
+const ADMIN_EMAIL =
+  process.env.DEMO_ADMIN_EMAIL ||
+  process.env.MWENDO_DEMO_ADMIN_EMAIL ||
+  getSecret('DEMO_ADMIN_EMAIL', 'admin@example.com');
 
 export const DEMO_ACCOUNTS = {
   admin: {
@@ -73,6 +76,7 @@ async function enableTotpMfa(): Promise<void> {
 
     await auth.projectConfigManager().updateProjectConfig({
       multiFactorConfig: {
+        state: projectConfig.multiFactorConfig?.state ?? 'ENABLED',
         providerConfigs: [
           ...existingProviders,
           {

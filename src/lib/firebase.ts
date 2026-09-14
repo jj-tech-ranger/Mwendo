@@ -87,7 +87,7 @@ export const firebaseConfigStatus: FirebaseConfigValidation = {
 };
 
 if (!firebaseConfigStatus.isValid && typeof window !== 'undefined') {
-  console.error('[Firebase] Configuration validation error:', firebaseConfigStatus.errorMessage);
+  console.warn('[Firebase] Configuration validation notice:', firebaseConfigStatus.errorMessage);
 }
 
 // In test environment or when config is missing, use safe fallback to avoid unhandled exceptions during module evaluation
@@ -167,7 +167,7 @@ if (useEmulators) {
   }
 }
 
-const hasRealConfig =
+export const hasRealConfig =
   !isTestEnv &&
   firebaseConfigStatus.isValid &&
   Boolean(rawConfig.apiKey) &&

@@ -1,11 +1,22 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
-import { enforceRateLimit } from '../lib/rateLimit';
+import { enforceRateLimit, isAnonymousAuth, extractClientIdentifier } from '../lib/rateLimit';
 import { isWithinKenya, isPlausibleSpeed } from '../lib/constants';
 
 export interface EmergencyContact { name: string; phone: string; relationship: string; }
-export interface SendSosPayload { alertId?: string; tripId?: string; userId?: string; vehicleRegNumber?: string; saccoId?: string; location?: { lat: number; lng: number }; speedKmH?: number; message?: string; timestamp?: string; }
+export interface SendSosPayload {
+  alertId?: string;
+  tripId?: string;
+  userId?: string;
+  vehicleRegNumber?: string;
+  saccoId?: string;
+  location?: { lat: number; lng: number };
+  speedKmH?: number;
+  message?: string;
+  timestamp?: string;
+  deviceId?: string;
+}
 export interface SendSosResult {
   success: boolean; alertId: string; userId: string; saccoId: string; contactsNotifiedCount: number;
   fcmDispatchedCount: number; dlqCount: number;
@@ -14,6 +25,11 @@ export interface SendSosResult {
 }
 export interface SmsProvider { sendSms: (to: string, message: string) => Promise<{ messageId: string; success: boolean }>; }
 export interface MessagingProvider { sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>; }
+
+export interface ProcessSendSosOptions {
+  isAnonymous?: boolean | undefined;
+  secondaryKey?: string | null | undefined;
+}
 
 function isEmulator(): boolean { return process.env.FUNCTIONS_EMULATOR === 'true' || !!process.env.FIREBASE_EMULATOR_HUB; }
 
@@ -63,9 +79,18 @@ export async function writeToDLQ(db: Firestore, entry: { id: string; topic: stri
   } catch (err) { console.error('[DLQ] Failed to record notification failure:', err); }
 }
 
-export async function processSendSosLogic(db: Firestore, messagingProvider: MessagingProvider, smsProvider: SmsProvider, payload: SendSosPayload): Promise<SendSosResult> {
-  const userId = payload.userId || 'anonymous';
-  if (!userId || userId === 'anonymous') throw new HttpsError('unauthenticated', 'Authenticated passenger required.');
+export async function processSendSosLogic(
+  db: Firestore,
+  messagingProvider: MessagingProvider,
+  smsProvider: SmsProvider,
+  payload: SendSosPayload,
+  options?: ProcessSendSosOptions
+): Promise<SendSosResult> {
+  const isAnonymous = options?.isAnonymous ?? false;
+  const userId = payload.userId || (isAnonymous ? 'anonymous_guest' : 'anonymous');
+  if (!userId || (userId === 'anonymous' && !isAnonymous)) {
+    throw new HttpsError('unauthenticated', 'Authenticated passenger required.');
+  }
 
   const rawLat = payload.location?.lat ?? (payload as { latitude?: number }).latitude;
   const rawLng = payload.location?.lng ?? (payload as { longitude?: number }).longitude;
@@ -88,7 +113,10 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
   });
 
   try {
-    await enforceRateLimit(db, userId, 'sos');
+    await enforceRateLimit(db, userId, 'sos', Date.now(), {
+      isAnonymous,
+      secondaryKey: options?.secondaryKey,
+    });
 
     const userSnap = await db.collection('users').doc(userId).get();
     const userData = userSnap.data() || {};
@@ -168,9 +196,18 @@ export async function processSendSosLogic(db: Firestore, messagingProvider: Mess
 
 export const sendSOS = onCall({ enforceAppCheck: true }, async (request) => {
   if (!request.auth) throw new HttpsError('unauthenticated', 'Caller must be authenticated to invoke sendSOS.');
+  const isAnonymous = isAnonymousAuth(request.auth);
+  const secondaryKey = extractClientIdentifier(request);
   const payload: SendSosPayload = { ...request.data, userId: request.auth.uid };
-  try { return await processSendSosLogic(getFirestore(), new DefaultMessagingProvider(), new DefaultSmsProvider(), payload); }
-  catch (err: unknown) {
+  try {
+    return await processSendSosLogic(
+      getFirestore(),
+      new DefaultMessagingProvider(),
+      new DefaultSmsProvider(),
+      payload,
+      { isAnonymous, secondaryKey }
+    );
+  } catch (err: unknown) {
     if (err instanceof HttpsError) throw err;
     console.error('[sendSOS] Execution failed:', err);
     throw new HttpsError('internal', 'Emergency SOS dispatch failed.');

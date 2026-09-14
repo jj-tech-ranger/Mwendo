@@ -155,7 +155,7 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
       data: { targetUid: 'target_user_01' },
       auth: {
         uid: 'admin_suspended_01',
-        token: { activeRole: 'admin', isSuspended: true, name: 'Suspended Admin' },
+        token: { activeRole: 'admin', isSuspended: true, name: 'Suspended Admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 
@@ -170,12 +170,53 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
     });
   });
 
-  it('SEC-004: caller with token.activeRole === admin succeeds even with no matching Firestore document', async () => {
+  it('SEC-MFA: rejects admin caller without mfaVerifiedAt claim with failed-precondition', async () => {
+    const unverifiedAdminRequest = {
+      data: { targetUid: 'target_user_01' },
+      auth: {
+        uid: 'admin_no_mfa',
+        token: { activeRole: 'admin', name: 'Unverified Admin' },
+      },
+    } as any;
+
+    await expect(suspendUser.run(unverifiedAdminRequest)).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: 'MFA re-verification required.',
+    });
+
+    await expect(reactivateUser.run(unverifiedAdminRequest)).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: 'MFA re-verification required.',
+    });
+  });
+
+  it('SEC-MFA: rejects admin caller whose mfaVerifiedAt is older than 12 hours', async () => {
+    const thirteenHoursAgo = Date.now() - 13 * 60 * 60 * 1000;
+    const expiredMfaRequest = {
+      data: { targetUid: 'target_user_01' },
+      auth: {
+        uid: 'admin_expired_mfa',
+        token: { activeRole: 'admin', name: 'Expired MFA Admin', mfaVerifiedAt: thirteenHoursAgo },
+      },
+    } as any;
+
+    await expect(suspendUser.run(expiredMfaRequest)).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: 'MFA re-verification required.',
+    });
+
+    await expect(reactivateUser.run(expiredMfaRequest)).rejects.toMatchObject({
+      code: 'failed-precondition',
+      message: 'MFA re-verification required.',
+    });
+  });
+
+  it('SEC-004: caller with token.activeRole === admin and valid MFA succeeds even with no matching Firestore document', async () => {
     const missingCallerRequest = {
       data: { targetUid: 'target_user_01', reason: 'Emergency suspension' },
       auth: {
         uid: 'ghost_admin_99',
-        token: { activeRole: 'admin', name: 'Ghost Admin' },
+        token: { activeRole: 'admin', name: 'Ghost Admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 
@@ -190,7 +231,7 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
       data: {},
       auth: {
         uid: 'admin_caller_01',
-        token: { activeRole: 'admin' },
+        token: { activeRole: 'admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 
@@ -208,7 +249,7 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
       data: { targetUid: 'target_user_01', reason: 'Repeated dangerous speeding' },
       auth: {
         uid: 'admin_caller_01',
-        token: { activeRole: 'admin', name: 'Super Admin' },
+        token: { activeRole: 'admin', name: 'Super Admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 
@@ -246,7 +287,7 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
       data: { targetUid: 'target_user_01' },
       auth: {
         uid: 'admin_caller_01',
-        token: { activeRole: 'admin', name: 'Super Admin' },
+        token: { activeRole: 'admin', name: 'Super Admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 
@@ -277,7 +318,7 @@ describe('Cloud Functions — suspendUser & reactivateUser (CF-001 & TEST-002)',
       data: { targetUid: 'target_user_01' },
       auth: {
         uid: 'admin_caller_01',
-        token: { activeRole: 'admin', name: 'Super Admin' },
+        token: { activeRole: 'admin', name: 'Super Admin', mfaVerifiedAt: Date.now() },
       },
     } as any;
 

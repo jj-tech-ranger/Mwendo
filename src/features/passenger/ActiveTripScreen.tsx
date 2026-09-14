@@ -10,6 +10,7 @@ import { offlineStorage } from '../../services/offlineStorage';
 import { offlineSyncService } from '../../services/offlineSyncService';
 import { storageService } from '../../services/storageService';
 import { telemetryPersistenceService } from '../../services/telemetryPersistenceService';
+import { functionsService } from '../../services/functionsService';
 import { useAuthStore } from '../../store/useAuthStore';
 import { SpeedSmoother, detectOverspeedViolations, GPSSample } from '../../lib/engine';
 import { remoteConfigService } from '../../services/remoteConfigService';
@@ -265,8 +266,18 @@ export const ActiveTripScreen: React.FC = () => {
     setShowEndModal(false);
     let saveSucceeded = false;
     try {
-      if (navigator.onLine) await tripRepository.save(result);
-      else {
+      if (navigator.onLine) {
+        await tripRepository.save(result);
+        try {
+          await functionsService.processTripCompletion({
+            tripId: result.id,
+            samples: authoritativeSamples,
+            speedLimitKmH: speedLimit,
+          });
+        } catch (procErr) {
+          console.warn('[ActiveTripScreen] Server-authoritative trip completion failed:', procErr);
+        }
+      } else {
         await offlineStorage.setItem(`offline_trip_${result.id}`, { ...result, retryCount: 0 });
         await offlineSyncService.updatePendingCount();
       }

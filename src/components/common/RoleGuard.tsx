@@ -61,10 +61,16 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({ allowedRoles }) => {
   // Mandatory MFA Enforcement (SEC-008): Admin and Authority accounts MUST have verified TOTP MFA
   if (effectiveRole === 'admin' || effectiveRole === 'authority') {
     if (!user.isMfaEnrolled) {
-      return <Navigate to="/auth/mfa-enrollment" replace />;
+      return <Navigate to="/auth/mfa-enrollment" state={{ from: location }} replace />;
     }
-    if (user.isMfaVerified === false) {
-      return <Navigate to="/auth/mfa-challenge" replace />;
+
+    const verifiedAt = (claims?.mfaVerifiedAt ?? user.mfaVerifiedAt) as number | undefined;
+    const isExpired = typeof verifiedAt === 'number'
+      ? (Date.now() - (verifiedAt < 1e11 ? verifiedAt * 1000 : verifiedAt)) > 12 * 60 * 60 * 1000
+      : false;
+
+    if (user.isMfaVerified === false || isExpired) {
+      return <Navigate to="/auth/mfa-challenge" state={{ from: location }} replace />;
     }
   }
 

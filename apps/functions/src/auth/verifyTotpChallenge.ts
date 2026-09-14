@@ -60,11 +60,38 @@ export const verifyTotpChallenge = onCall({ enforceAppCheck: true }, async (requ
 
   if (!verifyTotpToken(secretKey, cleanCode)) throw new HttpsError('invalid-argument', 'Invalid 6-digit TOTP verification code.');
 
-  await userRef.set({ isMfaVerified: true, isMfaEnrolled: true, updatedAt: new Date().toISOString() }, { merge: true });
-  await db.collection('audit_logs').add({
-    action: 'MFA_CHALLENGE_VERIFIED', actorUid: callerUid,
-    actorName: userData.displayName || request.auth.token?.name || 'User',
-    actorRole: request.auth.token?.activeRole || 'user', timestamp: new Date().toISOString(),
+  const verifiedAt = Date.now();
+
+  // SEC-MFA: Authoritative backend MFA claim stamping
+  // Merge mfaVerifiedAt into existing custom claims so that subsequent Cloud Functions
+  // and Firestore security rules can verify fresh second-factor completion.
+  const authUserRecord = await authAdmin.getUser(callerUid);
+  const existingClaims = authUserRecord.customClaims || {};
+  await authAdmin.setCustomUserClaims(callerUid, {
+    ...existingClaims,
+    mfaVerifiedAt: verifiedAt,
   });
-  return { success: true, verified: true };
+
+  await userRef.set(
+    {
+      isMfaVerified: true,
+      isMfaEnrolled: true,
+      mfaVerifiedAt: verifiedAt,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true }
+  );
+
+  await db.collection('audit_logs').add({
+    action: 'MFA_CHALLENGE_VERIFIED',
+    actorUid: callerUid,
+    actorName: userData.displayName || request.auth.token?.name || 'User',
+    actorRole: request.auth.token?.activeRole || 'user',
+    timestamp: new Date().toISOString(),
+    details: {
+      mfaVerifiedAt: verifiedAt,
+    },
+  });
+
+  return { success: true, verified: true, mfaVerifiedAt: verifiedAt };
 });

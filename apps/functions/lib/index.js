@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateReporterTrust = exports.decayBlackSpotsScheduled = exports.decayStaleBlackSpots = exports.generateTripSummary = exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.createInspection = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.deleteOwnAccount = exports.verifyTotpChallenge = exports.healthCheck = exports.reactivateUser = exports.suspendUser = void 0;
+exports.processTripCompletion = exports.updateReporterTrust = exports.decayBlackSpotsScheduled = exports.decayStaleBlackSpots = exports.generateTripSummary = exports.monthlyArchival = exports.weeklyReport = exports.dailyPurge = exports.createInspection = exports.reportBlackSpot = exports.sendSOS = exports.syncPublicPins = exports.dailyAnalyticsScheduled = exports.updateDailyAnalytics = exports.rebuildSaccoAnalytics = exports.computeVehicleRisk = exports.deleteOwnAccount = exports.verifyTotpChallenge = exports.healthCheck = exports.assignUserRole = exports.reactivateUser = exports.suspendUser = void 0;
 const app_1 = require("firebase-admin/app");
 const v2_1 = require("firebase-functions/v2");
 // Enforce regional architecture for all Gen 2 Cloud Functions
@@ -11,6 +11,8 @@ if (!(0, app_1.getApps)().length) {
 var suspendUser_1 = require("./admin/suspendUser");
 Object.defineProperty(exports, "suspendUser", { enumerable: true, get: function () { return suspendUser_1.suspendUser; } });
 Object.defineProperty(exports, "reactivateUser", { enumerable: true, get: function () { return suspendUser_1.reactivateUser; } });
+var assignUserRole_1 = require("./admin/assignUserRole");
+Object.defineProperty(exports, "assignUserRole", { enumerable: true, get: function () { return assignUserRole_1.assignUserRole; } });
 var healthCheck_1 = require("./admin/healthCheck");
 Object.defineProperty(exports, "healthCheck", { enumerable: true, get: function () { return healthCheck_1.healthCheck; } });
 var verifyTotpChallenge_1 = require("./auth/verifyTotpChallenge");
@@ -45,4 +47,6 @@ Object.defineProperty(exports, "decayStaleBlackSpots", { enumerable: true, get: 
 Object.defineProperty(exports, "decayBlackSpotsScheduled", { enumerable: true, get: function () { return decayStaleBlackSpots_1.decayBlackSpotsScheduled; } });
 var updateReporterTrust_1 = require("./trust/updateReporterTrust");
 Object.defineProperty(exports, "updateReporterTrust", { enumerable: true, get: function () { return updateReporterTrust_1.updateReporterTrust; } });
+var processTripCompletion_1 = require("./trips/processTripCompletion");
+Object.defineProperty(exports, "processTripCompletion", { enumerable: true, get: function () { return processTripCompletion_1.processTripCompletion; } });
 //# sourceMappingURL=index.js.map

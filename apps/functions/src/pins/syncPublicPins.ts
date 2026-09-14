@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+import { requireMfaVerification } from '../lib/auth';
 
 interface BlackSpotDocData {
   status?: string;
@@ -170,6 +171,9 @@ export const syncPublicPins = onCall(
         'Only administrative or authority staff can synchronize public pins.'
       );
     }
+
+    // SEC-MFA: Authoritative backend MFA check for administrative pin synchronization
+    requireMfaVerification(request.auth.token);
 
     const db = getFirestore();
     const data = request.data as SyncPublicPinsOptions | undefined;

@@ -134,6 +134,7 @@ const router = createBrowserRouter([
   // Public Live Trip Tracking Link (Read-only, no login required)
   { path: '/track/:shareId', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SharedTripViewScreen />) },
   { path: '/share/:shareId', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SharedTripViewScreen />) },
+  { path: '/share/trip/:shareId', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<SharedTripViewScreen />) },
 
   // Passenger Shell & Routes
   {
@@ -250,6 +251,22 @@ const router = createBrowserRouter([
   // Fallback 404
   { path: '*', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<NotFound404Screen />) },
 ]);
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('mwendo:mfa-required', () => {
+    const currentPath = window.location.pathname + window.location.search;
+    if (!currentPath.startsWith('/auth/mfa-challenge')) {
+      router.navigate('/auth/mfa-challenge', {
+        state: {
+          from: {
+            pathname: window.location.pathname,
+            search: window.location.search,
+          },
+        },
+      });
+    }
+  });
+}
 
 export const AppRoutes: React.FC = () => (
   <ErrorBoundary>

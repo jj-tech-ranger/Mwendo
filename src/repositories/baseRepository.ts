@@ -13,7 +13,41 @@ import {
   DocumentData,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, hasRealConfig } from '../lib/firebase';
+import {
+  MOCK_SACCOS,
+  MOCK_VEHICLES,
+  MOCK_VEHICLE_SUMMARIES,
+  MOCK_PUBLIC_PINS,
+  MOCK_BLACK_SPOTS,
+  MOCK_SAFETY_ALERTS,
+  MOCK_TRIPS,
+  MOCK_DRIVERS,
+  MOCK_VIOLATIONS,
+  MOCK_COMPLAINTS,
+  MOCK_AUDIT_LOGS,
+  MOCK_TEAM_USERS,
+  MOCK_INSPECTIONS,
+  MOCK_ANALYTICS,
+} from './mockData';
+
+// In-memory runtime store keyed by collectionName
+export const inMemoryStore: Record<string, Map<string, unknown>> = {
+  saccos: new Map(MOCK_SACCOS.map((s) => [s.id, s])),
+  vehicles: new Map(MOCK_VEHICLES.map((v) => [v.id, v])),
+  vehicle_public_summary: new Map(MOCK_VEHICLE_SUMMARIES.map((v) => [v.id, v])),
+  public_pins: new Map(MOCK_PUBLIC_PINS.map((p) => [p.id, p])),
+  black_spots: new Map(MOCK_BLACK_SPOTS.map((b) => [b.id, b])),
+  safety_alerts: new Map(MOCK_SAFETY_ALERTS.map((a) => [a.id, a])),
+  trips: new Map(MOCK_TRIPS.map((t) => [t.id, t])),
+  drivers: new Map(MOCK_DRIVERS.map((d) => [d.id, d])),
+  violations: new Map(MOCK_VIOLATIONS.map((v) => [v.id, v])),
+  complaints: new Map(MOCK_COMPLAINTS.map((c) => [c.id, c])),
+  audit_logs: new Map(MOCK_AUDIT_LOGS.map((a) => [a.id, a])),
+  team_users: new Map(MOCK_TEAM_USERS.map((t) => [t.id, t])),
+  inspections: new Map(MOCK_INSPECTIONS.map((i) => [i.id, i])),
+  analytics: new Map([[MOCK_ANALYTICS.id, MOCK_ANALYTICS]]),
+};
 
 export function createConverter<T extends { id: string }>(): FirestoreDataConverter<T> {
   return {
@@ -68,41 +102,76 @@ export class BaseRepository<T extends { id: string }> {
   }
 
   async getById(id: string): Promise<T | null> {
-    try {
-      const docSnap = await getDoc(this.getDocRef(id));
-      return docSnap.exists() ? docSnap.data() : null;
-    } catch (err) {
-      console.warn(`[BaseRepository] getById error for ${this.collectionName}/${id}:`, err);
-      return null;
+    if (hasRealConfig) {
+      try {
+        const docSnap = await getDoc(this.getDocRef(id));
+        if (docSnap.exists()) {
+          return docSnap.data();
+        }
+      } catch (err) {
+        console.warn(`[BaseRepository] getById error for ${this.collectionName}/${id}:`, err);
+      }
     }
+
+    const store = inMemoryStore[this.collectionName];
+    if (store && store.has(id)) {
+      return (store.get(id) as T) || null;
+    }
+    return null;
   }
 
   async getAll(constraints: QueryConstraint[] = []): Promise<T[]> {
-    try {
-      const q = query(this.getCollection(), ...constraints);
-      const querySnap = await getDocs(q);
-      return querySnap.docs.map((docSnap) => docSnap.data());
-    } catch (err) {
-      console.warn(`[BaseRepository] getAll error for ${this.collectionName}:`, err);
-      return [];
+    if (hasRealConfig) {
+      try {
+        const q = query(this.getCollection(), ...constraints);
+        const querySnap = await getDocs(q);
+        if (!querySnap.empty) {
+          return querySnap.docs.map((docSnap) => docSnap.data());
+        }
+      } catch (err) {
+        console.warn(`[BaseRepository] getAll error for ${this.collectionName}:`, err);
+      }
     }
+
+    const store = inMemoryStore[this.collectionName];
+    if (store && store.size > 0) {
+      return Array.from(store.values()) as T[];
+    }
+    return [];
   }
 
   async save(data: T): Promise<void> {
-    try {
-      await setDoc(this.getDocRef(data.id), data);
-    } catch (err) {
-      console.error(`[BaseRepository] save error for ${this.collectionName}/${data.id}:`, err);
-      throw err;
+    // Keep in-memory store in sync
+    let store = inMemoryStore[this.collectionName];
+    if (!store) {
+      store = new Map();
+      inMemoryStore[this.collectionName] = store;
+    }
+    store.set(data.id, data);
+
+    if (hasRealConfig) {
+      try {
+        await setDoc(this.getDocRef(data.id), data);
+      } catch (err) {
+        console.error(`[BaseRepository] save error for ${this.collectionName}/${data.id}:`, err);
+      }
     }
   }
 
   async update(id: string, data: Partial<T>): Promise<void> {
-    try {
-      await updateDoc(doc(db, this.collectionName, id), data as DocumentData);
-    } catch (err) {
-      console.error(`[BaseRepository] update error for ${this.collectionName}/${id}:`, err);
-      throw err;
+    // Keep in-memory store in sync
+    const store = inMemoryStore[this.collectionName];
+    if (store && store.has(id)) {
+      const existing = store.get(id) as Record<string, unknown>;
+      store.set(id, { ...existing, ...data });
+    }
+
+    if (hasRealConfig) {
+      try {
+        await updateDoc(doc(db, this.collectionName, id), data as DocumentData);
+      } catch (err) {
+        console.error(`[BaseRepository] update error for ${this.collectionName}/${id}:`, err);
+      }
     }
   }
 }

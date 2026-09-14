@@ -181,6 +181,9 @@ export const authService = {
         isActive: data.isActive !== false && claimedIsSuspended !== true,
         isMfaEnrolled: Boolean(data.isMfaEnrolled),
         isMfaVerified: Boolean(data.isMfaVerified),
+        mfaVerifiedAt: typeof tokenClaims?.mfaVerifiedAt === 'number'
+          ? tokenClaims.mfaVerifiedAt
+          : (typeof data.mfaVerifiedAt === 'number' ? data.mfaVerifiedAt : undefined),
         language: data.language,
         theme: data.theme,
         createdAt: data.createdAt || new Date().toISOString(),

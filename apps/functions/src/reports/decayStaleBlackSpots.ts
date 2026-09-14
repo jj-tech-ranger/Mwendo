@@ -2,6 +2,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { APP_CHECK_ENFORCED } from '../lib/env';
+import { requireMfaVerification } from '../lib/auth';
 
 export interface DecayResult {
   spotsEvaluated: number;
@@ -120,6 +121,9 @@ export const decayStaleBlackSpots = onCall(
     if (role !== 'admin' && role !== 'authority') {
       throw new HttpsError('permission-denied', 'Only authority or administrators can trigger decay cycle.');
     }
+
+    // SEC-MFA: Authoritative backend MFA check for manual blackspot decay execution
+    requireMfaVerification(request.auth.token);
 
     return processDecayStaleBlackSpotsLogic(getFirestore());
   }

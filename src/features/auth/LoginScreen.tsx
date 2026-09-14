@@ -131,6 +131,18 @@ export const LoginScreen: React.FC = () => {
     finally { setIsGuestLoading(false); }
   };
 
+  const handleQuickDemoLogin = async (role: 'passenger' | 'sacco' | 'authority' | 'admin') => {
+    setErrorMsg(null);
+    try {
+      const email = `${role}@demo.com`;
+      const profile = await authService.signInWithEmail(email, 'MwendoDemo123!');
+      routeProfile(profile);
+    } catch (err: unknown) {
+      console.error('Quick demo login error:', err);
+      setErrorMsg('Failed to sign in with demo account');
+    }
+  };
+
   const handleSendMagicLink = async () => {
     const email = getValues('email');
     if (!email) { setErrorMsg(t('auth.login.emailPlaceholder')); return; }
@@ -161,6 +173,46 @@ export const LoginScreen: React.FC = () => {
                 <Button type="button" variant="outline" className="min-h-12 w-full rounded-2xl" onClick={handleGoogleSignIn} isLoading={isGoogleLoading}><span className="material-symbols-outlined text-xl text-primary">account_circle</span>{t('auth.login.googleSignIn')}</Button>
                 <Button type="button" variant="outline" className="min-h-12 w-full rounded-2xl" onClick={handleSendMagicLink}>{t('auth.login.magicLink')}</Button>
                 <button type="button" onClick={handleGuestSignIn} disabled={isGuestLoading} className="min-h-11 w-full rounded-2xl px-4 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container hover:text-primary disabled:opacity-60">{isGuestLoading ? t('common.loading') : t('auth.login.continueAsGuest')}</button>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-outline-variant/30">
+                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2.5 text-center">
+                  Quick Demo Role Login
+                </p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('passenger')}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-base text-primary mb-0.5">commute</span>
+                    <span>Passenger</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('sacco')}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-base text-blue-600 mb-0.5">directions_bus</span>
+                    <span>SACCO</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('authority')}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-base text-amber-600 mb-0.5">verified_user</span>
+                    <span>NTSA</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleQuickDemoLogin('admin')}
+                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                  >
+                    <span className="material-symbols-outlined text-base text-purple-600 mb-0.5">admin_panel_settings</span>
+                    <span>Admin</span>
+                  </button>
+                </div>
               </div>
             </div>
             <div className="mt-6 text-center"><p className="text-sm text-on-surface-variant">{t('auth.login.noAccount')} <Link to="/auth/register" className="font-bold text-primary hover:underline">{t('auth.login.createOne')}</Link></p></div>

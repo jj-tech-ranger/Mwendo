@@ -1,7 +1,7 @@
 import { collection, query, where, orderBy, limit, onSnapshot, Query, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, hasRealConfig } from '../lib/firebase';
 import { normalizePlate } from '../lib/plate';
-import { BaseRepository } from './baseRepository';
+import { BaseRepository, inMemoryStore } from './baseRepository';
 import { UserProfile, Trip, BlackSpot, SafetyAlert, Vehicle, VehiclePublicSummary, Driver, Violation, Complaint, AuditLog, TeamUser, InspectionReport, SACCO, AnalyticsDocument } from '../types';
 
 export class UserRepository extends BaseRepository<UserProfile> {
@@ -53,6 +53,13 @@ export class AlertRepository extends BaseRepository<SafetyAlert> {
     onError?: (error: unknown) => void,
     limitCount = 50
   ): () => void {
+    if (!hasRealConfig) {
+      const store = inMemoryStore[this.collectionName];
+      const items = store ? (Array.from(store.values()) as SafetyAlert[]) : [];
+      callback(items.slice(0, limitCount));
+      return () => {};
+    }
+
     const q = this.getActiveAlertsQuery(limitCount);
     return onSnapshot(
       q,
@@ -84,18 +91,30 @@ export class VehicleRepository extends BaseRepository<Vehicle> {
     if (byId) return byId;
 
     // 2. Query regNumber matching normalized
-    try {
-      const q = query(
-        collection(db, this.collectionName).withConverter(this.converter),
-        where('regNumber', '==', normalized),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty && snap.docs[0]) {
-        return snap.docs[0].data();
+    if (hasRealConfig) {
+      try {
+        const q = query(
+          collection(db, this.collectionName).withConverter(this.converter),
+          where('regNumber', '==', normalized),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty && snap.docs[0]) {
+          return snap.docs[0].data();
+        }
+      } catch (err) {
+        console.warn('[VehicleRepository] findByNormalizedPlate query error:', err);
       }
-    } catch (err) {
-      console.warn('[VehicleRepository] findByNormalizedPlate query error:', err);
+    }
+
+    // Fallback to in-memory store
+    const store = inMemoryStore[this.collectionName];
+    if (store) {
+      for (const vehicle of store.values() as Iterable<Vehicle>) {
+        if (normalizePlate(vehicle.regNumber) === normalized || normalizePlate(vehicle.id) === normalized) {
+          return vehicle;
+        }
+      }
     }
 
     return null;
@@ -105,18 +124,37 @@ export class VehicleRepository extends BaseRepository<Vehicle> {
     const normalized = normalizePlate(prefix);
     if (!normalized || normalized.length < 2) return [];
 
-    try {
-      const q = query(
-        collection(db, this.collectionName).withConverter(this.converter),
-        where('regNumber', '>=', normalized),
-        where('regNumber', '<=', normalized + '\uf8ff'),
-        limit(maxResults)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => d.data());
-    } catch {
-      return [];
+    if (hasRealConfig) {
+      try {
+        const q = query(
+          collection(db, this.collectionName).withConverter(this.converter),
+          where('regNumber', '>=', normalized),
+          where('regNumber', '<=', normalized + '\uf8ff'),
+          limit(maxResults)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return snap.docs.map((d) => d.data());
+        }
+      } catch {
+        // Fall through to memory
+      }
     }
+
+    const store = inMemoryStore[this.collectionName];
+    if (store) {
+      const matches: Vehicle[] = [];
+      for (const vehicle of store.values() as Iterable<Vehicle>) {
+        const norm = normalizePlate(vehicle.regNumber);
+        if (norm.includes(normalized)) {
+          matches.push(vehicle);
+          if (matches.length >= maxResults) break;
+        }
+      }
+      return matches;
+    }
+
+    return [];
   }
 }
 
@@ -218,18 +256,29 @@ export class VehiclePublicSummaryRepository extends BaseRepository<VehiclePublic
     if (byId) return byId;
 
     // 2. Query regNumber matching normalized
-    try {
-      const q = query(
-        collection(db, this.collectionName).withConverter(this.converter),
-        where('regNumber', '==', normalized),
-        limit(1)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty && snap.docs[0]) {
-        return snap.docs[0].data();
+    if (hasRealConfig) {
+      try {
+        const q = query(
+          collection(db, this.collectionName).withConverter(this.converter),
+          where('regNumber', '==', normalized),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty && snap.docs[0]) {
+          return snap.docs[0].data();
+        }
+      } catch (err) {
+        console.warn('[VehiclePublicSummaryRepository] query error:', err);
       }
-    } catch (err) {
-      console.warn('[VehiclePublicSummaryRepository] query error:', err);
+    }
+
+    const store = inMemoryStore[this.collectionName];
+    if (store) {
+      for (const summary of store.values() as Iterable<VehiclePublicSummary>) {
+        if (normalizePlate(summary.regNumber) === normalized || normalizePlate(summary.id) === normalized) {
+          return summary;
+        }
+      }
     }
 
     return null;
@@ -239,18 +288,37 @@ export class VehiclePublicSummaryRepository extends BaseRepository<VehiclePublic
     const normalized = normalizePlate(prefix);
     if (!normalized || normalized.length < 2) return [];
 
-    try {
-      const q = query(
-        collection(db, this.collectionName).withConverter(this.converter),
-        where('regNumber', '>=', normalized),
-        where('regNumber', '<=', normalized + '\uf8ff'),
-        limit(maxResults)
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => d.data());
-    } catch {
-      return [];
+    if (hasRealConfig) {
+      try {
+        const q = query(
+          collection(db, this.collectionName).withConverter(this.converter),
+          where('regNumber', '>=', normalized),
+          where('regNumber', '<=', normalized + '\uf8ff'),
+          limit(maxResults)
+        );
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          return snap.docs.map((d) => d.data());
+        }
+      } catch {
+        // Fall through to memory
+      }
     }
+
+    const store = inMemoryStore[this.collectionName];
+    if (store) {
+      const matches: VehiclePublicSummary[] = [];
+      for (const summary of store.values() as Iterable<VehiclePublicSummary>) {
+        const norm = normalizePlate(summary.regNumber);
+        if (norm.includes(normalized)) {
+          matches.push(summary);
+          if (matches.length >= maxResults) break;
+        }
+      }
+      return matches;
+    }
+
+    return [];
   }
 }
 

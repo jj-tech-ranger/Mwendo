@@ -17,7 +17,8 @@ export default defineConfig({
       'src/**/*.test.{ts,tsx}',
       'src/**/__tests__/**/*.{ts,tsx}',
       'apps/functions/src/**/*.test.{ts,tsx}',
-      'apps/functions/src/**/__tests__/**/*.{ts,tsx}'
+      'apps/functions/src/**/__tests__/**/*.{ts,tsx}',
+      'tests/**/*.test.{ts,tsx}',
     ],
     exclude: ['node_modules', 'dist', 'e2e/**', '.idea', '.git', '.cache'],
     coverage: {
