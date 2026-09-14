@@ -22,6 +22,11 @@ export interface SendSosResult {
   fcmDispatchedCount: number; dlqCount: number;
   contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
   fcmSummary: Array<{ target: string; status: 'dispatched' | 'failed' }>;
+  notifiedChannels?: Array<{
+    channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+    label: string;
+    status: 'dispatched' | 'failed';
+  }>;
 }
 export interface SmsProvider { sendSms: (to: string, message: string) => Promise<{ messageId: string; success: boolean }>; }
 export interface MessagingProvider { sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>; }
@@ -175,6 +180,42 @@ export async function processSendSosLogic(
       catch (err) { dlqCount++; fcmSummary.push({ target: topic, status: 'failed' }); await writeToDLQ(db, { id: `dlq_fcm_${alertId}_${Date.now()}`, topic: 'safety-alerts', type: 'fcm_push_notification', alertId, userId, targetRecipient: topic, payload: fcmPayload, error: err }); }
     }
 
+    const notifiedChannels: Array<{
+      channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+      label: string;
+      status: 'dispatched' | 'failed';
+    }> = [];
+
+    for (const c of contactsSummary) {
+      notifiedChannels.push({
+        channel: 'sms',
+        label: c.status === 'dispatched'
+          ? `Sent SMS to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`
+          : `SMS delivery failed to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`,
+        status: c.status,
+      });
+    }
+
+    for (const f of fcmSummary) {
+      if (f.target.startsWith('sacco_')) {
+        notifiedChannels.push({
+          channel: 'sacco_fcm',
+          label: f.status === 'dispatched'
+            ? "Internal alert sent to your SACCO's operations team"
+            : "Alert to SACCO operations team failed",
+          status: f.status,
+        });
+      } else if (f.target === 'authority_alerts') {
+        notifiedChannels.push({
+          channel: 'authority_fcm',
+          label: f.status === 'dispatched'
+            ? 'Internal alert sent to on-duty safety officers'
+            : 'Alert to safety officers failed',
+          status: f.status,
+        });
+      }
+    }
+
     const safetyAlertData = {
       id: alertId, tripId: payload.tripId || null, userId, vehicleRegNumber: effectiveVehicleReg, saccoId: effectiveSaccoId,
       type: 'sos', severity: 'critical', message: payload.message || `Emergency SOS triggered by ${userDisplayName}`,
@@ -184,7 +225,7 @@ export async function processSendSosLogic(
       emergencyContactsCount: emergencyContacts.length, updatedAt: new Date().toISOString(),
     };
     await db.collection('safety_alerts').doc(alertId).create(safetyAlertData);
-    const result: SendSosResult = { success: true, alertId, userId, saccoId: effectiveSaccoId, contactsNotifiedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount, contactsSummary, fcmSummary };
+    const result: SendSosResult = { success: true, alertId, userId, saccoId: effectiveSaccoId, contactsNotifiedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount, contactsSummary, fcmSummary, notifiedChannels };
     await db.collection('audit_logs').doc(`audit_${alertId}`).set({ id: `audit_${alertId}`, action: 'EMERGENCY_SOS_DISPATCHED', actorUid: userId, actorName: userDisplayName, actorRole: 'passenger', saccoId: effectiveSaccoId, target: `Alert ${alertId} (${effectiveVehicleReg})`, timestamp: new Date().toISOString(), details: { alertId, emergencyContactsConfigured: emergencyContacts.length, smsDispatchedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount } });
     await requestRef.update({ status: 'completed', result, completedAt: new Date().toISOString() });
     return result;

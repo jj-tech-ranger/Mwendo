@@ -482,4 +482,212 @@ describe('DATA-002: Emergency SOS Contacts Real Data & Zero Hardcoded Fake Profi
       vi.useRealTimers();
     });
   });
+
+  describe('DATA-003: Emergency SOS Truth-in-Reporting & Zero Fabricated Authority Claims', () => {
+    it('renders success screen sourced strictly from real sendSOS response with zero NTSA claims', async () => {
+      vi.useFakeTimers();
+
+      const mockGeo = {
+        getCurrentPosition: vi.fn().mockImplementation((success) => {
+          success({
+            coords: { latitude: -1.2863, longitude: 36.8172 },
+            timestamp: Date.now(),
+          });
+        }),
+      };
+      Object.defineProperty(global.navigator, 'geolocation', {
+        value: mockGeo,
+        configurable: true,
+      });
+
+      const { useTripStore } = await import('../store/useTripStore');
+      useTripStore.setState({
+        activeTrip: {
+          id: 'trip_truth_101',
+          tripId: 'TRIP-101',
+          vehicleRegNumber: 'KCC 123A',
+          plateNumber: 'KCC 123A',
+          saccoId: 'sacco_highway',
+          saccoName: 'Highway Sacco',
+          routeName: 'Nairobi - Nakuru',
+          status: 'active',
+          currentSpeedKmH: 80,
+          maxSpeedKmH: 85,
+          avgSpeedKmH: 75,
+          startTime: '2026-08-23T10:00:00Z',
+          durationSeconds: 1200,
+          distanceMeters: 25000,
+          overspeedEventsCount: 0,
+          violationsCount: 0,
+        },
+        isTracking: true,
+        currentSpeed: 80,
+        plateNumber: 'KCC 123A',
+      });
+
+      useAuthStore.setState({
+        user: {
+          id: 'user_truth_test',
+          uid: 'user_truth_test',
+          email: 'truth@mwendo.co.ke',
+          displayName: 'Grace Muthoni',
+          role: 'passenger',
+          activeRole: 'passenger',
+          emergencyContacts: [
+            { name: 'David Muthoni', relationship: 'Brother', phone: '+254711223344' },
+          ],
+          isActive: true,
+          isVerified: true,
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      const { functionsService } = await import('../services/functionsService');
+      const sendSosSpy = vi.spyOn(functionsService, 'sendSOS').mockResolvedValue({
+        success: true,
+        alertId: 'sos_alert_truth_1',
+        contactsNotifiedCount: 1,
+        fcmDispatchedCount: 2,
+        dlqCount: 0,
+        contactsSummary: [
+          { name: 'David Muthoni', relationship: 'Brother', status: 'dispatched' },
+        ],
+        fcmSummary: [
+          { target: 'sacco_sacco_highway', status: 'dispatched' },
+          { target: 'authority_alerts', status: 'dispatched' },
+        ],
+        notifiedChannels: [
+          { channel: 'sms', label: 'Sent SMS to David Muthoni (Brother)', status: 'dispatched' },
+          { channel: 'sacco_fcm', label: "Internal alert sent to your SACCO's operations team", status: 'dispatched' },
+          { channel: 'authority_fcm', label: 'Internal alert sent to on-duty safety officers', status: 'dispatched' },
+        ],
+      });
+
+      render(
+        <MemoryRouter>
+          <EmergencySosScreen />
+        </MemoryRouter>
+      );
+
+      const sosBtn = screen.getByRole('button', { name: /Tap to Broadcast/i });
+      fireEvent.click(sosBtn);
+
+      for (let i = 0; i < 4; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1000);
+        });
+      }
+
+      expect(sendSosSpy).toHaveBeenCalledTimes(1);
+
+      // Verify success confirmation card
+      expect(screen.getByText('Emergency Alert Dispatched')).toBeTruthy();
+
+      // Find the dispatched channels list container
+      const channelsContainer = screen.getByTestId('dispatched-channels-list');
+      expect(channelsContainer).toBeTruthy();
+
+      // (a) Assert that 'NTSA' does NOT appear in the dispatched channels list or success state claims
+      expect(channelsContainer.textContent).not.toContain('NTSA');
+      expect(channelsContainer.textContent).not.toContain('NTSA Safety Control Center');
+      expect(channelsContainer.textContent).not.toContain('NTSA Safety Incident Portal');
+
+      // (b) Assert that every rendered claim corresponds to real fields in the response
+      expect(channelsContainer.textContent).toContain('Sent SMS to David Muthoni (Brother)');
+      expect(channelsContainer.textContent).toContain("Internal alert sent to your SACCO's operations team");
+      expect(channelsContainer.textContent).toContain('Internal alert sent to on-duty safety officers');
+
+      vi.useRealTimers();
+    });
+
+    it('honestly renders failed delivery states when backend reports failed channels', async () => {
+      vi.useFakeTimers();
+
+      const mockGeo = {
+        getCurrentPosition: vi.fn().mockImplementation((success) => {
+          success({
+            coords: { latitude: -1.2863, longitude: 36.8172 },
+            timestamp: Date.now(),
+          });
+        }),
+      };
+      Object.defineProperty(global.navigator, 'geolocation', {
+        value: mockGeo,
+        configurable: true,
+      });
+
+      const { useTripStore } = await import('../store/useTripStore');
+      useTripStore.setState({ activeTrip: null, isTracking: false, currentSpeed: 0, plateNumber: '' });
+
+      useAuthStore.setState({
+        user: {
+          id: 'user_failed_channel',
+          uid: 'user_failed_channel',
+          email: 'failed@mwendo.co.ke',
+          displayName: 'Samuel Mwangi',
+          role: 'passenger',
+          activeRole: 'passenger',
+          emergencyContacts: [
+            { name: 'John Mwangi', relationship: 'Father', phone: '+254700000000' },
+          ],
+          isActive: true,
+          isVerified: true,
+          createdAt: '2026-01-01',
+          updatedAt: '2026-01-01',
+        },
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      const { functionsService } = await import('../services/functionsService');
+      vi.spyOn(functionsService, 'sendSOS').mockResolvedValue({
+        success: true,
+        alertId: 'sos_partial_fail_1',
+        contactsNotifiedCount: 0,
+        fcmDispatchedCount: 0,
+        dlqCount: 2,
+        contactsSummary: [
+          { name: 'John Mwangi', relationship: 'Father', status: 'failed' },
+        ],
+        fcmSummary: [
+          { target: 'sacco_sacco_highway', status: 'failed' },
+          { target: 'authority_alerts', status: 'failed' },
+        ],
+        notifiedChannels: [
+          { channel: 'sms', label: 'SMS delivery failed to John Mwangi (Father)', status: 'failed' },
+          { channel: 'sacco_fcm', label: 'Alert to SACCO operations team failed', status: 'failed' },
+          { channel: 'authority_fcm', label: 'Alert to safety officers failed', status: 'failed' },
+        ],
+      });
+
+      render(
+        <MemoryRouter>
+          <EmergencySosScreen />
+        </MemoryRouter>
+      );
+
+      const sosBtn = screen.getByRole('button', { name: /Tap to Broadcast/i });
+      fireEvent.click(sosBtn);
+
+      for (let i = 0; i < 4; i++) {
+        await act(async () => {
+          vi.advanceTimersByTime(1000);
+        });
+      }
+
+      const channelsContainer = screen.getByTestId('dispatched-channels-list');
+      expect(channelsContainer).toBeTruthy();
+
+      // Confirms honesty: Shows failed message, NOT false "Sent SMS" or false success
+      expect(channelsContainer.textContent).toContain('SMS delivery failed to John Mwangi (Father)');
+      expect(channelsContainer.textContent).toContain('Alert to SACCO operations team failed');
+      expect(channelsContainer.textContent).not.toContain('Sent SMS to John Mwangi');
+      expect(channelsContainer.textContent).not.toContain('NTSA');
+
+      vi.useRealTimers();
+    });
+  });
 });

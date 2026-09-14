@@ -101,7 +101,7 @@ export const EmergencySosScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sos' | 'contacts' | 'tips'>('sos');
   const [dispatchedSummary, setDispatchedSummary] = useState<{
     contacts: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' | 'queued' | string }>;
-    fcmTargets: string[];
+    channels: Array<{ label: string; status: 'dispatched' | 'failed' | 'queued' | string; channelType?: string }>;
     alertId?: string;
     location?: { lat: number; lng: number } | null;
     isBackupActive?: boolean;
@@ -190,7 +190,7 @@ export const EmergencySosScreen: React.FC = () => {
 
       setDispatchedSummary({
         contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
-        fcmTargets: [],
+        channels: [],
         alertId,
         location,
         isBackupActive: true,
@@ -230,9 +230,51 @@ export const EmergencySosScreen: React.FC = () => {
       });
 
       if (result && result.success) {
+        // Derive honest channels directly from real backend response fields
+        const derivedChannels: Array<{ label: string; status: 'dispatched' | 'failed'; channelType?: string }> = [];
+
+        if (Array.isArray(result.notifiedChannels) && result.notifiedChannels.length > 0) {
+          for (const ch of result.notifiedChannels) {
+            // Keep FCM and internal officer notifications in channels list (contacts are displayed from contactsSummary)
+            if (ch.channel !== 'sms') {
+              derivedChannels.push({
+                label: ch.label,
+                status: ch.status,
+                channelType: ch.channel,
+              });
+            }
+          }
+        } else if (Array.isArray(result.fcmSummary) && result.fcmSummary.length > 0) {
+          for (const f of result.fcmSummary) {
+            if (f.target.startsWith('sacco_')) {
+              derivedChannels.push({
+                label: f.status === 'dispatched'
+                  ? "Internal alert sent to your SACCO's operations team"
+                  : "Alert to SACCO operations team failed",
+                status: f.status,
+                channelType: 'sacco_fcm',
+              });
+            } else if (f.target === 'authority_alerts') {
+              derivedChannels.push({
+                label: f.status === 'dispatched'
+                  ? 'Internal alert sent to on-duty safety officers'
+                  : 'Alert to safety officers failed',
+                status: f.status,
+                channelType: 'authority_fcm',
+              });
+            }
+          }
+        } else if (typeof result.fcmDispatchedCount === 'number' && result.fcmDispatchedCount > 0) {
+          derivedChannels.push({
+            label: "Internal alert sent to your SACCO's operations team",
+            status: 'dispatched',
+            channelType: 'sacco_fcm',
+          });
+        }
+
         setDispatchedSummary({
           contacts: result.contactsSummary || contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
-          fcmTargets: ['SACCO Operations Dispatch', 'NTSA Safety Control Center'],
+          channels: derivedChannels,
           alertId,
           location,
           isBackupActive: false,
@@ -274,7 +316,7 @@ export const EmergencySosScreen: React.FC = () => {
 
       setDispatchedSummary({
         contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
-        fcmTargets: [],
+        channels: [],
         alertId,
         location,
         isBackupActive: true,
@@ -490,7 +532,7 @@ export const EmergencySosScreen: React.FC = () => {
               <div className="text-6xl font-black font-mono text-error">{countdown}</div>
               <h2 className="text-lg font-bold text-error">Sending alert in {countdown}...</h2>
               <p className="text-xs text-on-surface-variant">
-                Server will automatically dispatch emergency SMS to your {contacts.length} saved contacts, send FCM push alerts to SACCO managers, and notify NTSA emergency portal.
+                Server will automatically dispatch emergency SMS to your {contacts.length} saved contacts and send alert push notifications to SACCO operations.
               </p>
               <div className="space-y-2">
                 <Button
@@ -695,24 +737,44 @@ export const EmergencySosScreen: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl">
+                <div
+                  id="dispatched-channels-list"
+                  data-testid="dispatched-channels-list"
+                  className="space-y-2 text-xs font-mono bg-surface p-3 rounded-xl"
+                >
                   <div className="text-xs font-bold text-on-surface uppercase mb-1">Dispatched Channels:</div>
                   {dispatchedSummary?.contacts.map((c, idx) => (
-                    <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-xs">sms</span>
-                      Sent SMS to {c.name} ({c.relationship})
+                    <div
+                      key={`contact_${idx}`}
+                      className={`font-bold flex items-center gap-1.5 ${
+                        c.status === 'failed'
+                          ? 'text-amber-700 dark:text-amber-400'
+                          : 'text-emerald-700 dark:text-emerald-400'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-xs">
+                        {c.status === 'failed' ? 'error_outline' : 'sms'}
+                      </span>
+                      {c.status === 'failed'
+                        ? `SMS delivery failed to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`
+                        : `Sent SMS to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`}
                     </div>
                   ))}
-                  {dispatchedSummary?.fcmTargets.map((tgt, idx) => (
-                    <div key={idx} className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-xs">notifications_active</span>
-                      FCM Push alert to {tgt}
+                  {dispatchedSummary?.channels.map((ch, idx) => (
+                    <div
+                      key={`channel_${idx}`}
+                      className={`font-bold flex items-center gap-1.5 ${
+                        ch.status === 'failed'
+                          ? 'text-amber-700 dark:text-amber-400'
+                          : 'text-emerald-700 dark:text-emerald-400'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-xs">
+                        {ch.status === 'failed' ? 'error_outline' : 'notifications_active'}
+                      </span>
+                      {ch.label}
                     </div>
                   ))}
-                  <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-xs">shield</span>
-                    Logged to NTSA Safety Incident Portal
-                  </div>
                 </div>
 
                 {/* Supplementary SMS deep-link notice */}

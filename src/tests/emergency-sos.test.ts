@@ -53,6 +53,12 @@ describe('CF-006: Emergency SOS Backend Dispatch & DLQ Verification', () => {
     expect(result.contactsNotifiedCount).toBe(2);
     expect(result.fcmDispatchedCount).toBe(2);
     expect(result.dlqCount).toBe(0);
+    expect(result.fcmSummary).toEqual([
+      { target: 'sacco_sacco_metro_trans', status: 'dispatched' },
+      { target: 'authority_alerts', status: 'dispatched' },
+    ]);
+    expect(result.notifiedChannels).toBeDefined();
+    expect(result.notifiedChannels?.some((c) => c.label.includes('NTSA'))).toBe(false);
     expect(mockSms.sendSms).toHaveBeenCalledTimes(2);
     expect(mockSms.sendSms).toHaveBeenCalledWith('+254711111111', expect.stringContaining('Wangari Maathai'));
     expect(mockSms.sendSms).toHaveBeenCalledWith('+254722222222', expect.stringContaining('KDA 123B'));

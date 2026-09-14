@@ -789,6 +789,13 @@ export const functionsService = {
     fcmDispatchedCount: number;
     dlqCount: number;
     contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
+    fcmSummary?: Array<{ target: string; status: 'dispatched' | 'failed' }>;
+    notifiedChannels?: Array<{
+      channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+      label: string;
+      status: 'dispatched' | 'failed';
+    }>;
+    saccoId?: string;
   }> {
     try {
       const callable = httpsCallable<typeof payload, {
@@ -798,6 +805,13 @@ export const functionsService = {
         fcmDispatchedCount: number;
         dlqCount: number;
         contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
+        fcmSummary?: Array<{ target: string; status: 'dispatched' | 'failed' }>;
+        notifiedChannels?: Array<{
+          channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+          label: string;
+          status: 'dispatched' | 'failed';
+        }>;
+        saccoId?: string;
       }>(functions, 'sendSOS');
       const res = await callable(payload);
       return res.data;
@@ -876,6 +890,9 @@ export const functionsService = {
         fcmDispatchedCount: 0,
         dlqCount: 0,
         contactsSummary,
+        fcmSummary: [],
+        notifiedChannels: [],
+        saccoId: payload.saccoId || 'unassigned',
       };
     }
   },
