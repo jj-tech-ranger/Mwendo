@@ -1,7 +1,8 @@
 import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { db, functions, auth } from '../lib/firebase';
+import { db, functions, auth, hasRealConfig } from '../lib/firebase';
 import { normalizePlate } from '../lib/plate';
+import { teamUserRepository } from '../repositories';
 import { PlatformAnalyticsDaily, SaccoAnalyticsDaily, GenerateTripSummaryPayload, GenerateTripSummaryResult, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import {
@@ -445,124 +446,152 @@ export const functionsService = {
    * Universal Callable Invoker
    */
   async callCloudFunction<T = unknown>(functionName: string, data: Record<string, unknown>): Promise<T> {
-    try {
-      const callable = httpsCallable<Record<string, unknown>, T>(functions, functionName);
-      const res = await callable(data);
-      return res.data;
-    } catch (err) {
-      if (isMfaRequiredError(err)) {
-        console.warn(`[functionsService] Cloud Function ${functionName} blocked: MFA re-verification required.`);
-        const currentUser = useAuthStore.getState().user;
-        if (currentUser) {
-          useAuthStore.getState().setUser({
-            ...currentUser,
-            isMfaVerified: false,
+    if (hasRealConfig) {
+      try {
+        const callable = httpsCallable<Record<string, unknown>, T>(functions, functionName);
+        const res = await callable(data);
+        return res.data;
+      } catch (err) {
+        if (isMfaRequiredError(err)) {
+          console.warn(`[functionsService] Cloud Function ${functionName} blocked: MFA re-verification required.`);
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            useAuthStore.getState().setUser({
+              ...currentUser,
+              isMfaVerified: false,
+            });
+          }
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('mwendo:mfa-required', {
+                detail: { functionName, error: err },
+              })
+            );
+          }
+          throw err;
+        }
+
+        console.warn(`[functionsService] Cloud Function ${functionName} remote call failed, invoking local fallback:`, err);
+      }
+    }
+
+    if (functionName === 'processTripCompletion') {
+      // Violations and risk scores cannot be written directly by client SDK
+      // because firestore.rules strictly enforces allow create: if false on /violations.
+      // Return a safe offline/fallback acknowledgment without violating security boundaries.
+      return {
+        success: true,
+        processed: false,
+        offlineFallback: true,
+        tripId: data.tripId as string,
+        violationsCount: 0,
+      } as unknown as T;
+    }
+    if (functionName === 'suspendUser') {
+      const targetUid = data.targetUid as string;
+      if (hasRealConfig) {
+        try {
+          await updateDoc(doc(db, 'users', targetUid), {
+            isActive: false,
+            updatedAt: new Date().toISOString(),
           });
+          await setDoc(doc(collection(db, 'audit_logs')), {
+            action: `SUSPEND_USER (${(data.reason as string) || 'Admin action'})`,
+            actorName: 'System Admin',
+            actorRole: 'admin',
+            target: `User ID: ${targetUid}`,
+            timestamp: new Date().toISOString(),
+          });
+        } catch {
+          // offline fallback
         }
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
-            new CustomEvent('mwendo:mfa-required', {
-              detail: { functionName, error: err },
-            })
-          );
+      }
+      return { success: true, targetUid, isSuspended: true } as unknown as T;
+    }
+    if (functionName === 'reactivateUser') {
+      const targetUid = data.targetUid as string;
+      if (hasRealConfig) {
+        try {
+          await updateDoc(doc(db, 'users', targetUid), {
+            isActive: true,
+            updatedAt: new Date().toISOString(),
+          });
+          await setDoc(doc(collection(db, 'audit_logs')), {
+            action: 'UNSUSPEND_USER',
+            actorName: 'System Admin',
+            actorRole: 'admin',
+            target: `User ID: ${targetUid}`,
+            timestamp: new Date().toISOString(),
+          });
+        } catch {
+          // offline fallback
         }
-        throw err;
+      }
+      return { success: true, targetUid, isSuspended: false } as unknown as T;
+    }
+    if (functionName === 'assignUserRole') {
+      const targetUid = data.targetUid as string;
+      const newRole = data.newRole as UserRole;
+      const saccoId = data.saccoId as string | undefined;
+      const authorityScope = data.authorityScope as 'national' | 'county' | undefined;
+      const county = data.county as string | undefined;
+      const teamUserId = data.teamUserId as string | undefined;
+
+      const userUpdate: Record<string, unknown> = {
+        role: newRole,
+        activeRole: newRole,
+        claimedActiveRole: newRole,
+        updatedAt: new Date().toISOString(),
+      };
+      if (newRole === 'sacco_manager') {
+        userUpdate.saccoId = saccoId;
+        userUpdate.claimedSaccoId = saccoId;
+        userUpdate.authorityScope = null;
+        userUpdate.claimedAuthorityScope = null;
+      } else if (newRole === 'authority') {
+        userUpdate.authorityScope = authorityScope || 'national';
+        userUpdate.claimedAuthorityScope = authorityScope || 'national';
+        if (county) userUpdate.county = county;
+        userUpdate.saccoId = null;
+        userUpdate.claimedSaccoId = null;
+      } else {
+        userUpdate.saccoId = null;
+        userUpdate.claimedSaccoId = null;
+        userUpdate.authorityScope = null;
+        userUpdate.claimedAuthorityScope = null;
+        userUpdate.county = null;
       }
 
-      console.warn(`[functionsService] Cloud Function ${functionName} remote call failed, invoking local fallback:`, err);
-      if (functionName === 'processTripCompletion') {
-        // Violations and risk scores cannot be written directly by client SDK
-        // because firestore.rules strictly enforces allow create: if false on /violations.
-        // Return a safe offline/fallback acknowledgment without violating security boundaries.
-        return {
-          success: true,
-          processed: false,
-          offlineFallback: true,
-          tripId: data.tripId as string,
-          violationsCount: 0,
-        } as unknown as T;
-      }
-      if (functionName === 'suspendUser') {
-        const targetUid = data.targetUid as string;
-        await updateDoc(doc(db, 'users', targetUid), {
-          isActive: false,
-          updatedAt: new Date().toISOString(),
-        });
-        await setDoc(doc(collection(db, 'audit_logs')), {
-          action: `SUSPEND_USER (${(data.reason as string) || 'Admin action'})`,
-          actorName: 'System Admin',
-          actorRole: 'admin',
-          target: `User ID: ${targetUid}`,
-          timestamp: new Date().toISOString(),
-        });
-        return { success: true, targetUid, isSuspended: true } as unknown as T;
-      }
-      if (functionName === 'reactivateUser') {
-        const targetUid = data.targetUid as string;
-        await updateDoc(doc(db, 'users', targetUid), {
-          isActive: true,
-          updatedAt: new Date().toISOString(),
-        });
-        await setDoc(doc(collection(db, 'audit_logs')), {
-          action: 'UNSUSPEND_USER',
-          actorName: 'System Admin',
-          actorRole: 'admin',
-          target: `User ID: ${targetUid}`,
-          timestamp: new Date().toISOString(),
-        });
-        return { success: true, targetUid, isSuspended: false } as unknown as T;
-      }
-      if (functionName === 'assignUserRole') {
-        const targetUid = data.targetUid as string;
-        const newRole = data.newRole as UserRole;
-        const saccoId = data.saccoId as string | undefined;
-        const authorityScope = data.authorityScope as 'national' | 'county' | undefined;
-        const county = data.county as string | undefined;
-        const teamUserId = data.teamUserId as string | undefined;
-
-        const userUpdate: Record<string, unknown> = {
-          role: newRole,
-          activeRole: newRole,
-          claimedActiveRole: newRole,
-          updatedAt: new Date().toISOString(),
-        };
-        if (newRole === 'sacco_manager') {
-          userUpdate.saccoId = saccoId;
-          userUpdate.claimedSaccoId = saccoId;
-          userUpdate.authorityScope = null;
-          userUpdate.claimedAuthorityScope = null;
-        } else if (newRole === 'authority') {
-          userUpdate.authorityScope = authorityScope || 'national';
-          userUpdate.claimedAuthorityScope = authorityScope || 'national';
-          if (county) userUpdate.county = county;
-          userUpdate.saccoId = null;
-          userUpdate.claimedSaccoId = null;
-        } else {
-          userUpdate.saccoId = null;
-          userUpdate.claimedSaccoId = null;
-          userUpdate.authorityScope = null;
-          userUpdate.claimedAuthorityScope = null;
-          userUpdate.county = null;
-        }
-
+      if (hasRealConfig) {
         try {
           await updateDoc(doc(db, 'users', targetUid), userUpdate as Record<string, string | null | undefined>);
         } catch {
           // offline or permission fallback
         }
+      }
 
-        if (teamUserId) {
+      if (teamUserId) {
+        const updatePayload = {
+          status: 'active' as const,
+          uid: targetUid,
+          updatedAt: new Date().toISOString(),
+          lastActive: 'Active',
+        };
+        if (hasRealConfig) {
           try {
-            await updateDoc(doc(db, 'team_users', teamUserId), {
-              status: 'active',
-              uid: targetUid,
-              updatedAt: new Date().toISOString(),
-            });
+            await updateDoc(doc(db, 'team_users', teamUserId), updatePayload);
           } catch {
             // ignore
           }
         }
+        try {
+          await teamUserRepository.update(teamUserId, updatePayload);
+        } catch {
+          // ignore
+        }
+      }
 
+      if (hasRealConfig) {
         try {
           await setDoc(doc(collection(db, 'audit_logs')), {
             action: `ASSIGN_USER_ROLE (${newRole})`,
@@ -576,6 +605,7 @@ export const functionsService = {
         } catch {
           // ignore
         }
+      }
 
         return {
           success: true,
@@ -604,8 +634,7 @@ export const functionsService = {
       if (functionName === 'reportBlackSpot') {
         return (await this.reportBlackSpot(data as Parameters<typeof this.reportBlackSpot>[0])) as unknown as T;
       }
-      throw err;
-    }
+      throw new Error(`[functionsService] Unhandled function fallback: ${functionName}`);
   },
 
   /**

@@ -379,7 +379,7 @@ export const AuthorityReportsScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">download_done</span>
             <span>{downloadNotice}</span>
           </div>
-          <button onClick={() => setDownloadNotice(null)}>
+          <button onClick={() => setDownloadNotice(null)} aria-label="Dismiss export download notification">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>

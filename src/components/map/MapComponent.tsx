@@ -485,6 +485,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
             <button
               type="button"
               onClick={() => setSelectedMarker(null)}
+              aria-label="Close map marker popup"
               className="text-on-surface-variant hover:text-on-surface p-0.5 rounded cursor-pointer"
             >
               <span className="material-symbols-outlined text-base">close</span>

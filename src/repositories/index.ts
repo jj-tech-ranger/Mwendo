@@ -216,6 +216,41 @@ export class TeamUserRepository extends BaseRepository<TeamUser> {
   constructor() {
     super('team_users');
   }
+
+  subscribeBySaccoId(
+    saccoId: string,
+    callback: (users: TeamUser[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    if (hasRealConfig) {
+      try {
+        const q = query(this.getCollection(), where('saccoId', '==', saccoId));
+        return onSnapshot(
+          q,
+          (snapshot) => {
+            const users = snapshot.docs.map((docSnap) => docSnap.data());
+            callback(users);
+          },
+          (err) => {
+            console.warn('[TeamUserRepository] onSnapshot error:', err);
+            if (onError) onError(err);
+          }
+        );
+      } catch (err) {
+        console.warn('[TeamUserRepository] subscribeBySaccoId setup error:', err);
+        if (onError && err instanceof Error) onError(err);
+      }
+    }
+
+    return this.subscribe(
+      [],
+      (items) => {
+        const saccoUsers = items.filter((u) => u.saccoId === saccoId);
+        callback(saccoUsers);
+      },
+      onError
+    );
+  }
 }
 
 export class InspectionReportRepository extends BaseRepository<InspectionReport> {

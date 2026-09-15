@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { blackSpotRepository } from '../../repositories';
 import { BlackSpot } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoBlackSpotsScreen: React.FC = () => {
@@ -89,7 +90,7 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div>
                   <Badge
-                    variant={spot.severity === 'critical' ? 'danger' : spot.severity === 'high' ? 'warning' : 'neutral'}
+                    variant={severityToBadgeVariant(spot.severity)}
                     className="uppercase text-[10px] mb-1"
                   >
                     {spot.hazardType || 'Hazard'}

@@ -5,6 +5,7 @@ import { violationRepository, auditLogRepository } from '../../repositories';
 import { Violation, SeverityLevel } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
@@ -96,7 +97,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">check_circle</span>
             <span>{actionSuccessMsg}</span>
           </div>
-          <button onClick={() => setActionSuccessMsg(null)}>
+          <button onClick={() => setActionSuccessMsg(null)} aria-label="Dismiss compliance action message">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
@@ -185,11 +186,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
                     <td className="py-3 px-3 font-label-mono text-outline">{v.speedLimitKmH} km/h</td>
                     <td className="py-3 px-3">{v.locationName || v.routeName || 'Thika Superhighway'}</td>
                     <td className="py-3 px-3">
-                      <Badge
-                        variant={
-                          v.severity === 'critical' || v.severity === 'high' ? 'danger' : 'warning'
-                        }
-                      >
+                      <Badge variant={severityToBadgeVariant(v.severity)}>
                         {v.severity.toUpperCase()}
                       </Badge>
                     </td>
@@ -239,6 +236,7 @@ export const AuthorityComplianceScreen: React.FC = () => {
               <button
                 onClick={() => setSelectedViolation(null)}
                 className="text-on-surface-variant hover:text-on-surface"
+                aria-label="Close compliance details modal"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>

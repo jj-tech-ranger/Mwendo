@@ -103,7 +103,7 @@ export const AdminSecurityScreen: React.FC = () => {
       {toastMsg && (
         <div className="p-md rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-body-sm text-xs flex items-center justify-between">
           <span>{toastMsg}</span>
-          <button onClick={() => setToastMsg(null)} className="text-outline">
+          <button onClick={() => setToastMsg(null)} className="text-outline" aria-label="Dismiss security notification">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>

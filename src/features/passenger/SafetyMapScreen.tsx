@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Dialog } from '../../components/ui/Dialog';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { publicPinRepository } from '../../repositories';
 import { useToast } from '../../components/ui/Toast';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
@@ -267,9 +268,7 @@ export const SafetyMapScreen: React.FC = () => {
                   variant={
                     item.type === 'hospital' || item.type === 'police'
                       ? 'neutral'
-                      : item.severity === 'high'
-                      ? 'danger'
-                      : 'warning'
+                      : severityToBadgeVariant(item.severity)
                   }
                   className="text-[10px] font-bold"
                 >

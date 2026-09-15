@@ -6,6 +6,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { ReportBlackSpotScreen } from '../features/passenger/ReportBlackSpotScreen';
 import { functionsService } from '../services/functionsService';
 import { useAuthStore } from '../store/useAuthStore';
+import { offlineStorage } from '../services/offlineStorage';
+import { offlineSyncService } from '../services/offlineSyncService';
 
 vi.mock('../services/functionsService', () => ({
   functionsService: {
@@ -202,6 +204,236 @@ describe('ReportBlackSpotScreen (CRIT-02 Geolocation & Pin Drop)', () => {
     expect(submittedPayload.latitude).not.toBe(-1.221);
     expect(submittedPayload.longitude).not.toBe(36.882);
     expect(submittedPayload.title).toBe('Oil Spill on Highway');
+  });
+});
+
+describe('ReportBlackSpotScreen (PROMPT 10 Offline-Queued vs Transmitted Confirmation)', () => {
+  const originalGeolocation = navigator.geolocation;
+  const originalOnLine = navigator.onLine;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({
+      user: {
+        uid: 'passenger_101',
+        id: 'passenger_101',
+        displayName: 'Wanjiku Mwangi',
+        email: 'wanjiku@example.com',
+        role: 'passenger',
+        activeRole: 'passenger',
+      } as any,
+    });
+
+    const mockGeolocation = {
+      getCurrentPosition: vi.fn((success) => {
+        success({
+          coords: {
+            latitude: -1.286389,
+            longitude: 36.817223,
+            accuracy: 10,
+            altitude: null,
+            altitudeAccuracy: null,
+            heading: null,
+            speed: null,
+          },
+          timestamp: Date.now(),
+        });
+      }),
+      watchPosition: vi.fn(),
+      clearWatch: vi.fn(),
+    };
+
+    Object.defineProperty(global.navigator, 'geolocation', {
+      value: mockGeolocation,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(global.navigator, 'geolocation', {
+      value: originalGeolocation,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: originalOnLine,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it('renders honest online submission confirmation with transmitted status when online succeeds', async () => {
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
+    vi.mocked(functionsService.reportBlackSpot).mockResolvedValueOnce({
+      success: true,
+      spotId: 'bs_server_ok',
+    });
+
+    render(
+      <MemoryRouter>
+        <ReportBlackSpotScreen />
+      </MemoryRouter>
+    );
+
+    // Step 1: Confirm Location
+    const confirmLocBtn = await screen.findByTestId('btn-confirm-location-next');
+    fireEvent.click(confirmLocBtn);
+
+    // Step 2: Fill Title & Details
+    const titleInput = await screen.findByTestId('input-hazard-title');
+    fireEvent.change(titleInput, { target: { value: 'Deep Pothole at Westlands Roundabout' } });
+    const nextDetailsBtn = screen.getByTestId('btn-hazard-details-next');
+    fireEvent.click(nextDetailsBtn);
+
+    // Step 3: Submit Report
+    const submitBtn = await screen.findByTestId('btn-submit-hazard-report');
+    fireEvent.click(submitBtn);
+
+    // Step 4: Verify Online Transmitted Confirmation Copy
+    await waitFor(() => {
+      expect(screen.getByTestId('report-submitted-title')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('report-submitted-title').textContent).toBe('Report Submitted — Thank You!');
+    expect(screen.getByTestId('report-submitted-description').textContent).toContain(
+      'Your hazard report helps keep fellow Kenyan commuters safe. Our authority team will review and corroborate it.'
+    );
+    expect(screen.getByTestId('badge-safety-points-submitted').textContent).toBe('+25 Safety Points');
+    expect(screen.getByTestId('badge-trust-score-submitted').textContent).toBe('+10 Trust Score');
+    expect(screen.getByTestId('status-report-submitted').textContent).toBe('Status: Pending Verification');
+
+    // Ensure queued copy is NOT rendered
+    expect(screen.queryByTestId('report-queued-title')).toBeNull();
+    expect(screen.queryByTestId('badge-safety-points-queued')).toBeNull();
+    expect(screen.queryByTestId('offline-queue-info-card')).toBeNull();
+  });
+
+  it('renders honest offline-queued confirmation with pending sync badges when navigator.onLine === false', async () => {
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: false,
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <ReportBlackSpotScreen />
+      </MemoryRouter>
+    );
+
+    // Step 1: Confirm Location
+    const confirmLocBtn = await screen.findByTestId('btn-confirm-location-next');
+    fireEvent.click(confirmLocBtn);
+
+    // Step 2: Fill Details
+    const titleInput = await screen.findByTestId('input-hazard-title');
+    fireEvent.change(titleInput, { target: { value: 'Missing Guardrail on Escarpment' } });
+    const nextDetailsBtn = screen.getByTestId('btn-hazard-details-next');
+    fireEvent.click(nextDetailsBtn);
+
+    // Step 3: Submit Report
+    const submitBtn = await screen.findByTestId('btn-submit-hazard-report');
+    fireEvent.click(submitBtn);
+
+    // Assert offline storage & sync count were invoked
+    await waitFor(() => {
+      expect(offlineStorage.setItem).toHaveBeenCalledWith(
+        expect.stringMatching(/^offline_report_bs_/),
+        expect.objectContaining({
+          title: 'Missing Guardrail on Escarpment',
+          status: 'pending',
+          retryCount: 0,
+        })
+      );
+      expect(offlineSyncService.updatePendingCount).toHaveBeenCalled();
+    });
+
+    // Verify Honest Offline Queued Copy
+    await waitFor(() => {
+      expect(screen.getByTestId('report-queued-title')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('report-queued-title').textContent).toBe('Report Saved — Will Send Automatically');
+    expect(screen.getByTestId('report-queued-description').textContent).toContain(
+      "Your hazard report is safely stored on this device. It has not reached Mwendo's servers yet, but will transmit automatically once connectivity returns."
+    );
+    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points (Pending Sync)');
+    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score (Pending Sync)');
+    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Queued Locally (Pending Sync)');
+    expect(screen.getByTestId('offline-queue-info-card').textContent).toContain(
+      'You can monitor pending sync items in the banner at the top of the screen.'
+    );
+
+    // Ensure submitted online claims are NOT rendered
+    expect(screen.queryByTestId('report-submitted-title')).toBeNull();
+    expect(screen.queryByTestId('badge-safety-points-submitted')).toBeNull();
+    expect(screen.queryByText('Report Submitted — Thank You!')).toBeNull();
+  });
+
+  it('renders honest offline-queued confirmation when online submission call throws a network error', async () => {
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+
+    vi.mocked(functionsService.reportBlackSpot).mockRejectedValueOnce(
+      new Error('Failed to fetch: Network connectivity lost')
+    );
+
+    render(
+      <MemoryRouter>
+        <ReportBlackSpotScreen />
+      </MemoryRouter>
+    );
+
+    // Step 1: Confirm Location
+    const confirmLocBtn = await screen.findByTestId('btn-confirm-location-next');
+    fireEvent.click(confirmLocBtn);
+
+    // Step 2: Fill Details
+    const titleInput = await screen.findByTestId('input-hazard-title');
+    fireEvent.change(titleInput, { target: { value: 'Unmarked Bump on Outer Ring Road' } });
+    const nextDetailsBtn = screen.getByTestId('btn-hazard-details-next');
+    fireEvent.click(nextDetailsBtn);
+
+    // Step 3: Submit Report
+    const submitBtn = await screen.findByTestId('btn-submit-hazard-report');
+    fireEvent.click(submitBtn);
+
+    // Assert offline storage saved the failed submission
+    await waitFor(() => {
+      expect(offlineStorage.setItem).toHaveBeenCalledWith(
+        expect.stringMatching(/^offline_report_bs_/),
+        expect.objectContaining({
+          title: 'Unmarked Bump on Outer Ring Road',
+          status: 'pending',
+          retryCount: 0,
+        })
+      );
+      expect(offlineSyncService.updatePendingCount).toHaveBeenCalled();
+    });
+
+    // Step 4: Verify Honest Offline Queued Confirmation
+    await waitFor(() => {
+      expect(screen.getByTestId('report-queued-title')).toBeTruthy();
+    });
+
+    expect(screen.getByTestId('report-queued-title').textContent).toBe('Report Saved — Will Send Automatically');
+    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points (Pending Sync)');
+    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score (Pending Sync)');
+    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Queued Locally (Pending Sync)');
+
+    // Ensure submitted online claims are NOT rendered
+    expect(screen.queryByTestId('report-submitted-title')).toBeNull();
+    expect(screen.queryByTestId('badge-safety-points-submitted')).toBeNull();
+    expect(screen.queryByText('Report Submitted — Thank You!')).toBeNull();
   });
 });
 

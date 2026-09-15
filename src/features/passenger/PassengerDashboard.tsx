@@ -373,6 +373,7 @@ export const PassengerDashboard: React.FC = () => {
                     onClick={handleClearMatchedVehicle}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface"
                     title="Clear matched vehicle"
+                    aria-label="Clear matched vehicle"
                   >
                     <span className="material-symbols-outlined text-lg">close</span>
                   </button>

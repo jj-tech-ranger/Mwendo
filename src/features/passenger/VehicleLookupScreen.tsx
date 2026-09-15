@@ -28,6 +28,7 @@ import { VehiclePublicSummary, SACCO } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { riskTierToBadgeVariant } from '../../lib/severity';
 import { useTripStore } from '../../store/useTripStore';
 import { useMotionPresets } from '../../lib/motion';
 
@@ -394,7 +395,7 @@ export const VehicleLookupScreen: React.FC = () => {
                         </span>
                       </div>
                       <Badge
-                        variant={v.riskTier === 'low' ? 'success' : v.riskTier === 'medium' ? 'warning' : 'danger'}
+                        variant={riskTierToBadgeVariant(v.riskTier)}
                         className="text-[10px] capitalize"
                       >
                         {v.riskTier || 'verified'}

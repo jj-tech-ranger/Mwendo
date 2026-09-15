@@ -17,6 +17,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { Input } from '../../components/ui/Input';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { toStandardDate } from '../../lib/utils';
@@ -413,9 +414,9 @@ export const AuthorityDashboard: React.FC = () => {
                       </span>
                       <Badge
                         variant={
-                          alert.type === 'sos' || alert.severity === 'critical'
+                          alert.type === 'sos'
                             ? 'danger'
-                            : 'warning'
+                            : severityToBadgeVariant(alert.severity)
                         }
                       >
                         {alert.type.toUpperCase()}

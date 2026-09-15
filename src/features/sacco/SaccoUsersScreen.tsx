@@ -7,7 +7,6 @@ import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { teamUserRepository } from '../../repositories';
-import { where } from 'firebase/firestore';
 import { TeamUser } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 
@@ -17,48 +16,50 @@ export const SaccoUsersScreen: React.FC = () => {
 
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'roles'>('users');
   const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'sacco_manager' | 'operations' | 'viewer'>('operations');
 
-  const loadTeamUsers = async () => {
-    if (!saccoId) return;
-    setLoading(true);
-    try {
-      const docs = await teamUserRepository.getAll([where('saccoId', '==', saccoId)]);
-      setTeamUsers(docs);
-    } catch (err) {
-      console.warn('Error loading team users:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadTeamUsers();
+    if (!saccoId) return;
+
+    const unsubscribe = teamUserRepository.subscribeBySaccoId(
+      saccoId,
+      (users) => {
+        setTeamUsers(users);
+      },
+      (err) => {
+        console.warn('Error in team users subscription:', err);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
   }, [saccoId]);
 
   const handleInvite = async () => {
     if (!inviteName || !inviteEmail || !saccoId) return;
+    const nowIso = new Date().toISOString();
     const newUser: TeamUser = {
       id: `tu_${Date.now()}`,
       saccoId,
-      name: inviteName,
-      email: inviteEmail,
+      name: inviteName.trim(),
+      email: inviteEmail.trim().toLowerCase(),
       role: inviteRole,
       status: 'invited',
-      lastActive: 'Pending Acceptance',
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      lastActive: 'Awaiting Admin Approval',
     };
 
     try {
       await teamUserRepository.save(newUser);
-      await loadTeamUsers();
     } catch (err) {
       console.warn('Error inviting team user; retaining local fallback:', err);
-      setTeamUsers([...teamUsers, newUser]);
+      setTeamUsers((prev) => [...prev, newUser]);
     } finally {
       setShowInviteModal(false);
       setInviteName('');
@@ -104,7 +105,7 @@ export const SaccoUsersScreen: React.FC = () => {
             Role Permissions
           </button>
 
-          <Button size="sm" className="font-bold text-xs ml-2" onClick={() => setShowInviteModal(true)}>
+          <Button size="sm" className="font-bold text-xs ml-2" onClick={() => setShowInviteModal(true)} data-testid="open-invite-modal-btn">
             + Invite User
           </Button>
         </div>
@@ -146,11 +147,23 @@ export const SaccoUsersScreen: React.FC = () => {
                         </Badge>
                       </td>
                       <td className="p-3.5">
-                        <Badge variant={u.status === 'active' ? 'success' : 'warning'} className="text-[10px]">
-                          {u.status === 'invited' ? 'Pending Admin Approval' : u.status}
+                        <Badge
+                          variant={u.status === 'active' ? 'success' : u.status === 'invited' ? 'warning' : 'neutral'}
+                          className="text-[10px]"
+                          data-testid={`status-badge-${u.id}`}
+                        >
+                          {u.status === 'invited' ? 'Pending Admin Approval' : u.status === 'active' ? 'Active' : u.status}
                         </Badge>
                       </td>
-                      <td className="p-3.5 text-right font-mono text-on-surface-variant">{u.lastActive}</td>
+                      <td className="p-3.5 text-right font-mono text-on-surface-variant" data-testid={`last-active-${u.id}`}>
+                        {u.status === 'invited'
+                          ? 'Awaiting Admin Approval'
+                          : u.lastActive && u.lastActive !== 'Pending Acceptance' && u.lastActive !== 'Awaiting Admin Approval'
+                            ? u.lastActive
+                            : u.updatedAt
+                              ? new Date(u.updatedAt).toLocaleDateString()
+                              : 'Active'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,7 +235,7 @@ export const SaccoUsersScreen: React.FC = () => {
               Server-Authoritative Role Provisioning
             </span>
             <p>
-              Sending an invitation creates a pending invite. A platform administrator will authorize the request and provision the required Firebase Auth custom claims for tenant access.
+              Sending an invitation creates a verified pending role request. A platform administrator will review the request and provision the required Firebase Auth custom claims before the user can access SACCO tenant data.
             </p>
           </div>
 
@@ -230,7 +243,9 @@ export const SaccoUsersScreen: React.FC = () => {
             <Button variant="ghost" onClick={() => setShowInviteModal(false)}>
               Cancel
             </Button>
-            <Button onClick={handleInvite}>Send Invitation</Button>
+            <Button onClick={handleInvite} data-testid="send-invitation-btn">
+              Send Invitation
+            </Button>
           </div>
         </div>
       </Dialog>

@@ -51,6 +51,24 @@ export const ActiveTripScreen: React.FC = () => {
   const [gpsSignalLost, setGpsSignalLost] = useState(false);
   const [gpsRecoverySeconds, setGpsRecoverySeconds] = useState(GPS_RECOVERY_TIMEOUT_SECONDS);
   const [telemetryRestored, setTelemetryRestored] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [_lastGpsSampleTime, setLastGpsSampleTime] = useState<number | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const speedSmootherRef = useRef<SpeedSmoother>(new SpeedSmoother(0.35, 30));
   const gpsSamplesBufferRef = useRef<GPSSample[]>([]);
@@ -141,13 +159,16 @@ export const ActiveTripScreen: React.FC = () => {
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         handleGpsRecovered();
+        const accuracy = pos.coords.accuracy;
+        setGpsAccuracy(accuracy);
+        setLastGpsSampleTime(Date.now());
         const rawSpeedMs = pos.coords.speed;
         const rawSpeedKmH = rawSpeedMs !== null && rawSpeedMs >= 0 ? Math.round(rawSpeedMs * 3.6) : currentSpeed;
         const sample: GPSSample = {
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
           speedKmH: rawSpeedKmH,
-          accuracy: pos.coords.accuracy,
+          accuracy,
           timestamp: new Date().toISOString(),
         };
         const { isValid, smoothedSpeedKmH } = speedSmootherRef.current.processSample(sample);
@@ -162,6 +183,7 @@ export const ActiveTripScreen: React.FC = () => {
           updateTelemetry(smoothedSpeedKmH, {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
+            accuracy,
             timestamp: typeof sample.timestamp === 'string' ? sample.timestamp : new Date(sample.timestamp).toISOString(),
             speedKmH: smoothedSpeedKmH,
           });
@@ -171,6 +193,7 @@ export const ActiveTripScreen: React.FC = () => {
       (err) => {
         if (disposed) return;
         console.warn('Geolocation position error:', err);
+        setGpsAccuracy(null);
         handleGpsLost();
       },
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
@@ -178,7 +201,7 @@ export const ActiveTripScreen: React.FC = () => {
     return () => {
       disposed = true;
       clearGpsWatchdog();
-      navigator.geolocation.clearWatch(watchId);
+      navigator?.geolocation?.clearWatch?.(watchId);
     };
   }, [isTracking, isPaused, telemetryRestored]);
 
@@ -188,6 +211,8 @@ export const ActiveTripScreen: React.FC = () => {
       gpsSamplesBufferRef.current = [];
       tripCompletionInProgressRef.current = false;
       setTelemetryRestored(false);
+      setGpsAccuracy(null);
+      setLastGpsSampleTime(null);
       if (setupPlate) {
         startTrip({
           plateNumber: normalizePlate(setupPlate),
@@ -354,6 +379,49 @@ export const ActiveTripScreen: React.FC = () => {
     );
   }
 
+  const getGpsStatus = () => {
+    if (gpsSignalLost) {
+      return {
+        label: 'GPS Lost',
+        status: 'lost',
+        icon: 'location_off',
+        colorClass: 'bg-red-950/80 border-red-500/50 text-red-300',
+      };
+    }
+    if (gpsAccuracy === null) {
+      return {
+        label: 'Acquiring GPS…',
+        status: 'searching',
+        icon: 'satellite_alt',
+        colorClass: 'bg-emerald-950/60 border-emerald-800/40 text-emerald-300/80',
+      };
+    }
+    if (gpsAccuracy > 30) {
+      return {
+        label: `GPS Degraded (±${Math.round(gpsAccuracy)}m)`,
+        status: 'degraded',
+        icon: 'gps_not_fixed',
+        colorClass: 'bg-red-950/80 border-red-500/50 text-red-300',
+      };
+    }
+    if (gpsAccuracy > 15) {
+      return {
+        label: `GPS Fair (±${Math.round(gpsAccuracy)}m)`,
+        status: 'fair',
+        icon: 'gps_fixed',
+        colorClass: 'bg-amber-950/80 border-amber-500/50 text-amber-300',
+      };
+    }
+    return {
+      label: `GPS Good (±${Math.round(gpsAccuracy)}m)`,
+      status: 'good',
+      icon: 'gps_fixed',
+      colorClass: 'bg-emerald-950/80 border-emerald-800/50 text-emerald-300',
+    };
+  };
+
+  const gpsStatus = getGpsStatus();
+
   return (
     <div className="min-h-screen bg-[#112214] text-white p-4 sm:p-6 max-w-lg mx-auto flex flex-col justify-between relative overflow-hidden select-none">
       <div className="absolute inset-0 bg-[radial-gradient(#2a4d31_1px,transparent_1px)] [background-size:16px_16px] opacity-30 pointer-events-none" />
@@ -379,8 +447,62 @@ export const ActiveTripScreen: React.FC = () => {
         </button>
       </div>
       {gpsSignalLost && <div className="relative z-20 mt-3 rounded-xl border border-amber-500/50 bg-amber-950/90 px-3 py-2 text-xs text-amber-100 shadow-lg"><div className="flex items-center gap-2"><span className="material-symbols-outlined text-amber-400 text-base">location_off</span><div className="min-w-0 flex-1"><div className="font-bold text-white">GPS signal lost</div><div className="text-[11px] text-amber-200/90">Reconnecting… trip will be marked incomplete in {gpsRecoverySeconds}s if GPS does not return.</div></div><span className="font-mono font-black text-amber-300">{gpsRecoverySeconds}s</span></div></div>}
-      <div className="relative z-10 my-auto py-6 text-center space-y-6"><div className="relative w-64 h-64 mx-auto flex items-center justify-center"><svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" stroke="#1b3620" strokeWidth="6" fill="transparent" /><circle cx="50" cy="50" r="42" stroke={currentSpeed > 90 ? '#ef4444' : currentSpeed > 80 ? '#f59e0b' : '#10b981'} strokeWidth="8" strokeDasharray={264} strokeDashoffset={264 - (264 * Math.min(currentSpeed, 120)) / 120} fill="transparent" strokeLinecap="round" className="transition-all duration-500 ease-out" /></svg><div className="absolute inset-0 flex flex-col items-center justify-center space-y-1"><span className={`text-6xl font-black font-mono tracking-tight transition-colors duration-300 ${currentSpeed > 90 ? 'text-red-500 animate-pulse' : currentSpeed > 80 ? 'text-amber-400' : 'text-emerald-300'}`}>{currentSpeed}</span><span className="text-xs font-bold font-mono tracking-widest text-emerald-400/80 uppercase">KM / H</span>{isPaused && <Badge variant="warning" className="text-[10px] mt-1">PAUSED</Badge>}</div></div>
-        <div className="flex items-center justify-center gap-4 text-xs font-mono"><div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">Max Speed: <span className="font-bold text-white">{maxSpeed} km/h</span></div><div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span></div></div>
+      <div className="relative z-10 my-auto py-6 text-center space-y-6">
+        <div className="relative w-64 h-64 mx-auto flex items-center justify-center">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" stroke="#1b3620" strokeWidth="6" fill="transparent" />
+            <circle cx="50" cy="50" r="42" stroke={currentSpeed > 90 ? '#ef4444' : currentSpeed > 80 ? '#f59e0b' : '#10b981'} strokeWidth="8" strokeDasharray={264} strokeDashoffset={264 - (264 * Math.min(currentSpeed, 120)) / 120} fill="transparent" strokeLinecap="round" className="transition-all duration-500 ease-out" />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center space-y-1">
+            <span className={`text-6xl font-black font-mono tracking-tight transition-colors duration-300 ${currentSpeed > 90 ? 'text-red-500 animate-pulse' : currentSpeed > 80 ? 'text-amber-400' : 'text-emerald-300'}`}>
+              {currentSpeed}
+            </span>
+            <span className="text-xs font-bold font-mono tracking-widest text-emerald-400/80 uppercase">KM / H</span>
+            {isPaused && <Badge variant="warning" className="text-[10px] mt-1">PAUSED</Badge>}
+          </div>
+        </div>
+
+        {/* Live GPS Quality & Online Connectivity Status Bar */}
+        <div
+          id="live-telemetry-status-bar"
+          data-testid="live-telemetry-status-bar"
+          className="flex items-center justify-center gap-2 flex-wrap"
+        >
+          <div
+            id="gps-status-badge"
+            data-testid="gps-status-badge"
+            data-status={gpsStatus.status}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono font-medium shadow-sm transition-colors duration-200 ${gpsStatus.colorClass}`}
+          >
+            <span className="material-symbols-outlined text-xs">{gpsStatus.icon}</span>
+            <span>{gpsStatus.label}</span>
+          </div>
+
+          <div
+            id="connectivity-status-badge"
+            data-testid="connectivity-status-badge"
+            data-online={isOnline ? 'true' : 'false'}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono font-medium shadow-sm transition-colors duration-200 ${
+              isOnline
+                ? 'bg-emerald-950/80 border-emerald-800/50 text-emerald-300'
+                : 'bg-amber-950/80 border-amber-500/50 text-amber-300'
+            }`}
+          >
+            <span className="material-symbols-outlined text-xs">
+              {isOnline ? 'wifi' : 'wifi_off'}
+            </span>
+            <span>{isOnline ? 'Online' : 'Offline (Local Log)'}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-4 text-xs font-mono">
+          <div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">
+            Max Speed: <span className="font-bold text-white">{maxSpeed} km/h</span>
+          </div>
+          <div className="bg-emerald-950/80 border border-emerald-800/40 px-3 py-1.5 rounded-xl text-emerald-200">
+            Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span>
+          </div>
+        </div>
         <div className="space-y-2 max-w-sm mx-auto text-left">{currentSpeed > 90 ? <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl flex items-center gap-3 text-red-200 text-xs animate-bounce"><span className="material-symbols-outlined text-red-400 text-xl">warning</span><div><div className="font-bold text-white">Overspeed Violation Detected!</div><div className="text-[11px] text-red-300/90">Vehicle traveling over 90 km/h threshold on Thika Road.</div></div></div> : currentSpeed > 80 ? <div className="bg-amber-950/80 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3 text-amber-200 text-xs"><span className="material-symbols-outlined text-amber-400 text-xl">speed</span><div><div className="font-bold text-white">Approaching Speed Limit</div><div className="text-[11px] text-amber-300/90">Speed is 81–90 km/h. Drive cautiously.</div></div></div> : <div className="bg-emerald-950/60 border border-emerald-800/50 p-3 rounded-xl flex items-center gap-3 text-emerald-200 text-xs"><span className="material-symbols-outlined text-emerald-400 text-xl">verified</span><div><div className="font-bold text-white">Route Normal & Safe</div><div className="text-[11px] text-emerald-300/80">Speed within legal safety limit. Co-riders online: 4</div></div></div>}</div>
       </div>
       <div className="relative z-10 flex items-center justify-between border-t border-emerald-900/50 pt-3">

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog } from '../../../components/ui/Dialog';
 import { Button } from '../../../components/ui/Button';
+import { Badge } from '../../../components/ui/Badge';
+import { riskTierToBadgeVariant } from '../../../lib/severity';
 import { useToast } from '../../../components/ui/Toast';
 import { functionsService } from '../../../services/functionsService';
 import { pointsService } from '../../../services/pointsService';
@@ -103,13 +105,6 @@ export const HazardConfirmationSheet: React.FC<HazardConfirmationSheetProps> = (
     }
   };
 
-  const severityBadgeClass =
-    severity === 'critical' || severity === 'high'
-      ? 'bg-rose-100 text-rose-800 border-rose-200'
-      : severity === 'medium'
-      ? 'bg-amber-100 text-amber-800 border-amber-200'
-      : 'bg-emerald-100 text-emerald-800 border-emerald-200';
-
   return (
     <Dialog isOpen={isOpen} onClose={onClose} title={hazardTitle || 'Road Hazard Report'}>
       <div id="hazard-confirmation-sheet" className="space-y-4 text-xs text-slate-800">
@@ -120,9 +115,9 @@ export const HazardConfirmationSheet: React.FC<HazardConfirmationSheetProps> = (
               <MapPin className="w-4 h-4 text-emerald-600 flex-shrink-0" />
               <span className="truncate">{locationName}</span>
             </div>
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${severityBadgeClass}`}>
+            <Badge variant={riskTierToBadgeVariant(severity)} className="uppercase text-[10px] tracking-wider">
               {severity} Risk
-            </span>
+            </Badge>
           </div>
           {typeof distanceKm === 'number' && (
             <p className="text-slate-500 text-[11px]">

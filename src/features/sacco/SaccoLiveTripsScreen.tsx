@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 
 interface LiveTripItem {
@@ -232,7 +233,7 @@ export const SaccoLiveTripsScreen: React.FC = () => {
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <Badge variant={inc.severity === 'high' ? 'danger' : 'warning'} className="uppercase font-mono text-[10px]">
+                  <Badge variant={severityToBadgeVariant(inc.severity)} className="uppercase font-mono text-[10px]">
                     {inc.type}
                   </Badge>
                   <span className="font-mono font-bold text-sm text-primary">{inc.plate}</span>

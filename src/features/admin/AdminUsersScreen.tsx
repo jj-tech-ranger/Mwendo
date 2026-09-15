@@ -212,7 +212,7 @@ export const AdminUsersScreen: React.FC = () => {
             <span className="material-symbols-outlined text-emerald-500">check_circle</span>
             <span>{actionSuccess}</span>
           </div>
-          <button onClick={() => setActionSuccess(null)} className="text-outline hover:text-on-surface">
+          <button onClick={() => setActionSuccess(null)} className="text-outline hover:text-on-surface" aria-label="Dismiss user action notification">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
@@ -424,6 +424,7 @@ export const AdminUsersScreen: React.FC = () => {
               <button
                 onClick={() => setSelectedUser(null)}
                 className="p-1 rounded-xl hover:bg-surface-container text-on-surface-variant"
+                aria-label="Close user details modal"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>

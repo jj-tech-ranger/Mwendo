@@ -9,6 +9,7 @@ import { tripRepository, violationRepository, vehicleRepository, complaintReposi
 import { calculateSaccoSafetyScore } from '../../lib/engine';
 import { where } from 'firebase/firestore';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 import { toStandardDate } from '../../lib/utils';
 import { Trip } from '../../types';
@@ -334,7 +335,7 @@ export const SaccoDashboard: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <Badge
-                      variant={r.severity === 'high' ? 'danger' : r.severity === 'medium' ? 'warning' : 'neutral'}
+                      variant={severityToBadgeVariant(r.severity)}
                       className="text-[10px] font-mono uppercase"
                     >
                       {r.severity}

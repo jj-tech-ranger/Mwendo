@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { normalizePlate } from './plate';
+export * from './severity';
 
 export { normalizePlate };
 

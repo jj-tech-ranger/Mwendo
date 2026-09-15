@@ -150,7 +150,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">fact_check</span>
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)}>
+          <button onClick={() => setSuccessMsg(null)} aria-label="Dismiss inspection status message">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
@@ -334,6 +334,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 type="button"
                 onClick={() => setShowModal(false)}
                 className="text-on-surface-variant hover:text-on-surface"
+                aria-label="Close vehicle inspection modal"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>

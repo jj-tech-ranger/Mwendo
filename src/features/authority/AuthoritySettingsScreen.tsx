@@ -88,7 +88,7 @@ export const AuthoritySettingsScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">check_circle</span>
             <span>Inspector Profile & Jurisdiction Scope updated successfully!</span>
           </div>
-          <button onClick={() => setSavedSuccess(false)}>
+          <button onClick={() => setSavedSuccess(false)} aria-label="Dismiss profile update message">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>

@@ -48,6 +48,7 @@ export const Drawer: React.FC<DrawerProps> = ({
           {title && <h3 className="font-headline-lg-mobile text-lg text-on-surface font-bold">{title}</h3>}
           <button
             onClick={onClose}
+            aria-label="Close drawer"
             className="p-1 rounded-full text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors ml-auto"
           >
             <span className="material-symbols-outlined text-xl">close</span>

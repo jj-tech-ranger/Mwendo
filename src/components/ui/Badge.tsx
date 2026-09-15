@@ -1,8 +1,10 @@
 import React from 'react';
 import { cn } from '../../lib/utils';
 
-interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
-  variant?: 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+export type BadgeVariant = 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: BadgeVariant;
 }
 
 export const Badge: React.FC<BadgeProps> = ({

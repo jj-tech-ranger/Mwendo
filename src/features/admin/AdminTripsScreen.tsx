@@ -194,6 +194,7 @@ export const AdminTripsScreen: React.FC = () => {
               <button
                 onClick={() => setSelectedTrip(null)}
                 className="p-1 rounded-xl hover:bg-surface-container text-on-surface-variant"
+                aria-label="Close trip details drawer"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
@@ -262,6 +263,7 @@ export const AdminTripsScreen: React.FC = () => {
               <button
                 onClick={() => setShowRawTelemetryModal(false)}
                 className="text-emerald-400 hover:text-white"
+                aria-label="Close raw telemetry modal"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>

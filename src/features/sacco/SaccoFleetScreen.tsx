@@ -12,6 +12,7 @@ import { where } from 'firebase/firestore';
 import { Vehicle } from '../../types';
 import { normalizePlate } from '../../lib/plate';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { riskTierToBadgeVariant } from '../../lib/severity';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 interface ProvisionalVehicle {
@@ -196,7 +197,7 @@ export const SaccoFleetScreen: React.FC = () => {
               { route: 'Mombasa Road Corridor', count: 12, risk: 'Moderate Risk' },
               { route: 'Waiyaki Way Express', count: 8, risk: 'Low Risk' },
             ].map((r, i) => (
-              <div key={i} className="p-3 bg-surface-container rounded-xl flex items-center justify-between"><div className="font-bold text-xs">{r.route}</div><div className="flex items-center gap-3"><span className="font-mono text-xs text-on-surface-variant">{r.count} vehicles</span><Badge variant={r.risk === 'Low Risk' ? 'success' : 'warning'} className="text-[10px]">{r.risk}</Badge></div></div>
+              <div key={i} className="p-3 bg-surface-container rounded-xl flex items-center justify-between"><div className="font-bold text-xs">{r.route}</div><div className="flex items-center gap-3"><span className="font-mono text-xs text-on-surface-variant">{r.count} vehicles</span><Badge variant={riskTierToBadgeVariant(r.risk)} className="text-[10px]">{r.risk}</Badge></div></div>
             ))}</div>
           </Card>
         </div>

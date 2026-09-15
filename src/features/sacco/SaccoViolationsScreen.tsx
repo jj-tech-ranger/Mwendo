@@ -11,6 +11,7 @@ import { violationRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
 import { Violation } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 
 export const SaccoViolationsScreen: React.FC = () => {
@@ -69,54 +70,70 @@ export const SaccoViolationsScreen: React.FC = () => {
       />
 
       {/* Table of Violations */}
-      <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-          <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
-            <tr>
-              <th className="p-3.5">Violation ID</th>
-              <th className="p-3.5">Plate Number</th>
-              <th className="p-3.5">Speed / Limit</th>
-              <th className="p-3.5">Location</th>
-              <th className="p-3.5">Severity</th>
-              <th className="p-3.5">Corroborated</th>
-              <th className="p-3.5 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-outline-variant/20 font-medium">
-            {filtered.map((v) => (
-              <tr key={v.id} className="hover:bg-surface-container/50">
-                <td className="p-3.5 font-mono text-primary font-bold">{v.violationId || v.id}</td>
-                <td className="p-3.5 font-mono font-bold">{v.vehicleRegNumber}</td>
-                <td className="p-3.5 font-mono text-error font-bold">
-                  {v.recordedSpeedKmH} km/h <span className="text-on-surface-variant font-normal">/ {v.speedLimitKmH} limit</span>
-                </td>
-                <td className="p-3.5">{v.locationName || v.routeName}</td>
-                <td className="p-3.5">
-                  <Badge variant={v.severity === 'high' ? 'danger' : 'warning'} className="uppercase text-[10px]">
-                    {v.severity}
-                  </Badge>
-                </td>
-                <td className="p-3.5 font-mono">
-                  {v.isCorroborated ? (
-                    <span className="text-emerald-700 font-bold flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">check_circle</span> Yes
-                    </span>
-                  ) : (
-                    <span className="text-on-surface-variant">No</span>
-                  )}
-                </td>
-                <td className="p-3.5 text-right">
-                  <Button variant="ghost" className="h-8 text-[11px]" onClick={() => setSelectedViolation(v)}>
-                    Details
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {loading ? (
+        <div className="p-12 text-center text-xs text-on-surface-variant font-mono">
+          Loading safety violations...
         </div>
-      </Card>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          icon={searchTerm ? 'search_off' : 'verified_user'}
+          title={searchTerm ? 'No Matching Violations' : 'No Violations Recorded'}
+          description={
+            searchTerm
+              ? `No recorded violations match "${searchTerm}".`
+              : 'No violations recorded in the selected period.'
+          }
+        />
+      ) : (
+        <Card className="p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+            <thead className="bg-surface-container-high border-b border-outline-variant/30 font-mono uppercase text-on-surface-variant">
+              <tr>
+                <th className="p-3.5">Violation ID</th>
+                <th className="p-3.5">Plate Number</th>
+                <th className="p-3.5">Speed / Limit</th>
+                <th className="p-3.5">Location</th>
+                <th className="p-3.5">Severity</th>
+                <th className="p-3.5">Corroborated</th>
+                <th className="p-3.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/20 font-medium">
+              {filtered.map((v) => (
+                <tr key={v.id} className="hover:bg-surface-container/50">
+                  <td className="p-3.5 font-mono text-primary font-bold">{v.violationId || v.id}</td>
+                  <td className="p-3.5 font-mono font-bold">{v.vehicleRegNumber}</td>
+                  <td className="p-3.5 font-mono text-error font-bold">
+                    {v.recordedSpeedKmH} km/h <span className="text-on-surface-variant font-normal">/ {v.speedLimitKmH} limit</span>
+                  </td>
+                  <td className="p-3.5">{v.locationName || v.routeName}</td>
+                  <td className="p-3.5">
+                    <Badge variant={severityToBadgeVariant(v.severity)} className="uppercase text-[10px]">
+                      {v.severity}
+                    </Badge>
+                  </td>
+                  <td className="p-3.5 font-mono">
+                    {v.isCorroborated ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-1">
+                        <span className="material-symbols-outlined text-sm">check_circle</span> Yes
+                      </span>
+                    ) : (
+                      <span className="text-on-surface-variant">No</span>
+                    )}
+                  </td>
+                  <td className="p-3.5 text-right">
+                    <Button variant="ghost" className="h-8 text-[11px]" onClick={() => setSelectedViolation(v)}>
+                      Details
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          </div>
+        </Card>
+      )}
 
       {/* VIOLATION DETAILS MODAL */}
       <Dialog
@@ -149,9 +166,18 @@ export const SaccoViolationsScreen: React.FC = () => {
               <span className="font-bold block">GPS Location Pin</span>
               <p className="text-on-surface-variant">{selectedViolation.locationName}</p>
               <div className="text-[10px] font-mono text-primary font-bold pt-1 flex items-center justify-between">
-                <span>Verification Confidence: {Math.round((typeof selectedViolation.confidenceScore === 'number' ? selectedViolation.confidenceScore : 0.95) * 100)}%</span>
+                <span>
+                  Verification Confidence:{' '}
+                  {typeof selectedViolation.confidenceScore === 'number' && !Number.isNaN(selectedViolation.confidenceScore)
+                    ? `${Math.round(selectedViolation.confidenceScore * 100)}%`
+                    : 'Not available'}
+                </span>
                 <span className="text-on-surface-variant text-[9px] font-normal">
-                  (Risk Weight: {(typeof selectedViolation.confidenceScore === 'number' ? selectedViolation.confidenceScore : 0.95).toFixed(2)}x)
+                  (Risk Weight:{' '}
+                  {typeof selectedViolation.confidenceScore === 'number' && !Number.isNaN(selectedViolation.confidenceScore)
+                    ? `${selectedViolation.confidenceScore.toFixed(2)}x`
+                    : '—'}
+                  )
                 </span>
               </div>
             </div>

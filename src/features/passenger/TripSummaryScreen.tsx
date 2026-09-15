@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { riskTierToBadgeVariant } from '../../lib/severity';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../lib/firebase';
 import { Trip, GenerateTripSummaryPayload, GenerateTripSummaryResult } from '../../types';
@@ -252,7 +253,7 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
             <span className="material-symbols-outlined text-base">auto_awesome</span>
             <span>AI Safety Assessment</span>
           </div>
-          <Badge variant={aiRiskTier === 'low' ? 'success' : aiRiskTier === 'moderate' ? 'warning' : 'danger'} className="text-[10px]">
+          <Badge variant={riskTierToBadgeVariant(aiRiskTier)} className="text-[10px]">
             {aiRiskTier.toUpperCase()} RISK
           </Badge>
         </div>

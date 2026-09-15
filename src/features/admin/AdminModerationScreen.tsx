@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
 import { Violation } from '../../types';
 import { toStandardDate } from '../../lib/utils';
+import { severityToBadgeVariant } from '../../lib/severity';
 
 export const AdminModerationScreen: React.FC = () => {
   const { showToast } = useToast();
@@ -179,7 +180,7 @@ export const AdminModerationScreen: React.FC = () => {
       {toastMsg && (
         <div className="p-md rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 font-body-sm text-xs flex items-center justify-between">
           <span>{toastMsg}</span>
-          <button onClick={() => setToastMsg(null)} className="text-outline">
+          <button onClick={() => setToastMsg(null)} className="text-outline" aria-label="Dismiss moderation notification">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
@@ -258,13 +259,7 @@ export const AdminModerationScreen: React.FC = () => {
                         {violation.vehicleRegNumber}
                       </span>
                       <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            violation.severity === 'critical' || violation.severity === 'high'
-                              ? 'danger'
-                              : 'warning'
-                          }
-                        >
+                        <Badge variant={severityToBadgeVariant(violation.severity)}>
                           {violation.severity.toUpperCase()}
                         </Badge>
                         <span className="font-label-mono text-[10px] text-outline">
@@ -318,13 +313,7 @@ export const AdminModerationScreen: React.FC = () => {
                     Violation Adjudication & Evidence Review
                   </h3>
                 </div>
-                <Badge
-                  variant={
-                    selectedViolation.severity === 'critical' || selectedViolation.severity === 'high'
-                      ? 'danger'
-                      : 'warning'
-                  }
-                >
+                <Badge variant={severityToBadgeVariant(selectedViolation.severity)}>
                   {selectedViolation.severity.toUpperCase()} SEVERITY
                 </Badge>
               </div>

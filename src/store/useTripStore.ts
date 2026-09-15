@@ -16,6 +16,7 @@ interface PersistedTripState {
   durationSeconds: number;
   overspeedCount: number;
   routeCoordinates: GPSPoint[];
+  lastGpsAccuracy: number | null;
   saccoId: string | undefined;
   saccoName: string;
   routeName: string;
@@ -43,6 +44,7 @@ const EMPTY_TRIP_STATE: PersistedTripState = {
   durationSeconds: 0,
   overspeedCount: 0,
   routeCoordinates: [],
+  lastGpsAccuracy: null,
   saccoId: undefined,
   saccoName: '',
   routeName: '',
@@ -68,6 +70,7 @@ function loadPersistedTrip(): PersistedTripState {
       ...parsed,
       saccoId,
       telemetrySampleCount,
+      lastGpsAccuracy: typeof parsed.lastGpsAccuracy === 'number' ? parsed.lastGpsAccuracy : null,
       routeCoordinates: Array.isArray(parsed.routeCoordinates) ? parsed.routeCoordinates : [],
     };
   } catch {
@@ -92,6 +95,7 @@ function persistTrip(state: TripState) {
         durationSeconds: state.durationSeconds,
         overspeedCount: state.overspeedCount,
         routeCoordinates: state.routeCoordinates,
+        lastGpsAccuracy: state.lastGpsAccuracy,
         saccoId: state.saccoId,
         saccoName: state.saccoName,
         routeName: state.routeName,
@@ -196,6 +200,7 @@ export const useTripStore = create<TripState>((set, get) => ({
       durationSeconds: 0,
       overspeedCount: 0,
       routeCoordinates: [],
+      lastGpsAccuracy: null,
       plateNumber: cleanPlate,
       saccoId,
       saccoName: saccoName || saccoId,
@@ -242,6 +247,7 @@ export const useTripStore = create<TripState>((set, get) => ({
         avgSpeed: nextAvgSpeed,
         telemetrySampleCount: nextTelemetrySampleCount,
         routeCoordinates: updatedCoords,
+        lastGpsAccuracy: typeof gps?.accuracy === 'number' ? gps.accuracy : current.lastGpsAccuracy,
         activeTrip: current.activeTrip
           ? {
               ...current.activeTrip,

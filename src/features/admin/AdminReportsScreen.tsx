@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { limit } from 'firebase/firestore';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { blackSpotRepository } from '../../repositories';
 import { BlackSpot } from '../../types';
 
@@ -124,7 +125,7 @@ export const AdminReportsScreen: React.FC = () => {
                           <p className="text-[10px] text-outline">{r.county}</p>
                         </td>
                         <td className="p-md">
-                          <Badge variant={r.severity === 'critical' ? 'danger' : 'warning'}>{r.severity}</Badge>
+                          <Badge variant={severityToBadgeVariant(r.severity)}>{r.severity}</Badge>
                         </td>
                         <td className="p-md font-label-mono font-bold text-xs">{r.corroborationCount ?? 1} Commuters</td>
                         <td className="p-md font-label-mono font-bold text-primary">{r.confidenceScore ?? 80}%</td>

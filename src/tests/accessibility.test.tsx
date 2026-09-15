@@ -155,4 +155,60 @@ describe('Accessibility Audit (axe-core)', () => {
     expect(input.getAttribute('aria-invalid')).toBe('false');
     expect(queryByRole('alert')).toBeNull();
   });
+
+  it('Drawer component close button has an accessible name and passes accessibility check', async () => {
+    const { container, getByRole } = render(
+      <div role="region" aria-label="Drawer container">
+        <div id="drawer-root">
+          <div className="flex justify-between items-center">
+            <h3>Test Drawer</h3>
+            <button
+              onClick={() => {}}
+              aria-label="Close drawer"
+              className="p-1 rounded-full"
+            >
+              <span className="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+    const closeBtn = getByRole('button', { name: 'Close drawer' });
+    expect(closeBtn).toBeDefined();
+    expect(closeBtn.getAttribute('aria-label')).toBe('Close drawer');
+
+    await checkA11y(container);
+  });
+
+  it('Admin and Authority notification dismiss buttons have context-appropriate accessible names', async () => {
+    const { container, getByRole } = render(
+      <div>
+        <div className="p-2 flex justify-between items-center">
+          <span>Global maintenance mode activated</span>
+          <button onClick={() => {}} aria-label="Dismiss maintenance notification">
+            <span>close</span>
+          </button>
+        </div>
+        <div className="p-2 flex justify-between items-center">
+          <span>User roles updated</span>
+          <button onClick={() => {}} aria-label="Dismiss user action notification">
+            <span>close</span>
+          </button>
+        </div>
+        <div className="p-2 flex justify-between items-center">
+          <span>Official black spot published</span>
+          <button onClick={() => {}} aria-label="Dismiss black spot action message">
+            <span>close</span>
+          </button>
+        </div>
+      </div>
+    );
+
+    expect(getByRole('button', { name: 'Dismiss maintenance notification' })).toBeDefined();
+    expect(getByRole('button', { name: 'Dismiss user action notification' })).toBeDefined();
+    expect(getByRole('button', { name: 'Dismiss black spot action message' })).toBeDefined();
+
+    await checkA11y(container);
+  });
 });

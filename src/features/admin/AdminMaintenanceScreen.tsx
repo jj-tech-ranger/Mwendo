@@ -95,7 +95,7 @@ export const AdminMaintenanceScreen: React.FC = () => {
       {toastMsg && (
         <div className="p-md rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 font-body-sm text-xs flex items-center justify-between">
           <span>{toastMsg}</span>
-          <button onClick={() => setToastMsg(null)} className="text-outline">
+          <button onClick={() => setToastMsg(null)} className="text-outline" aria-label="Dismiss maintenance notification">
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>

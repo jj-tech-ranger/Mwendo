@@ -9,6 +9,7 @@ import {
   query,
   setDoc,
   updateDoc,
+  onSnapshot,
   QueryConstraint,
   DocumentData,
   Timestamp,
@@ -87,10 +88,23 @@ export function createConverter<T extends { id: string }>(): FirestoreDataConver
 export class BaseRepository<T extends { id: string }> {
   public readonly collectionName: string;
   protected converter: FirestoreDataConverter<T>;
+  protected subscribers: Set<(items: T[]) => void> = new Set();
 
   constructor(collectionName: string) {
     this.collectionName = collectionName;
     this.converter = createConverter<T>();
+  }
+
+  protected notifySubscribers(): void {
+    const store = inMemoryStore[this.collectionName];
+    const items = store && store.size > 0 ? (Array.from(store.values()) as T[]) : [];
+    this.subscribers.forEach((cb) => {
+      try {
+        cb(items);
+      } catch (err) {
+        console.warn(`[BaseRepository] subscriber notification error for ${this.collectionName}:`, err);
+      }
+    });
   }
 
   protected getCollection() {
@@ -148,6 +162,7 @@ export class BaseRepository<T extends { id: string }> {
       inMemoryStore[this.collectionName] = store;
     }
     store.set(data.id, data);
+    this.notifySubscribers();
 
     if (hasRealConfig) {
       try {
@@ -163,7 +178,8 @@ export class BaseRepository<T extends { id: string }> {
     const store = inMemoryStore[this.collectionName];
     if (store && store.has(id)) {
       const existing = store.get(id) as Record<string, unknown>;
-      store.set(id, { ...existing, ...data });
+      store.set(id, { ...existing, ...data } as T);
+      this.notifySubscribers();
     }
 
     if (hasRealConfig) {
@@ -173,5 +189,47 @@ export class BaseRepository<T extends { id: string }> {
         console.error(`[BaseRepository] update error for ${this.collectionName}/${id}:`, err);
       }
     }
+  }
+
+  subscribe(
+    constraints: QueryConstraint[] = [],
+    callback: (data: T[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
+    if (hasRealConfig) {
+      try {
+        const q = constraints.length > 0 ? query(this.getCollection(), ...constraints) : this.getCollection();
+        const unsubscribe = onSnapshot(
+          q,
+          (snapshot) => {
+            const items = snapshot.docs.map((docSnap) => docSnap.data());
+            callback(items);
+          },
+          (err) => {
+            console.warn(`[BaseRepository] onSnapshot error for ${this.collectionName}:`, err);
+            if (onError) onError(err);
+          }
+        );
+        return unsubscribe;
+      } catch (err) {
+        console.warn(`[BaseRepository] subscribe setup error for ${this.collectionName}:`, err);
+        if (onError && err instanceof Error) onError(err);
+      }
+    }
+
+    const handler = (items: T[]) => {
+      callback(items);
+    };
+
+    this.subscribers.add(handler);
+
+    // Initial sync
+    const store = inMemoryStore[this.collectionName];
+    const initialItems = store && store.size > 0 ? (Array.from(store.values()) as T[]) : [];
+    callback(initialItems);
+
+    return () => {
+      this.subscribers.delete(handler);
+    };
   }
 }

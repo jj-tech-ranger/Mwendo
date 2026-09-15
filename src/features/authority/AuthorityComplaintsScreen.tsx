@@ -87,7 +87,7 @@ export const AuthorityComplaintsScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">rate_review</span>
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg(null)}>
+          <button onClick={() => setSuccessMsg(null)} aria-label="Dismiss complaint status message">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
@@ -203,6 +203,7 @@ export const AuthorityComplaintsScreen: React.FC = () => {
               <button
                 onClick={() => setSelectedComplaint(null)}
                 className="text-on-surface-variant hover:text-on-surface"
+                aria-label="Close complaint details modal"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>

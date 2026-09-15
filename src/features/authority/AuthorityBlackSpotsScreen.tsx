@@ -7,6 +7,7 @@ import { BlackSpot, SeverityLevel, HazardType } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { severityToBadgeVariant } from '../../lib/severity';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useToast } from '../../components/ui/Toast';
@@ -225,7 +226,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
             <span className="material-symbols-outlined text-lg">verified</span>
             <span>{actionMessage}</span>
           </div>
-          <button onClick={() => setActionMessage(null)}>
+          <button onClick={() => setActionMessage(null)} aria-label="Dismiss black spot action message">
             <span className="material-symbols-outlined text-base">close</span>
           </button>
         </div>
@@ -339,7 +340,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
                         {spot.hazardType || 'accident_prone'}
                       </td>
                       <td className="py-3 px-3">
-                        <Badge variant={spot.severity === 'critical' ? 'danger' : 'warning'}>
+                        <Badge variant={severityToBadgeVariant(spot.severity)}>
                           {spot.severity.toUpperCase()}
                         </Badge>
                       </td>
@@ -444,6 +445,7 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
                 type="button"
                 onClick={() => setShowAddModal(false)}
                 className="text-on-surface-variant hover:text-on-surface"
+                aria-label="Close publish black spot modal"
               >
                 <span className="material-symbols-outlined text-lg">close</span>
               </button>
