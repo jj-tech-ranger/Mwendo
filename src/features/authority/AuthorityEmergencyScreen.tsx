@@ -229,9 +229,16 @@ export const AuthorityEmergencyScreen: React.FC = () => {
               </div>
             </div>
 
+            <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded-xl text-[11px] text-amber-200/90 flex items-start gap-2">
+              <span className="material-symbols-outlined text-amber-400 text-sm mt-0.5 shrink-0">info</span>
+              <span>
+                Note: Telephony and CAD integrations with Kenya Police and NTSA patrols are not connected. Actions below record internal audit entries and acknowledge the incident.
+              </span>
+            </div>
+
             <div className="space-y-2">
               <p className="font-label-mono text-[11px] text-on-surface-variant uppercase">
-                Select Dispatch Action:
+                Log Operational Action:
               </p>
 
               <Button
@@ -240,12 +247,12 @@ export const AuthorityEmergencyScreen: React.FC = () => {
                 onClick={() =>
                   handleDispatchAction(
                     selectedAlert.id,
-                    `Dispatched Kenya Police Service Highway Unit to intercept vehicle ${selectedAlert.vehicleRegNumber}`
+                    `Logged police dispatch request for vehicle ${selectedAlert.vehicleRegNumber} (external dispatch manual/pending)`
                   )
                 }
               >
                 <span className="material-symbols-outlined text-lg">local_police</span>
-                Dispatch Kenya Police Highway Unit
+                Log Police Dispatch Request
               </Button>
 
               <Button
@@ -254,12 +261,12 @@ export const AuthorityEmergencyScreen: React.FC = () => {
                 onClick={() =>
                   handleDispatchAction(
                     selectedAlert.id,
-                    `Dispatched NTSA Mobile Safety Inspection Patrol to ${selectedAlert.vehicleRegNumber}`
+                    `Recorded NTSA mobile patrol referral for ${selectedAlert.vehicleRegNumber}`
                   )
                 }
               >
                 <span className="material-symbols-outlined text-lg">minor_crash</span>
-                Dispatch NTSA Mobile Patrol
+                Record NTSA Patrol Referral
               </Button>
 
               <Button

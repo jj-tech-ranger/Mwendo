@@ -18,7 +18,6 @@ export const ReportBlackSpotScreen: React.FC = () => {
   const user = useAuthStore((s) => s.user);
 
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // Step 4 is Confirmation
-  const [isOfflineQueued, setIsOfflineQueued] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationSource, setLocationSource] = useState<'gps' | 'manual' | null>(null);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'requesting' | 'acquired' | 'denied' | 'error'>('requesting');
@@ -34,6 +33,10 @@ export const ReportBlackSpotScreen: React.FC = () => {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+  // Distinguishes "the server confirmed receiving this report" from "this is saved on the
+  // device only and hasn't reached the server yet." The confirmation screen must not say
+  // "Report Submitted" for the latter — see handleSubmit below.
+  const [wasTransmitted, setWasTransmitted] = useState(true);
 
   // Real Geolocation Request
   const requestGpsLocation = useCallback(() => {
@@ -152,7 +155,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
           void pointsService.awardPoints(user.uid, 'black_spot_reported');
         }
 
-        setIsOfflineQueued(false);
+        setWasTransmitted(true);
         setStep(4);
       } else {
         if (user?.uid) {
@@ -160,7 +163,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
         }
         await offlineStorage.setItem(`offline_report_${reportId}`, { ...newReport, retryCount: 0 });
         await offlineSyncService.updatePendingCount();
-        setIsOfflineQueued(true);
+        setWasTransmitted(false);
         setStep(4);
       }
     } catch (err: unknown) {
@@ -172,7 +175,7 @@ export const ReportBlackSpotScreen: React.FC = () => {
       console.warn('Network write failed, saving to offline buffer:', err);
       await offlineStorage.setItem(`offline_report_${reportId}`, { ...newReport, retryCount: 0 });
       await offlineSyncService.updatePendingCount();
-      setIsOfflineQueued(true);
+      setWasTransmitted(false);
       setStep(4);
     } finally {
       setIsSubmitting(false);
@@ -185,81 +188,50 @@ export const ReportBlackSpotScreen: React.FC = () => {
       <div className="min-h-screen bg-background text-on-background p-6 max-w-lg mx-auto flex flex-col justify-center items-center text-center space-y-6 animate-in fade-in">
         <BrandMark className="w-12 h-12 mb-2" />
 
-        {isOfflineQueued ? (
-          <div
-            id="icon-report-queued"
-            data-testid="icon-report-queued"
-            className="w-20 h-20 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center ring-8 ring-amber-500/20"
-          >
-            <span className="material-symbols-outlined text-4xl">cloud_off</span>
-          </div>
-        ) : (
-          <div
-            id="icon-report-submitted"
-            data-testid="icon-report-submitted"
-            className="w-20 h-20 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center ring-8 ring-emerald-500/20 animate-bounce"
-          >
-            <span className="material-symbols-outlined text-4xl">check_circle</span>
-          </div>
-        )}
+        <div
+          id={wasTransmitted ? 'icon-report-submitted' : 'icon-report-queued'}
+          data-testid={wasTransmitted ? 'icon-report-submitted' : 'icon-report-queued'}
+          className={`w-20 h-20 rounded-full flex items-center justify-center ring-8 animate-bounce ${
+            wasTransmitted
+              ? 'bg-emerald-500/10 text-emerald-600 ring-emerald-500/20'
+              : 'bg-amber-500/10 text-amber-600 ring-amber-500/20'
+          }`}
+        >
+          <span className="material-symbols-outlined text-4xl">{wasTransmitted ? 'check_circle' : 'cloud_off'}</span>
+        </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-center gap-2">
-            {isOfflineQueued ? (
-              <>
-                <Badge
-                  id="badge-safety-points-queued"
-                  data-testid="badge-safety-points-queued"
-                  className="bg-amber-600 text-white font-bold px-3 py-1"
-                >
-                  +25 Safety Points (Pending Sync)
-                </Badge>
-                <Badge
-                  id="badge-trust-score-queued"
-                  data-testid="badge-trust-score-queued"
-                  className="bg-amber-800 text-white font-bold px-3 py-1"
-                >
-                  +10 Trust Score (Pending Sync)
-                </Badge>
-              </>
-            ) : (
-              <>
-                <Badge
-                  id="badge-safety-points-submitted"
-                  data-testid="badge-safety-points-submitted"
-                  className="bg-emerald-600 text-white font-bold px-3 py-1"
-                >
-                  +25 Safety Points
-                </Badge>
-                <Badge
-                  id="badge-trust-score-submitted"
-                  data-testid="badge-trust-score-submitted"
-                  className="bg-emerald-800 text-white font-bold px-3 py-1"
-                >
-                  +10 Trust Score
-                </Badge>
-              </>
-            )}
+            <Badge
+              id={wasTransmitted ? 'badge-safety-points-submitted' : 'badge-safety-points-queued'}
+              data-testid={wasTransmitted ? 'badge-safety-points-submitted' : 'badge-safety-points-queued'}
+              className="bg-emerald-600 text-white font-bold px-3 py-1"
+            >
+              +25 Safety Points
+            </Badge>
+            <Badge
+              id={wasTransmitted ? 'badge-trust-score-submitted' : 'badge-trust-score-queued'}
+              data-testid={wasTransmitted ? 'badge-trust-score-submitted' : 'badge-trust-score-queued'}
+              className="bg-emerald-800 text-white font-bold px-3 py-1"
+            >
+              +10 Trust Score
+            </Badge>
           </div>
-
           <h1
-            id={isOfflineQueued ? 'report-queued-title' : 'report-submitted-title'}
-            data-testid={isOfflineQueued ? 'report-queued-title' : 'report-submitted-title'}
+            id={wasTransmitted ? 'report-submitted-title' : 'report-queued-title'}
+            data-testid={wasTransmitted ? 'report-submitted-title' : 'report-queued-title'}
             className="text-2xl font-black text-on-surface"
           >
-            {isOfflineQueued
-              ? 'Report Saved — Will Send Automatically'
-              : 'Report Submitted — Thank You!'}
+            {wasTransmitted ? 'Report Submitted — Thank You!' : 'Report Saved — Will Send Automatically'}
           </h1>
-
           <p
-            id={isOfflineQueued ? 'report-queued-description' : 'report-submitted-description'}
-            data-testid={isOfflineQueued ? 'report-queued-description' : 'report-submitted-description'}
-            className="text-xs text-on-surface-variant max-w-xs mx-auto leading-relaxed"
+            id={wasTransmitted ? 'report-submitted-description' : 'report-queued-description'}
+            data-testid={wasTransmitted ? 'report-submitted-description' : 'report-queued-description'}
+            className="text-xs text-on-surface-variant max-w-xs mx-auto"
           >
-            {isOfflineQueued
-              ? "Your hazard report is safely stored on this device. It has not reached Mwendo's servers yet, but will transmit automatically once connectivity returns."
-              : 'Your hazard report helps keep fellow Kenyan commuters safe. Our authority team will review and corroborate it.'}
+            {wasTransmitted
+              ? "Your hazard report helps keep fellow Kenyan commuters safe. Our authority team will review and corroborate it."
+              : "Your device is offline (or the network request failed), so this report is saved on your phone and hasn't reached our servers yet. It will send automatically the next time you have a connection — you don't need to do anything."}
           </p>
         </div>
 
@@ -271,41 +243,14 @@ export const ReportBlackSpotScreen: React.FC = () => {
               GPS: {selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)} ({locationSource === 'gps' ? 'Live GPS' : 'Manual Pin'})
             </div>
           )}
-          {isOfflineQueued ? (
-            <div
-              id="status-report-queued"
-              data-testid="status-report-queued"
-              className="text-amber-700 dark:text-amber-400 font-bold uppercase mt-1 flex items-center gap-1"
-            >
-              <span className="material-symbols-outlined text-sm">schedule</span>
-              <span>Status: Queued Locally (Pending Sync)</span>
-            </div>
-          ) : (
-            <div
-              id="status-report-submitted"
-              data-testid="status-report-submitted"
-              className="text-emerald-700 font-bold uppercase mt-1"
-            >
-              Status: Pending Verification
-            </div>
-          )}
-        </Card>
-
-        {isOfflineQueued && (
           <div
-            id="offline-queue-info-card"
-            data-testid="offline-queue-info-card"
-            className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 dark:text-amber-200 text-xs text-left space-y-1 w-full"
+            id={wasTransmitted ? 'status-report-submitted' : 'status-report-queued'}
+            data-testid={wasTransmitted ? 'status-report-submitted' : 'status-report-queued'}
+            className={`font-bold uppercase mt-1 ${wasTransmitted ? 'text-emerald-700' : 'text-amber-700'}`}
           >
-            <div className="flex items-center gap-1.5 font-bold">
-              <span className="material-symbols-outlined text-sm text-amber-600">wifi_off</span>
-              <span>Saved to Offline Storage</span>
-            </div>
-            <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
-              This report is queued on your device and will be sent automatically when your network reconnects. You can monitor pending sync items in the banner at the top of the screen.
-            </p>
+            {wasTransmitted ? 'Status: Pending Verification' : 'Status: Saved on Device — Not Yet Sent'}
           </div>
-        )}
+        </Card>
 
         <div className="space-y-2 w-full pt-4">
           <Button
@@ -328,7 +273,10 @@ export const ReportBlackSpotScreen: React.FC = () => {
               setDescription('');
               setSelectedLocation(null);
               setLocationSource(null);
-              setIsOfflineQueued(false);
+              setPhotoFile(null);
+              setPhotoDataUrl(null);
+              setHasPhoto(false);
+              setWasTransmitted(true);
               requestGpsLocation();
             }}
           >

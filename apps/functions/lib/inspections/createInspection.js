@@ -5,6 +5,7 @@ exports.processCreateInspectionLogic = processCreateInspectionLogic;
 const firestore_1 = require("firebase-admin/firestore");
 const https_1 = require("firebase-functions/v2/https");
 const env_1 = require("../lib/env");
+const auth_1 = require("../lib/auth");
 const CERTIFICATE_VALIDITY_DAYS = 365;
 function requireNonEmptyString(value, field) {
     if (typeof value !== 'string' || value.trim().length === 0) {
@@ -103,6 +104,9 @@ exports.createInspection = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHEC
         throw new https_1.HttpsError('unauthenticated', 'An authenticated authority session is required.');
     }
     const inspectorRole = resolveAuthorityRole(request.auth.token);
+    if (inspectorRole === 'authority' || inspectorRole === 'admin') {
+        (0, auth_1.requireMfaVerification)(request.auth.token);
+    }
     return processCreateInspectionLogic((0, firestore_1.getFirestore)(), request.data, request.auth.uid, inspectorRole);
 });
 //# sourceMappingURL=createInspection.js.map

@@ -6,6 +6,7 @@ const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const env_1 = require("../lib/env");
+const auth_1 = require("../lib/auth");
 const ROLLING_WINDOW_DAYS = 14;
 async function processDecayStaleBlackSpotsLogic(db) {
     const cutoffTime = new Date(Date.now() - ROLLING_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -96,6 +97,8 @@ exports.decayStaleBlackSpots = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_
     if (role !== 'admin' && role !== 'authority') {
         throw new https_1.HttpsError('permission-denied', 'Only authority or administrators can trigger decay cycle.');
     }
+    // SEC-MFA: Authoritative backend MFA check for manual blackspot decay execution
+    (0, auth_1.requireMfaVerification)(request.auth.token);
     return processDecayStaleBlackSpotsLogic((0, firestore_1.getFirestore)());
 });
 //# sourceMappingURL=decayStaleBlackSpots.js.map

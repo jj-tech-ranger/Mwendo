@@ -29,7 +29,7 @@ export async function processUpdateReporterTrustLogic(
   nowMs: number = Date.now(),
   actorRole: string = 'passenger'
 ): Promise<UpdateReporterTrustResult> {
-  if (!userId || typeof userId !== 'string' || userId.trim() === '' || userId === 'anonymous') {
+  if (!userId || typeof userId !== 'string' || userId.trim() === '') {
     throw new HttpsError('unauthenticated', 'A valid authenticated user ID is required.');
   }
 

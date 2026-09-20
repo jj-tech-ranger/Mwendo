@@ -328,8 +328,8 @@ export const ActiveTripScreen: React.FC = () => {
         id: activeTripId,
         vehicleRegNumber: activeTrip?.plateNumber || setupPlate,
         plateNumber: activeTrip?.plateNumber || setupPlate,
-        saccoName: activeTrip?.saccoName || setupSacco || 'Super Metro SACCO',
-        routeName: activeTrip?.routeName || setupRoute || 'Thika Road Corridor',
+        saccoName: activeTrip?.saccoName || setupSacco || 'Independent / Unassigned',
+        routeName: activeTrip?.routeName || setupRoute || 'Corridor Route',
         status: isTracking ? 'active' : 'paused',
         currentSpeedKmH: currentSpeed,
         maxSpeedKmH: maxSpeed,
@@ -503,7 +503,7 @@ export const ActiveTripScreen: React.FC = () => {
             Duration: <span className="font-bold text-white">{formatDuration(durationSeconds)}</span>
           </div>
         </div>
-        <div className="space-y-2 max-w-sm mx-auto text-left">{currentSpeed > 90 ? <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl flex items-center gap-3 text-red-200 text-xs animate-bounce"><span className="material-symbols-outlined text-red-400 text-xl">warning</span><div><div className="font-bold text-white">Overspeed Violation Detected!</div><div className="text-[11px] text-red-300/90">Vehicle traveling over 90 km/h threshold on Thika Road.</div></div></div> : currentSpeed > 80 ? <div className="bg-amber-950/80 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3 text-amber-200 text-xs"><span className="material-symbols-outlined text-amber-400 text-xl">speed</span><div><div className="font-bold text-white">Approaching Speed Limit</div><div className="text-[11px] text-amber-300/90">Speed is 81–90 km/h. Drive cautiously.</div></div></div> : <div className="bg-emerald-950/60 border border-emerald-800/50 p-3 rounded-xl flex items-center gap-3 text-emerald-200 text-xs"><span className="material-symbols-outlined text-emerald-400 text-xl">verified</span><div><div className="font-bold text-white">Route Normal & Safe</div><div className="text-[11px] text-emerald-300/80">Speed within legal safety limit. Co-riders online: 4</div></div></div>}</div>
+        <div className="space-y-2 max-w-sm mx-auto text-left">{currentSpeed > 90 ? <div className="bg-red-950/80 border border-red-500/50 p-3 rounded-xl flex items-center gap-3 text-red-200 text-xs animate-bounce"><span className="material-symbols-outlined text-red-400 text-xl">warning</span><div><div className="font-bold text-white">Overspeed Violation Detected!</div><div className="text-[11px] text-red-300/90">Vehicle traveling over 90 km/h threshold.</div></div></div> : currentSpeed > 80 ? <div className="bg-amber-950/80 border border-amber-500/50 p-3 rounded-xl flex items-center gap-3 text-amber-200 text-xs"><span className="material-symbols-outlined text-amber-400 text-xl">speed</span><div><div className="font-bold text-white">Approaching Speed Limit</div><div className="text-[11px] text-amber-300/90">Speed is 81–90 km/h. Drive cautiously.</div></div></div> : <div className="bg-emerald-950/60 border border-emerald-800/50 p-3 rounded-xl flex items-center gap-3 text-emerald-200 text-xs"><span className="material-symbols-outlined text-emerald-400 text-xl">verified</span><div><div className="font-bold text-white">Route Normal & Safe</div><div className="text-[11px] text-emerald-300/80">Speed within legal safety limit.</div></div></div>}</div>
       </div>
       <div className="relative z-10 flex items-center justify-between border-t border-emerald-900/50 pt-3">
         <div className="flex items-center gap-2">

@@ -416,24 +416,17 @@ describe('AUDIT TASK: Anonymous Auth Rate Limit Bypass Investigation & Fix', () 
   });
 
   // ---------------------------------------------------------------------------
-  // STEP 5: Closure of the Literal 'anonymous' String Comparison
+  // STEP 5: Closure of the Literal 'anonymous' String Comparison & Fail-Closed Guarding
   // ---------------------------------------------------------------------------
-  describe('Step 5: Literal "anonymous" string handling', () => {
-    it('does not bypass rate limiting when userId is the literal string "anonymous"', async () => {
+  describe('Step 5: Literal "anonymous" string handling and fail-closed guarding', () => {
+    it('fails closed when userId is missing or empty', async () => {
       const now = Date.now();
-
-      // 1st call with userId = 'anonymous' succeeds under anonymous quota
-      const res1 = await enforceRateLimit(db, 'anonymous', 'sos', now);
-      expect(res1.allowed).toBe(true);
-
-      // 2nd call with userId = 'anonymous' is blocked!
-      // Previously, line 41 returned allowed: true unconditionally.
-      await expect(enforceRateLimit(db, 'anonymous', 'sos', now + 1000)).rejects.toMatchObject({
-        code: 'resource-exhausted',
-      });
+      await expect(enforceRateLimit(db, '', 'sos', now)).rejects.toThrowError(
+        /enforceRateLimit called without a verified userId/
+      );
     });
 
-    it('rejects unauthenticated callers who pass missing or literal "anonymous" userId without auth context', async () => {
+    it('rejects unauthenticated callers who pass missing userId', async () => {
       const payload = {
         location: { lat: -1.286389, lng: 36.817223 },
       };
@@ -445,9 +438,9 @@ describe('AUDIT TASK: Anonymous Auth Rate Limit Bypass Investigation & Fix', () 
         code: 'unauthenticated',
       });
 
-      // reportBlackSpot rejects literal 'anonymous' without isAnonymous auth flag
+      // reportBlackSpot rejects missing userId
       await expect(
-        processReportBlackSpotLogic(db, payload as any, 'anonymous')
+        processReportBlackSpotLogic(db, payload as any, '')
       ).rejects.toMatchObject({
         code: 'unauthenticated',
       });

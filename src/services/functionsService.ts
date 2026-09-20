@@ -31,6 +31,12 @@ export function isMfaRequiredError(err: unknown): boolean {
 
 export const functionsService = {
   /**
+   * Note on computeVehicleRisk & evaluateTripOverspeed:
+   * Client-side duplicates of computeVehicleRisk and evaluateTripOverspeed were removed.
+   * Server-side apps/functions/src/risk/computeVehicleRisk.ts is now the sole authoritative implementation.
+   */
+
+  /**
    * Provisional vehicle auto-provisioning (§8.2)
    */
   async provisionProvisionalVehicle(vehicleRegNumber: string, saccoId: string = 'unassigned'): Promise<void> {

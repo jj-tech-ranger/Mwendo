@@ -51,7 +51,11 @@ export async function processReportBlackSpotLogic(
   options?: ProcessReportBlackSpotOptions
 ): Promise<ReportBlackSpotResult> {
   const isAnonymous = options?.isAnonymous ?? false;
-  if (!userId || (userId === 'anonymous' && !isAnonymous)) {
+  // `userId` is always the server-verified request.auth.uid by the time it reaches here (see the
+  // onCall wrapper below), so this guards against a malformed/empty value, not anonymous sessions
+  // specifically — a genuine Firebase Anonymous-Auth uid is a random string, never the literal
+  // word 'anonymous'.
+  if (!userId) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to report a road hazard.');
   }
 

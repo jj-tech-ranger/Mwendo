@@ -228,8 +228,8 @@ describe('SEC-004: Authority Real-Time Safety Alerts Feed & Collection Guard', (
     const openModalBtn = screen.getByRole('button', { name: /Dispatch Highway Patrol/i });
     fireEvent.click(openModalBtn);
 
-    // Click "Dispatch Kenya Police Highway Unit" in the modal
-    const dispatchBtn = screen.getByRole('button', { name: /Dispatch Kenya Police Highway Unit/i });
+    // Click "Log Police Dispatch Request" in the modal
+    const dispatchBtn = screen.getByRole('button', { name: /Log Police Dispatch Request/i });
     fireEvent.click(dispatchBtn);
 
     await waitFor(() => {

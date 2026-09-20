@@ -87,7 +87,7 @@ describe('Cloud Functions — updateReporterTrust (CF-015 & Trust Engine)', () =
       await expect(processUpdateReporterTrustLogic(mockDb, '')).rejects.toMatchObject({
         code: 'unauthenticated',
       });
-      await expect(processUpdateReporterTrustLogic(mockDb, 'anonymous')).rejects.toMatchObject({
+      await expect(processUpdateReporterTrustLogic(mockDb, '   ')).rejects.toMatchObject({
         code: 'unauthenticated',
       });
     });

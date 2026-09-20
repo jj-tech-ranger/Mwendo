@@ -5,6 +5,7 @@ exports.processSyncPublicPinsLogic = processSyncPublicPinsLogic;
 const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const env_1 = require("../lib/env");
+const auth_1 = require("../lib/auth");
 async function processSyncPublicPinsLogic(db, options) {
     const currentRunTimestamp = new Date().toISOString();
     const cursorRef = db.collection('system_config').doc('public_pins_sync');
@@ -111,6 +112,8 @@ exports.syncPublicPins = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CHECK_
     if (role !== 'admin' && role !== 'authority') {
         throw new https_1.HttpsError('permission-denied', 'Only administrative or authority staff can synchronize public pins.');
     }
+    // SEC-MFA: Authoritative backend MFA check for administrative pin synchronization
+    (0, auth_1.requireMfaVerification)(request.auth.token);
     const db = (0, firestore_1.getFirestore)();
     const data = request.data;
     return await processSyncPublicPinsLogic(db, data);

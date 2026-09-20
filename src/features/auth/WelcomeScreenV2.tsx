@@ -1,147 +1,950 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { HorizontalLogo, ShieldSpeedometerMark } from '../../components/assets/BrandAssets';
-import { Button } from '../../components/ui/Button';
-import { LanguageToggle } from '../../components/common/LanguageToggle';
-import { useThemeStore } from '../../store/useThemeStore';
-
-const trustItems: Array<[icon: string, key: string]> = [
-  ['check_circle', 'welcome.hero.trustTripSafety'],
-  ['speed', 'welcome.hero.trustSpeedAwareness'],
-  ['report', 'welcome.hero.trustHazardReporting'],
-];
-
-const howItWorksItems: Array<[number: string, icon: string, title: string, desc: string]> = [
-  ['01', 'location_on', 'welcome.howItWorks.step1Title', 'welcome.howItWorks.step1Desc'],
-  ['02', 'speed', 'welcome.howItWorks.step2Title', 'welcome.howItWorks.step2Desc'],
-  ['03', 'shield', 'welcome.howItWorks.step3Title', 'welcome.howItWorks.step3Desc'],
-];
-
-const HeroPhotoShowcase: React.FC = () => (
-  <div className="relative h-[440px] overflow-hidden rounded-[32px] border border-outline-variant/30 bg-surface-container-high shadow-2xl sm:h-[520px]">
-    {/* High-Resolution Transit Photo */}
-    <img
-      src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=1200&q=80"
-      alt="Modern Kenyan passenger transport highway"
-      referrerPolicy="no-referrer"
-      className="absolute inset-0 h-full w-full object-cover object-center"
-    />
-    
-    {/* Dark Forest Overlay for Maximum Legibility & Brand Consistency */}
-    <div className="absolute inset-0 bg-gradient-to-t from-primary/95 via-primary/60 to-black/35" />
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(34,197,94,0.15),transparent_60%)]" />
-
-    {/* Top Badges */}
-    <div className="absolute left-5 right-5 top-5 flex items-center justify-between gap-3 sm:left-6 sm:right-6 sm:top-6">
-      <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-black/40 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md">
-        <span className="flex h-2 w-2 rounded-full bg-emerald-400" />
-        <span>Live Safety Network Active</span>
-      </div>
-      <div className="hidden items-center gap-1.5 rounded-2xl border border-white/20 bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 backdrop-blur-md sm:flex">
-        <span className="material-symbols-outlined text-sm text-emerald-300">verified</span>
-        <span>SACCO Monitored</span>
-      </div>
-    </div>
-
-    {/* Center Floating Telemetry Card */}
-    <div className="absolute left-5 right-5 top-20 sm:left-8 sm:right-8 sm:top-24">
-      <div className="rounded-2xl border border-white/20 bg-slate-950/70 p-4 text-white shadow-xl backdrop-blur-md sm:p-5">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
-              <span className="material-symbols-outlined text-xl">directions_bus</span>
-            </span>
-            <div>
-              <p className="text-xs font-extrabold text-white">KBZ 819M · 2N SACCO</p>
-              <p className="text-[10px] text-white/70">Nairobi ➔ Nakuru Expressway</p>
-            </div>
-          </div>
-          <span className="rounded-full bg-emerald-500/20 px-2.5 py-1 text-[10px] font-extrabold text-emerald-300">
-            NORMAL
-          </span>
-        </div>
-
-        <div className="mt-3.5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white/5 p-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Speed</p>
-            <div className="mt-1 flex items-baseline gap-1">
-              <span className="text-2xl font-black text-white">74</span>
-              <span className="text-[10px] text-white/60">/ 80 km/h</span>
-            </div>
-          </div>
-          <div className="rounded-xl bg-white/5 p-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-white/60">Status</p>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-base text-emerald-400">check_circle</span>
-              <span className="text-xs font-bold text-white">Safe Journey</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Bottom Footer Info */}
-    <div className="absolute bottom-5 left-5 right-5 flex items-end justify-between gap-4 text-white sm:bottom-6 sm:left-6 sm:right-6">
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[.2em] text-emerald-300">Mwendo Salama</p>
-        <p className="mt-0.5 text-sm font-semibold text-white/95">Protecting every kilometer across Kenya.</p>
-      </div>
-      <div className="flex items-center gap-1.5 text-[11px] font-bold text-white/80">
-        <span className="material-symbols-outlined text-sm text-emerald-300">location_on</span>
-        <span className="hidden sm:inline">GPS & Sensor Verified</span>
-      </div>
-    </div>
-  </div>
-);
 
 export const WelcomeScreenV2: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
-  const { mode, toggleDarkMode } = useThemeStore();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const scrollTo = (id: string) => {
-    setMenuOpen(false);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const handleNav = (path: string, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setMobileMenuOpen(false);
+
+    switch (path) {
+      case 'home':
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'why-mwendo':
+      case 'mobility':
+      case 'for-passengers':
+      case 'ecosystem':
+      case 'safety': {
+        const el = document.getElementById(path);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        break;
+      }
+      case 'for-saccos': {
+        const el = document.getElementById('ecosystem') || document.getElementById('why-mwendo');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        break;
+      }
+      case 'about': {
+        const el = document.getElementById('why-mwendo');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        break;
+      }
+      case 'sign-in':
+        navigate('/auth/login');
+        break;
+      case 'get-started':
+        navigate('/location-permission');
+        break;
+      case 'contact':
+        window.location.href = 'mailto:support@mwendo.co.ke?subject=Transit%20Support%20Inquiry';
+        break;
+      case 'privacy-policy':
+      case 'terms-of-service':
+      case 'system-status':
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      default:
+        break;
+    }
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-surface text-on-surface">
-      <header className="sticky top-0 z-50 border-b border-outline-variant/20 bg-surface/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Mwendo Salama home"><HorizontalLogo className="h-8 sm:h-9" /></button>
-          <nav className="hidden items-center gap-7 md:flex">
-            <button onClick={() => scrollTo('how-it-works')} className="text-xs font-bold text-on-surface-variant transition hover:text-primary">{t('welcome.nav.howItWorks')}</button>
-            <button onClick={() => scrollTo('safety')} className="text-xs font-bold text-on-surface-variant transition hover:text-primary">{t('welcome.nav.passengerSafety')}</button>
-            <button onClick={() => scrollTo('saccos')} className="text-xs font-bold text-on-surface-variant transition hover:text-primary">{t('welcome.nav.forSaccos')}</button>
-            <button onClick={() => scrollTo('about')} className="text-xs font-bold text-on-surface-variant transition hover:text-primary">{t('welcome.nav.about')}</button>
+    <div className="bg-surface font-body-md text-body-md text-on-surface antialiased selection:bg-secondary-container selection:text-on-secondary-container min-h-screen">
+      {/* FIXED NAVIGATION BAR */}
+      <header className="fixed top-0 left-0 w-full z-50 bg-surface/90 backdrop-blur-xl border-b border-[#e5eae7] shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+        <div className="h-20 max-w-[1280px] mx-auto px-gutter flex items-center justify-between gap-space-md">
+          {/* Brand Lockup */}
+          <div className="flex items-center gap-space-lg">
+            <a
+              className="flex items-center gap-space-sm cursor-pointer"
+              data-path="home"
+              href="#"
+              onClick={(e) => handleNav('home', e)}
+            >
+              <img
+                alt="Mwendo Logo"
+                className="h-8 w-auto object-contain"
+                src="/logo-light.png"
+              />
+              <span className="font-headline-sm text-headline-sm text-primary tracking-tight">
+                Mwendo
+              </span>
+            </a>
+            <div className="hidden xl:flex items-center gap-space-xs pl-space-sm">
+              <span className="inline-flex items-center px-space-sm py-space-xs rounded-full bg-surface-container-low text-primary font-label-badge text-label-badge tracking-wider uppercase">
+                Civic Transit OS
+              </span>
+            </div>
+          </div>
+
+          {/* Center Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-space-lg" data-active-classes="text-primary font-bold">
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="why-mwendo"
+              href="#why-mwendo"
+              onClick={(e) => handleNav('why-mwendo', e)}
+            >
+              Why Mwendo
+            </a>
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="mobility"
+              href="#mobility"
+              onClick={(e) => handleNav('mobility', e)}
+            >
+              Mobility
+            </a>
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="for-passengers"
+              href="#for-passengers"
+              onClick={(e) => handleNav('for-passengers', e)}
+            >
+              For Passengers
+            </a>
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="for-saccos"
+              href="#for-saccos"
+              onClick={(e) => handleNav('for-saccos', e)}
+            >
+              For SACCOs
+            </a>
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="ecosystem"
+              href="#ecosystem"
+              onClick={(e) => handleNav('ecosystem', e)}
+            >
+              Ecosystem
+            </a>
+            <a
+              className="font-body-md text-body-md text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+              data-path="safety"
+              href="#safety"
+              onClick={(e) => handleNav('safety', e)}
+            >
+              Safety
+            </a>
           </nav>
-          <div className="hidden items-center gap-2 md:flex"><LanguageToggle /><button onClick={toggleDarkMode} aria-label="Toggle theme" className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/40 text-on-surface-variant transition hover:bg-surface-container"><span className="material-symbols-outlined text-lg">{mode === 'dark' ? 'light_mode' : 'dark_mode'}</span></button><Button variant="outline" size="sm" onClick={() => navigate('/auth/login')}>{t('welcome.nav.logIn')}</Button><Button variant="primary" size="sm" onClick={() => navigate('/location-permission')}>{t('welcome.nav.getStarted')}</Button></div>
-          <div className="flex items-center gap-2 md:hidden"><LanguageToggle /><button onClick={toggleDarkMode} aria-label="Toggle theme" className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/40"><span className="material-symbols-outlined text-lg">{mode === 'dark' ? 'light_mode' : 'dark_mode'}</span></button><button onClick={() => setMenuOpen((open) => !open)} aria-label="Toggle navigation" className="flex h-9 w-9 items-center justify-center rounded-xl border border-outline-variant/40"><span className="material-symbols-outlined text-xl">{menuOpen ? 'close' : 'menu'}</span></button></div>
+
+          {/* Right Actions */}
+          <div className="flex items-center gap-space-md">
+            <a
+              className="hidden sm:inline-flex font-body-md text-body-md text-on-surface-variant hover:text-on-surface px-space-sm py-space-xs transition-colors cursor-pointer"
+              data-path="sign-in"
+              href="#"
+              onClick={(e) => handleNav('sign-in', e)}
+            >
+              Sign In
+            </a>
+            <a
+              className="inline-flex items-center justify-center bg-primary text-on-primary font-body-md text-body-md font-semibold px-space-lg py-space-sm rounded-lg shadow-[0_4px_20px_-2px_rgba(13,25,18,0.08)] hover:bg-primary-container hover:text-on-primary-container transition-all cursor-pointer"
+              data-path="get-started"
+              href="#"
+              onClick={(e) => handleNav('get-started', e)}
+            >
+              Get Started
+            </a>
+            <div
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 cursor-pointer"
+              onClick={(e) => handleNav('sign-in', e)}
+              title="User Account"
+            >
+              <span className="material-symbols-outlined text-on-primary text-[18px]">person</span>
+            </div>
+
+            {/* Mobile Hamburger Toggle */}
+            <button
+              type="button"
+              className="lg:hidden p-2 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle navigation menu"
+            >
+              <span className="material-symbols-outlined text-2xl">
+                {mobileMenuOpen ? 'close' : 'menu'}
+              </span>
+            </button>
+          </div>
         </div>
-        {menuOpen && <div className="border-t border-outline-variant/20 bg-surface px-4 py-4 md:hidden"><div className="mx-auto max-w-7xl space-y-1"><button onClick={() => scrollTo('how-it-works')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-surface-container">{t('welcome.nav.howItWorks')}</button><button onClick={() => scrollTo('safety')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-surface-container">{t('welcome.nav.passengerSafety')}</button><button onClick={() => scrollTo('saccos')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-surface-container">{t('welcome.nav.forSaccos')}</button><button onClick={() => scrollTo('about')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-bold hover:bg-surface-container">{t('welcome.nav.about')}</button><div className="grid grid-cols-2 gap-2 border-t border-outline-variant/20 pt-3"><Button variant="outline" className="w-full" onClick={() => navigate('/auth/login')}>{t('welcome.nav.logIn')}</Button><Button variant="primary" className="w-full" onClick={() => navigate('/location-permission')}>{t('welcome.nav.startSafeTrip')}</Button></div></div></div>}
+
+        {/* Mobile Dropdown Menu */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden border-t border-[#e5eae7] bg-surface px-gutter py-space-md shadow-lg">
+            <nav className="flex flex-col gap-space-sm">
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="why-mwendo"
+                href="#why-mwendo"
+                onClick={(e) => handleNav('why-mwendo', e)}
+              >
+                Why Mwendo
+              </a>
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="mobility"
+                href="#mobility"
+                onClick={(e) => handleNav('mobility', e)}
+              >
+                Mobility
+              </a>
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="for-passengers"
+                href="#for-passengers"
+                onClick={(e) => handleNav('for-passengers', e)}
+              >
+                For Passengers
+              </a>
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="for-saccos"
+                href="#for-saccos"
+                onClick={(e) => handleNav('for-saccos', e)}
+              >
+                For SACCOs
+              </a>
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="ecosystem"
+                href="#ecosystem"
+                onClick={(e) => handleNav('ecosystem', e)}
+              >
+                Ecosystem
+              </a>
+              <a
+                className="py-2 text-on-surface font-body-md hover:text-primary transition-colors cursor-pointer"
+                data-path="safety"
+                href="#safety"
+                onClick={(e) => handleNav('safety', e)}
+              >
+                Safety
+              </a>
+              <div className="pt-space-sm border-t border-[#e5eae7] flex flex-col gap-space-sm">
+                <a
+                  className="py-2 text-on-surface font-body-md font-semibold hover:text-primary cursor-pointer"
+                  data-path="sign-in"
+                  href="#"
+                  onClick={(e) => handleNav('sign-in', e)}
+                >
+                  Sign In
+                </a>
+                <a
+                  className="inline-flex items-center justify-center bg-primary text-on-primary font-body-md font-semibold px-space-lg py-space-sm rounded-lg shadow-md cursor-pointer"
+                  data-path="get-started"
+                  href="#"
+                  onClick={(e) => handleNav('get-started', e)}
+                >
+                  Get Started
+                </a>
+              </div>
+            </nav>
+          </div>
+        )}
       </header>
 
-      <main>
-        <section className="relative overflow-hidden border-b border-outline-variant/20">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_75%_15%,rgba(26,92,46,.13),transparent_30%),linear-gradient(to_bottom,var(--color-surface),var(--color-surface-container-lowest))]" />
-          <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[1.02fr_.98fr] lg:gap-16 lg:px-8 lg:pb-24 lg:pt-20">
-            <div className="max-w-2xl"><div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-2 text-[10px] font-bold uppercase tracking-[.16em] text-primary"><span className="material-symbols-outlined text-base">shield</span>{t('welcome.hero.badge')}</div><h1 className="text-4xl font-extrabold leading-[1.05] tracking-[-.035em] sm:text-5xl lg:text-6xl">{t('welcome.hero.title')} <span className="text-primary">Mwendo Salama</span>.</h1><p className="mt-6 max-w-xl text-base leading-7 text-on-surface-variant sm:text-lg">{t('welcome.hero.description')}</p><div className="mt-8 flex flex-wrap gap-3"><Button variant="primary" size="lg" onClick={() => navigate('/location-permission')} className="rounded-2xl px-6 shadow-lg shadow-primary/15"><span>{t('welcome.hero.startSafeTrip')}</span><span className="material-symbols-outlined ml-1 text-lg">arrow_forward</span></Button><Button variant="outline" size="lg" onClick={() => navigate('/safety-map')} className="rounded-2xl px-6"><span className="material-symbols-outlined mr-1 text-lg text-primary">map</span>{t('welcome.hero.exploreSafetyMap')}</Button></div><div className="mt-9 grid max-w-xl grid-cols-1 gap-3 border-t border-outline-variant/25 pt-6 sm:grid-cols-3">{trustItems.map(([icon, key]) => <div key={key} className="flex items-center gap-2 text-xs font-semibold text-on-surface-variant"><span className="material-symbols-outlined text-base text-primary">{icon}</span>{t(key)}</div>)}</div></div>
-            <HeroPhotoShowcase />
-          </div>
-        </section>
+      <main className="w-full pt-20 bg-surface">
+        <div className="flex flex-col w-full">
+          {/* SECTION 1 — HERO */}
+          <section className="relative w-full overflow-hidden bg-surface pb-space-2xl">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-center pt-space-xl">
+                {/* Hero Text Content (Left 7 Cols) */}
+                <div className="lg:col-span-7 flex flex-col gap-space-lg">
+                  <div className="inline-flex items-center gap-space-xs px-space-sm py-space-xs rounded-full bg-surface-container w-fit">
+                    <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+                    <span className="font-label-eyebrow text-label-eyebrow text-primary uppercase tracking-wider">
+                      MWENDO / KENYAN MOBILITY PLATFORM
+                    </span>
+                  </div>
 
-        <section id="how-it-works" className="scroll-mt-20 border-b border-outline-variant/20 bg-surface-container-lowest py-20 sm:py-24"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="mx-auto max-w-2xl text-center"><p className="text-[11px] font-bold uppercase tracking-[.2em] text-primary">{t('welcome.howItWorks.tag')}</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">{t('welcome.howItWorks.title')}</h2><p className="mt-4 text-sm leading-6 text-on-surface-variant sm:text-base">{t('welcome.howItWorks.subtitle')}</p></div><div className="mt-12 grid gap-5 md:grid-cols-3">{howItWorksItems.map(([number, icon, title, desc]) => <article key={number} className="group rounded-[28px] border border-outline-variant/25 bg-surface p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl"><div className="flex items-center justify-between"><span className="text-xs font-bold tracking-[.18em] text-primary">{number}</span><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary transition group-hover:scale-105"><span className="material-symbols-outlined text-2xl">{icon}</span></span></div><h3 className="mt-8 text-lg font-bold">{t(title)}</h3><p className="mt-3 text-sm leading-6 text-on-surface-variant">{t(desc)}</p></article>)}</div></div></section>
+                  <h1 className="font-display-hero text-display-hero text-on-surface tracking-tight">
+                    Smarter, safer journeys across{' '}
+                    <span className="text-secondary font-extrabold">Kenya</span>.
+                  </h1>
 
-        <section id="safety" className="scroll-mt-20 border-b border-outline-variant/20 bg-surface py-20 sm:py-24"><div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8"><div className="relative overflow-hidden rounded-[32px] bg-surface-container-low p-7 sm:p-10"><div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-primary/10 blur-3xl" /><div className="relative"><div className="flex items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.18em] text-primary">Passenger safety</p><h3 className="mt-2 text-2xl font-extrabold">See the journey as it happens.</h3></div><ShieldSpeedometerMark className="h-12 w-12" /></div><div className="mt-8 rounded-3xl border border-outline-variant/25 bg-surface p-5 shadow-lg"><div className="flex items-center justify-between text-xs font-bold"><span className="text-on-surface-variant">Live speed</span><span className="text-primary">Within limit</span></div><div className="mt-5 flex items-end justify-between"><div><span className="text-5xl font-extrabold tracking-tight">72</span><span className="ml-2 text-xs text-on-surface-variant">km/h</span></div><div className="text-right text-[10px] text-on-surface-variant">SPEED LIMIT<br/><strong className="text-on-surface">80 km/h</strong></div></div><div className="mt-5 h-2 overflow-hidden rounded-full bg-surface-container-high"><div className="h-full w-[85%] rounded-full bg-primary" /></div><div className="mt-5 flex items-start gap-3 rounded-2xl bg-amber-500/10 p-3.5"><span className="material-symbols-outlined text-amber-600">warning</span><div><p className="text-xs font-bold">Road alert nearby</p><p className="mt-1 text-[11px] text-on-surface-variant">Stay aware and review reported hazards ahead.</p></div></div></div></div></div><div className="max-w-xl"><p className="text-[11px] font-bold uppercase tracking-[.2em] text-primary">Safety, not noise</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Know what is happening on the road.</h2><p className="mt-5 text-sm leading-7 text-on-surface-variant sm:text-base">Mwendo Salama turns a normal PSV trip into a clearer safety experience—with live speed awareness, road-risk visibility, hazard reporting and emergency support.</p><div className="mt-8 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-outline-variant/20 p-4"><span className="material-symbols-outlined text-primary">speed</span><p className="mt-3 text-sm font-bold">Live speed awareness</p></div><div className="rounded-2xl border border-outline-variant/20 p-4"><span className="material-symbols-outlined text-primary">warning</span><p className="mt-3 text-sm font-bold">Community hazard reports</p></div><div className="rounded-2xl border border-outline-variant/20 p-4"><span className="material-symbols-outlined text-primary">emergency</span><p className="mt-3 text-sm font-bold">Emergency support</p></div><div className="rounded-2xl border border-outline-variant/20 p-4"><span className="material-symbols-outlined text-primary">analytics</span><p className="mt-3 text-sm font-bold">Trip safety insights</p></div></div></div></div></section>
+                  <p className="font-body-lg text-body-lg text-on-surface-variant max-w-xl">
+                    Connecting passengers, SACCO operators, and transport authorities to build a more transparent, dependable, and dignified everyday transit experience.
+                  </p>
 
-        <section id="saccos" className="scroll-mt-20 border-b border-outline-variant/20 bg-surface-container-lowest py-20 sm:py-24"><div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"><div className="rounded-[36px] bg-primary p-7 text-on-primary shadow-2xl sm:p-10 lg:p-14"><div className="grid items-center gap-10 lg:grid-cols-[1.1fr_.9fr]"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-on-primary/60">For SACCOs & safety teams</p><h2 className="mt-3 max-w-2xl text-3xl font-extrabold tracking-tight sm:text-4xl">Turn passenger journeys into actionable safety intelligence.</h2><p className="mt-5 max-w-xl text-sm leading-7 text-on-primary/70">Give fleet teams a clearer view of trips, violations, hazards and safety trends—without losing sight of the people travelling in those vehicles.</p><div className="mt-7"><Button variant="outline" onClick={() => navigate('/auth/login')} className="border-white/25 bg-white/10 text-white hover:bg-white/15">{t('welcome.nav.logIn')} <span className="material-symbols-outlined ml-1">arrow_forward</span></Button></div></div><div className="grid grid-cols-2 gap-3"><div className="rounded-3xl border border-white/10 bg-white/10 p-5"><span className="text-3xl font-extrabold">Live</span><p className="mt-2 text-xs text-on-primary/65">trip visibility</p></div><div className="rounded-3xl border border-white/10 bg-white/10 p-5"><span className="text-3xl font-extrabold">Risk</span><p className="mt-2 text-xs text-on-primary/65">trend awareness</p></div><div className="rounded-3xl border border-white/10 bg-white/10 p-5"><span className="text-3xl font-extrabold">Data</span><p className="mt-2 text-xs text-on-primary/65">ground truth</p></div><div className="rounded-3xl border border-white/10 bg-white/10 p-5"><span className="text-3xl font-extrabold">Kenya</span><p className="mt-2 text-xs text-on-primary/65">built for local roads</p></div></div></div></div></div></section>
+                  {/* Primary Actions */}
+                  <div className="flex flex-wrap items-center gap-space-md pt-space-xs">
+                    <a
+                      className="inline-flex items-center justify-center gap-space-xs bg-primary text-on-primary font-body-md text-body-md font-semibold px-space-xl py-space-md rounded-lg shadow-md hover:bg-primary-container transition-all cursor-pointer"
+                      data-path="get-started"
+                      href="#"
+                      onClick={(e) => handleNav('get-started', e)}
+                    >
+                      <span>Create Account</span>
+                      <span className="material-symbols-outlined text-sm">download</span>
+                    </a>
+                    <a
+                      className="inline-flex items-center justify-center gap-space-xs bg-surface-container-low text-primary font-body-md text-body-md font-semibold px-space-lg py-space-md rounded-lg hover:bg-surface-container transition-all cursor-pointer"
+                      href="#mobility"
+                      onClick={(e) => handleNav('mobility', e)}
+                    >
+                      <span className="material-symbols-outlined text-secondary">play_circle</span>
+                      <span>Watch how it works</span>
+                    </a>
+                  </div>
 
-        <section id="about" className="scroll-mt-20 py-20 sm:py-24"><div className="mx-auto max-w-3xl px-4 text-center sm:px-6"><p className="text-[11px] font-bold uppercase tracking-[.2em] text-primary">Mwendo Salama</p><h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Safer journeys start with better visibility.</h2><p className="mt-5 text-sm leading-7 text-on-surface-variant sm:text-base">Built around Kenya's public transport reality, Mwendo Salama connects passengers, SACCOs and safety authorities around a shared picture of road risk.</p><div className="mt-8 flex flex-wrap justify-center gap-3"><Button variant="primary" size="lg" onClick={() => navigate('/location-permission')} className="rounded-2xl">{t('welcome.hero.startSafeTrip')} <span className="material-symbols-outlined ml-1">arrow_forward</span></Button><Button variant="outline" size="lg" onClick={() => navigate('/safety-map')} className="rounded-2xl">{t('welcome.hero.exploreSafetyMap')}</Button></div></div></section>
+                  {/* Store Badges and Civic Trust Metrics */}
+                  <div className="flex flex-wrap items-center gap-space-lg pt-space-sm">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary/10 border border-secondary/20 text-secondary font-label-mono text-xs">
+                      <span className="material-symbols-outlined text-sm">security</span>
+                      <span className="font-semibold">NTSA &amp; SACCO Federation</span>
+                    </div>
+                    <div className="h-5 w-px bg-surface-container-high hidden sm:block" />
+                    <div className="flex items-center gap-2 text-on-surface-variant">
+                      <span className="material-symbols-outlined text-secondary text-base">verified</span>
+                      <span className="font-body-sm text-body-sm">Backed by Nairobi &amp; Regional SACCO Cooperatives</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hero Visual Composition (Right 5 Cols) */}
+                <div className="lg:col-span-5 relative flex justify-center">
+                  <div className="relative w-full rounded-2xl overflow-hidden shadow-xl bg-surface-container border border-[#e5eae7]">
+                    <img
+                      alt="Mwendo Kenyan Urban Mobility Experience"
+                      className="w-full h-full object-cover aspect-[1.79] lg:aspect-[4/5] object-center"
+                      src="/images/hero-matatu.jpg"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 2 — WHY MWENDO (Core Value) */}
+          <section className="w-full bg-surface-container-low py-space-3xl" id="why-mwendo">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-start">
+                {/* Left Column */}
+                <div className="lg:col-span-5 flex flex-col gap-space-md">
+                  <span className="font-label-eyebrow text-label-eyebrow text-secondary tracking-widest uppercase">
+                    WHY MWENDO
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+                    A modern foundation for everyday transit.
+                  </h2>
+                  <p className="font-body-lg text-body-lg text-on-surface-variant">
+                    Public transit carries the lifeblood of Kenya's economy. Mwendo restores calm, predictability, and visibility to everyday urban travel by linking every moving part under a transparent standard.
+                  </p>
+                  <div className="pt-space-md">
+                    <a
+                      className="inline-flex items-center gap-space-xs text-primary font-body-md text-body-md font-semibold hover:text-secondary transition-colors cursor-pointer"
+                      data-path="about"
+                      href="#why-mwendo"
+                      onClick={(e) => handleNav('about', e)}
+                    >
+                      <span>Read our civic transit charter</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Right Column: 4 Concise Value Propositions */}
+                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-space-lg">
+                  {/* Item 1 */}
+                  <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl">verified_user</span>
+                    </div>
+                    <h3 className="font-title-md text-title-md text-primary pt-1">Verified Vehicles</h3>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Know relevant vehicle and operator registration before you board. Certified SACCO credentials keep you informed and safe.
+                    </p>
+                  </div>
+
+                  {/* Item 2 */}
+                  <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 rounded-full bg-surface-container-high text-primary flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl">location_on</span>
+                    </div>
+                    <h3 className="font-title-md text-title-md text-primary pt-1">Real-Time Information</h3>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Stay informed about your journey and route progress in real time with synchronized cooperative timetables.
+                    </p>
+                  </div>
+
+                  {/* Item 3 */}
+                  <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 rounded-full bg-surface-container-high text-primary flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl">warning</span>
+                    </div>
+                    <h3 className="font-title-md text-title-md text-primary pt-1">Safety Alerts</h3>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Receive timely notices regarding disruptions, sudden blackspots, road conditions, and corridor congestion updates.
+                    </p>
+                  </div>
+
+                  {/* Item 4 */}
+                  <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-sm hover:shadow-md transition-shadow">
+                    <div className="w-12 h-12 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                      <span className="material-symbols-outlined text-2xl">hub</span>
+                    </div>
+                    <h3 className="font-title-md text-title-md text-primary pt-1">Connected Transport</h3>
+                    <p className="font-body-sm text-body-sm text-on-surface-variant">
+                      Bridge passengers, SACCOs, and regional transit authorities seamlessly on a unified, high-integrity open network.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 3 — REAL-TIME MOBILITY (Network Scale) */}
+          <section className="w-full bg-surface py-space-3xl" id="mobility">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-center">
+                {/* Left: Corridor Scale Visual */}
+                <div className="lg:col-span-7 relative">
+                  <div className="rounded-2xl overflow-hidden shadow-xl bg-surface-container-high border border-[#e5eae7]">
+                    <img
+                      alt="Nairobi Highway and Corridor Scale"
+                      className="w-full h-auto aspect-[1.34] object-cover"
+                      src="/images/corridor-routes.jpg"
+                    />
+                  </div>
+                  {/* Floating Badge */}
+                  <div className="absolute -bottom-6 right-6 bg-primary text-on-primary p-space-md rounded-xl shadow-xl flex items-center gap-space-sm max-w-xs border border-white/10">
+                    <span className="material-symbols-outlined text-secondary-fixed text-3xl">swap_calls</span>
+                    <div>
+                      <p className="font-label-badge text-label-badge font-bold">Over 85 Arterial Routes</p>
+                      <p className="font-body-sm text-body-sm text-on-primary-container font-label-mono">
+                        Monitored 24/7 across Nairobi Metropolitan Core
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Editorial Context & Checklist */}
+                <div className="lg:col-span-5 flex flex-col gap-space-md mt-8 lg:mt-0">
+                  <span className="font-label-eyebrow text-label-eyebrow text-secondary tracking-widest uppercase">
+                    REAL-TIME JOURNEY INFORMATION
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+                    Know what's happening across every corridor.
+                  </h2>
+                  <p className="font-body-lg text-body-lg text-on-surface-variant">
+                    Mwendo unifies active transit feeds and cooperative route schedules to bring clarity to daily movement across Kenya's urban hubs.
+                  </p>
+                  <div className="flex flex-col gap-space-sm pt-space-sm">
+                    <div className="flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-xl mt-0.5">check_circle</span>
+                      <p className="font-body-md text-body-md text-on-surface">
+                        Live vehicle verification and corridor status indicators
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-xl mt-0.5">check_circle</span>
+                      <p className="font-body-md text-body-md text-on-surface">
+                        Route stops, expected transit windows, and transparent fares
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-xl mt-0.5">check_circle</span>
+                      <p className="font-body-md text-body-md text-on-surface">
+                        Proactive congestion, road diversion, and weather alerts
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-xl mt-0.5">check_circle</span>
+                      <p className="font-body-md text-body-md text-on-surface">
+                        Multi-point arrival time estimates calibrated by live traffic
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 4 — THE CONNECTED ECOSYSTEM */}
+          <section className="w-full bg-surface-container-low py-space-3xl" id="ecosystem">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              {/* Section Header */}
+              <div className="text-center max-w-3xl mx-auto mb-space-2xl">
+                <span className="font-label-eyebrow text-label-eyebrow text-secondary tracking-widest uppercase">
+                  THE CONNECTED ECOSYSTEM
+                </span>
+                <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight pt-space-xs">
+                  Built for every participant in Kenya's transit fabric.
+                </h2>
+                <p className="font-body-lg text-body-lg text-on-surface-variant pt-space-sm">
+                  A truly resilient urban mobility infrastructure aligns travelers, cooperatives, city engineers, and system technicians under one standard.
+                </p>
+              </div>
+
+              {/* Feature Image (Interchange Aerial) */}
+              <div className="w-full rounded-2xl overflow-hidden shadow-lg mb-space-xl border border-[#e5eae7]">
+                <img
+                  alt="Connected Nairobi Urban Highway Interchange Network"
+                  className="w-full h-auto aspect-[1.79] object-cover"
+                  src="/images/ecosystem-interchange.jpg"
+                />
+              </div>
+
+              {/* 4 Core Stakeholder Pillars in Balanced Layout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-lg">
+                <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-xs hover:shadow-md transition-shadow">
+                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mb-1">
+                    <span className="material-symbols-outlined">commute</span>
+                  </div>
+                  <h3 className="font-title-md text-title-md text-primary font-bold">1. Passengers</h3>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Travel with reliable real-time information, predictable transit schedules, and peace of mind on every corridor.
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-xs hover:shadow-md transition-shadow">
+                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mb-1">
+                    <span className="material-symbols-outlined">supervisor_account</span>
+                  </div>
+                  <h3 className="font-title-md text-title-md text-primary font-bold">2. SACCOs &amp; Operators</h3>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Streamline vehicle dispatch, verify crew credentials, monitor maintenance readiness, and enhance commuter trust.
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-xs hover:shadow-md transition-shadow">
+                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mb-1">
+                    <span className="material-symbols-outlined">policy</span>
+                  </div>
+                  <h3 className="font-title-md text-title-md text-primary font-bold">3. Regulatory Authorities</h3>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Observe arterial corridor density, route compliance rates, and road safety benchmarks in synchronized live feeds.
+                  </p>
+                </div>
+
+                <div className="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm border border-[#e5eae7] flex flex-col gap-space-xs hover:shadow-md transition-shadow">
+                  <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mb-1">
+                    <span className="material-symbols-outlined">domain</span>
+                  </div>
+                  <h3 className="font-title-md text-title-md text-primary font-bold">4. County Transport Urban Planners</h3>
+                  <p className="font-body-sm text-body-sm text-on-surface-variant">
+                    Coordinate metropolitan transit corridors, terminal allocations, and long-term public mobility masterplans with empirical data.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 5 — PASSENGER EXPERIENCE */}
+          <section className="w-full bg-surface py-space-3xl" id="for-passengers">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-center">
+                {/* Passenger Visual */}
+                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-12 gap-space-md items-center">
+                  <div className="sm:col-span-12 rounded-2xl overflow-hidden shadow-lg bg-surface-container border border-[#e5eae7]">
+                    <img
+                      alt="Commuter seated calmly by window with backpack in clean transit interior"
+                      className="w-full h-auto aspect-[1.79] sm:aspect-[4/5] object-cover"
+                      src="/images/passenger-experience.jpg"
+                    />
+                  </div>
+                </div>
+
+                {/* Narrative Copy */}
+                <div className="lg:col-span-5 flex flex-col gap-space-md">
+                  <span className="font-label-eyebrow text-label-eyebrow text-secondary tracking-widest uppercase">
+                    PASSENGER EXPERIENCE
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+                    Travel with everyday confidence.
+                  </h2>
+                  <p className="font-body-lg text-body-lg text-on-surface-variant">
+                    Whether commuting across Nairobi or embarking on an inter-county connection, Mwendo is engineered around the passenger's human journey—delivering dignity, predictability, and calm.
+                  </p>
+                  <div className="space-y-4 pt-space-xs">
+                    <div className="p-space-md rounded-xl bg-surface-container-low border border-[#e5eae7] flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-2xl">sentiment_satisfied</span>
+                      <div>
+                        <h4 className="font-title-md text-title-md text-primary font-bold">Unrushed Commuting</h4>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          Know exactly when your ride arrives so you spend less time waiting on roadside stages.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-space-md rounded-xl bg-surface-container-low border border-[#e5eae7] flex items-start gap-space-sm">
+                      <span className="material-symbols-outlined text-secondary text-2xl">shield</span>
+                      <div>
+                        <h4 className="font-title-md text-title-md text-primary font-bold">Guaranteed Accountability</h4>
+                        <p className="font-body-sm text-body-sm text-on-surface-variant">
+                          Trip details and vehicle telemetry stay recorded for safety and prompt customer assistance.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 6 — VEHICLE AWARENESS & SAFETY */}
+          <section className="w-full bg-surface-container-low py-space-3xl" id="safety">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-center">
+                {/* Text & Safety Features (Left) */}
+                <div className="lg:col-span-6 flex flex-col gap-space-md order-2 lg:order-1">
+                  <span className="font-label-eyebrow text-label-eyebrow text-secondary tracking-widest uppercase">
+                    TRAVEL WITH MORE INFORMATION
+                  </span>
+                  <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
+                    Useful information before you board.
+                  </h2>
+                  <p className="font-body-lg text-body-lg text-on-surface-variant">
+                    Make empowered transit decisions. Mwendo confirms the operational health, licensing, and track record of vehicles entering your stage.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md pt-space-sm">
+                    <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-[#e5eae7] hover:shadow-md transition-shadow">
+                      <span className="material-symbols-outlined text-secondary text-2xl mb-1">fact_check</span>
+                      <h4 className="font-title-md text-title-md text-primary font-bold">Verified SACCO Badges</h4>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant pt-1">
+                        Licensed PSV compliance status visible before you step foot on board.
+                      </p>
+                    </div>
+                    <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-[#e5eae7] hover:shadow-md transition-shadow">
+                      <span className="material-symbols-outlined text-secondary text-2xl mb-1">alt_route</span>
+                      <h4 className="font-title-md text-title-md text-primary font-bold">Route Adherence</h4>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant pt-1">
+                        Live telemetry indicators confirm vehicles adhere to approved gazetted stages.
+                      </p>
+                    </div>
+                    <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-[#e5eae7] hover:shadow-md transition-shadow">
+                      <span className="material-symbols-outlined text-secondary text-2xl mb-1">campaign</span>
+                      <h4 className="font-title-md text-title-md text-primary font-bold">Advisory Broadcasts</h4>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant pt-1">
+                        Real-time alerts broadcasted instantly across commuters on active sectors.
+                      </p>
+                    </div>
+                    <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-[#e5eae7] hover:shadow-md transition-shadow">
+                      <span className="material-symbols-outlined text-secondary text-2xl mb-1">psychology</span>
+                      <h4 className="font-title-md text-title-md text-primary font-bold">Informed Mobility</h4>
+                      <p className="font-body-sm text-body-sm text-on-surface-variant pt-1">
+                        Transparent fare structures and expected transit delays clearly illuminated.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Portrait of commuter checking bus (Right) */}
+                <div className="lg:col-span-6 flex justify-center order-1 lg:order-2">
+                  <div className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-surface-container border border-[#e5eae7]">
+                    <img
+                      alt="Commuter checking mobile verification while viewing incoming bus"
+                      className="w-full h-auto aspect-[0.81] object-cover"
+                      src="/images/vehicle-verification.jpg"
+                    />
+                    <div className="absolute top-4 right-4 bg-primary text-on-primary px-3 py-1.5 rounded-full text-xs font-label-mono flex items-center gap-1.5 shadow-md border border-white/10">
+                      <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
+                      <span>Vehicle Verified · KDA 892M</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 7 — CALL TO ACTION */}
+          <section className="w-full bg-surface py-space-2xl">
+            <div className="max-w-[1280px] mx-auto px-gutter">
+              <div className="bg-primary rounded-3xl p-space-xl md:p-space-3xl text-center text-on-primary shadow-2xl relative overflow-hidden border border-white/10">
+                {/* Subtle Ambient Rings */}
+                <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-secondary/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-secondary/15 blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 max-w-2xl mx-auto flex flex-col items-center gap-space-md">
+                  <span className="font-label-eyebrow text-label-eyebrow text-primary-fixed uppercase tracking-widest">
+                    GET STARTED TODAY
+                  </span>
+                  <h2 className="font-display-hero text-display-hero text-on-primary tracking-tight">
+                    Move with confidence.
+                  </h2>
+                  <p className="font-body-lg text-body-lg text-on-primary-container">
+                    Join thousands of commuters, drivers, and SACCOs building a safer, more connected journey today.
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-center gap-space-md pt-space-md">
+                    <a
+                      className="inline-flex items-center justify-center gap-space-xs bg-secondary-container text-on-secondary-container font-body-md text-body-md font-bold px-space-xl py-space-md rounded-lg shadow-md hover:bg-secondary-fixed transition-all cursor-pointer"
+                      data-path="get-started"
+                      href="#"
+                      onClick={(e) => handleNav('get-started', e)}
+                    >
+                      <span>Create Free Account</span>
+                      <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                    </a>
+                    <a
+                      className="inline-flex items-center justify-center gap-space-xs bg-primary-container text-on-primary font-body-md text-body-md font-semibold px-space-xl py-space-md rounded-lg hover:bg-secondary/20 transition-all cursor-pointer"
+                      data-path="contact"
+                      href="#"
+                      onClick={(e) => handleNav('contact', e)}
+                    >
+                      <span>Contact Transit Support</span>
+                      <span className="material-symbols-outlined text-sm">support_agent</span>
+                    </a>
+                  </div>
+
+                  <div className="pt-space-lg flex flex-wrap items-center justify-center gap-space-lg font-body-sm text-body-sm text-on-primary-container">
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-secondary-fixed text-base">check</span>
+                      <span>Free passenger account</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-secondary-fixed text-base">check</span>
+                      <span>Certified SACCO network</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-secondary-fixed text-base">check</span>
+                      <span>Available in English &amp; Kiswahili</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
       </main>
 
-      <footer className="border-t border-outline-variant/20 bg-surface-container-lowest"><div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 text-xs text-on-surface-variant sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8"><HorizontalLogo className="h-7" /><p>© {new Date().getFullYear()} Mwendo Salama · Safer public transport across Kenya.</p><div className="flex gap-4"><button onClick={() => navigate('/auth/login')} className="font-bold hover:text-primary">{t('welcome.nav.logIn')}</button><button onClick={() => navigate('/location-permission')} className="font-bold hover:text-primary">{t('welcome.nav.getStarted')}</button></div></div></footer>
+      {/* INSTITUTIONAL FOOTER */}
+      <footer className="w-full bg-primary text-on-primary pt-space-3xl pb-space-2xl border-t border-white/10">
+        <div className="max-w-[1280px] mx-auto px-gutter">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-xl pb-space-2xl">
+            {/* Col 1: Brand & Live Core Status */}
+            <div className="lg:col-span-1 flex flex-col gap-space-md">
+              <div className="flex items-center gap-space-sm cursor-pointer" onClick={(e) => handleNav('home', e)}>
+                <img
+                  alt="Mwendo Logo"
+                  className="h-8 w-auto object-contain brightness-0 invert"
+                  src="/logo-light.png"
+                />
+                <span className="font-headline-sm text-headline-sm text-on-primary tracking-tight">
+                  Mwendo
+                </span>
+              </div>
+              <p className="font-body-sm text-body-sm text-on-primary-container max-w-xs">
+                Kenya's unified public transit platform connecting commuters, SACCO operations, and civic transport infrastructure.
+              </p>
+              <div className="flex items-center gap-space-xs pt-space-xs">
+                <span className="w-2 h-2 rounded-full bg-secondary-fixed-dim animate-pulse" />
+                <span className="font-label-mono text-label-mono text-on-primary-container">
+                  Nairobi Metropolitan Core · Live
+                </span>
+              </div>
+            </div>
+
+            {/* Col 2: Platform */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-eyebrow text-label-eyebrow text-primary-fixed uppercase tracking-wider">
+                Platform
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="mobility"
+                  href="#mobility"
+                  onClick={(e) => handleNav('mobility', e)}
+                >
+                  Unified Route Network
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="mobility"
+                  href="#mobility"
+                  onClick={(e) => handleNav('mobility', e)}
+                >
+                  Real-Time Fleet Telemetry
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="mobility"
+                  href="#mobility"
+                  onClick={(e) => handleNav('mobility', e)}
+                >
+                  Fare Clearance Engine
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="mobility"
+                  href="#mobility"
+                  onClick={(e) => handleNav('mobility', e)}
+                >
+                  Integrated Terminal Ops
+                </a>
+              </nav>
+            </div>
+
+            {/* Col 3: Solutions */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-eyebrow text-label-eyebrow text-primary-fixed uppercase tracking-wider">
+                Solutions
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="for-passengers"
+                  href="#for-passengers"
+                  onClick={(e) => handleNav('for-passengers', e)}
+                >
+                  Passenger Mobile Pass
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="for-saccos"
+                  href="#for-saccos"
+                  onClick={(e) => handleNav('for-saccos', e)}
+                >
+                  SACCO Fleet Management
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="for-saccos"
+                  href="#for-saccos"
+                  onClick={(e) => handleNav('for-saccos', e)}
+                >
+                  Crew Compliance &amp; Payouts
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="for-passengers"
+                  href="#for-passengers"
+                  onClick={(e) => handleNav('for-passengers', e)}
+                >
+                  Transit Card Top-up
+                </a>
+              </nav>
+            </div>
+
+            {/* Col 4: Ecosystem */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-eyebrow text-label-eyebrow text-primary-fixed uppercase tracking-wider">
+                Ecosystem
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="ecosystem"
+                  href="#ecosystem"
+                  onClick={(e) => handleNav('ecosystem', e)}
+                >
+                  Open Transit API
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="ecosystem"
+                  href="#ecosystem"
+                  onClick={(e) => handleNav('ecosystem', e)}
+                >
+                  County Transport Authorities
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="ecosystem"
+                  href="#ecosystem"
+                  onClick={(e) => handleNav('ecosystem', e)}
+                >
+                  Hardware Integrations
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="ecosystem"
+                  href="#ecosystem"
+                  onClick={(e) => handleNav('ecosystem', e)}
+                >
+                  Developer Portal
+                </a>
+              </nav>
+            </div>
+
+            {/* Col 5: Safety & Company */}
+            <div className="flex flex-col gap-space-sm">
+              <span className="font-label-eyebrow text-label-eyebrow text-primary-fixed uppercase tracking-wider">
+                Safety &amp; Company
+              </span>
+              <nav className="flex flex-col gap-space-xs">
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="safety"
+                  href="#safety"
+                  onClick={(e) => handleNav('safety', e)}
+                >
+                  Emergency SOS Network
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="safety"
+                  href="#safety"
+                  onClick={(e) => handleNav('safety', e)}
+                >
+                  Driver Accreditation
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="why-mwendo"
+                  href="#why-mwendo"
+                  onClick={(e) => handleNav('why-mwendo', e)}
+                >
+                  About Mwendo
+                </a>
+                <a
+                  className="font-body-sm text-body-sm text-on-primary-container hover:text-on-primary transition-colors cursor-pointer"
+                  data-path="why-mwendo"
+                  href="#why-mwendo"
+                  onClick={(e) => handleNav('why-mwendo', e)}
+                >
+                  Civic Mission &amp; Impact
+                </a>
+              </nav>
+            </div>
+          </div>
+
+          {/* Bottom Legal Bar */}
+          <div className="pt-space-lg border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-space-md font-body-sm text-body-sm text-on-primary-container">
+            <p>© 2025 Mwendo Mobility Technologies Ltd. All rights reserved. Sovereign East African Public Infrastructure.</p>
+            <div className="flex items-center gap-space-lg">
+              <a
+                className="hover:text-on-primary transition-colors cursor-pointer"
+                data-path="privacy-policy"
+                href="#"
+                onClick={(e) => handleNav('privacy-policy', e)}
+              >
+                Privacy Policy
+              </a>
+              <a
+                className="hover:text-on-primary transition-colors cursor-pointer"
+                data-path="terms-of-service"
+                href="#"
+                onClick={(e) => handleNav('terms-of-service', e)}
+              >
+                Terms of Service
+              </a>
+              <a
+                className="hover:text-on-primary transition-colors cursor-pointer"
+                data-path="system-status"
+                href="#"
+                onClick={(e) => handleNav('system-status', e)}
+              >
+                System Status
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
+
+export default WelcomeScreenV2;

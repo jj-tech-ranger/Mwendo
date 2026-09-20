@@ -175,45 +175,47 @@ export const LoginScreen: React.FC = () => {
                 <button type="button" onClick={handleGuestSignIn} disabled={isGuestLoading} className="min-h-11 w-full rounded-2xl px-4 text-sm font-bold text-on-surface-variant transition hover:bg-surface-container hover:text-primary disabled:opacity-60">{isGuestLoading ? t('common.loading') : t('auth.login.continueAsGuest')}</button>
               </div>
 
-              <div className="mt-5 pt-4 border-t border-outline-variant/30">
-                <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2.5 text-center">
-                  Quick Demo Role Login
-                </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('passenger')}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-base text-primary mb-0.5">commute</span>
-                    <span>Passenger</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('sacco')}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-base text-blue-600 mb-0.5">directions_bus</span>
-                    <span>SACCO</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('authority')}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-base text-amber-600 mb-0.5">verified_user</span>
-                    <span>NTSA</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickDemoLogin('admin')}
-                    className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
-                  >
-                    <span className="material-symbols-outlined text-base text-purple-600 mb-0.5">admin_panel_settings</span>
-                    <span>Admin</span>
-                  </button>
+              {import.meta.env.DEV && (
+                <div className="mt-5 pt-4 border-t border-outline-variant/30">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-2.5 text-center">
+                    Quick Demo Role Login
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDemoLogin('passenger')}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-base text-primary mb-0.5">commute</span>
+                      <span>Passenger</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDemoLogin('sacco')}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-base text-blue-600 mb-0.5">directions_bus</span>
+                      <span>SACCO</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDemoLogin('authority')}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-base text-amber-600 mb-0.5">verified_user</span>
+                      <span>NTSA</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickDemoLogin('admin')}
+                      className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition text-xs font-semibold text-on-surface"
+                    >
+                      <span className="material-symbols-outlined text-base text-purple-600 mb-0.5">admin_panel_settings</span>
+                      <span>Admin</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
             <div className="mt-6 text-center"><p className="text-sm text-on-surface-variant">{t('auth.login.noAccount')} <Link to="/auth/register" className="font-bold text-primary hover:underline">{t('auth.login.createOne')}</Link></p></div>
             <div className="mt-6 flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"><span className="material-symbols-outlined text-sm text-primary">verified_user</span>Secure sign-in · Your account is protected</div>

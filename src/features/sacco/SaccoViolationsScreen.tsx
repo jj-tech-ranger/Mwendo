@@ -21,7 +21,7 @@ export const SaccoViolationsScreen: React.FC = () => {
   const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { data: violations = [], isLoading: loading } = useQuery({
+  const { data: violations = [], isLoading: loading, isError, error, refetch } = useQuery({
     queryKey: ['saccoViolations', saccoId],
     queryFn: async () => {
       if (!saccoId) return [];
@@ -43,6 +43,18 @@ export const SaccoViolationsScreen: React.FC = () => {
         icon="error"
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
+      />
+    );
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        icon="error"
+        title="Failed to Load Violations"
+        description={(error as Error)?.message || 'Unable to retrieve safety violations for this SACCO. Please try again.'}
+        secondaryCtaLabel="Retry Fetch"
+        onSecondaryCta={() => refetch()}
       />
     );
   }
@@ -74,16 +86,6 @@ export const SaccoViolationsScreen: React.FC = () => {
         <div className="p-12 text-center text-xs text-on-surface-variant font-mono">
           Loading safety violations...
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={searchTerm ? 'search_off' : 'verified_user'}
-          title={searchTerm ? 'No Matching Violations' : 'No Violations Recorded'}
-          description={
-            searchTerm
-              ? `No recorded violations match "${searchTerm}".`
-              : 'No violations recorded in the selected period.'
-          }
-        />
       ) : (
         <Card className="p-0 overflow-hidden">
           <div className="overflow-x-auto">
@@ -100,6 +102,18 @@ export const SaccoViolationsScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20 font-medium">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <EmptyState
+                      icon="fact_check"
+                      title="No violations recorded"
+                      description="This may reflect a genuinely clean record, or that violation reporting has not yet started for this fleet. Absence of data here is not itself proof of a safe fleet."
+                      className="border-0 shadow-none"
+                    />
+                  </td>
+                </tr>
+              )}
               {filtered.map((v) => (
                 <tr key={v.id} className="hover:bg-surface-container/50">
                   <td className="p-3.5 font-mono text-primary font-bold">{v.violationId || v.id}</td>
@@ -166,19 +180,16 @@ export const SaccoViolationsScreen: React.FC = () => {
               <span className="font-bold block">GPS Location Pin</span>
               <p className="text-on-surface-variant">{selectedViolation.locationName}</p>
               <div className="text-[10px] font-mono text-primary font-bold pt-1 flex items-center justify-between">
-                <span>
-                  Verification Confidence:{' '}
-                  {typeof selectedViolation.confidenceScore === 'number' && !Number.isNaN(selectedViolation.confidenceScore)
-                    ? `${Math.round(selectedViolation.confidenceScore * 100)}%`
-                    : 'Not available'}
-                </span>
-                <span className="text-on-surface-variant text-[9px] font-normal">
-                  (Risk Weight:{' '}
-                  {typeof selectedViolation.confidenceScore === 'number' && !Number.isNaN(selectedViolation.confidenceScore)
-                    ? `${selectedViolation.confidenceScore.toFixed(2)}x`
-                    : '—'}
-                  )
-                </span>
+                {typeof selectedViolation.confidenceScore === 'number' && !Number.isNaN(selectedViolation.confidenceScore) ? (
+                  <>
+                    <span>Verification Confidence: {Math.round(selectedViolation.confidenceScore * 100)}%</span>
+                    <span className="text-on-surface-variant text-[9px] font-normal">
+                      (Risk Weight: {selectedViolation.confidenceScore.toFixed(2)}x)
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-on-surface-variant font-normal">Verification confidence: Not available for this record</span>
+                )}
               </div>
             </div>
 

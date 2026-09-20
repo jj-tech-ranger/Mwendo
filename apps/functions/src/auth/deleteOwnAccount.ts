@@ -27,7 +27,7 @@ export async function processDeleteOwnAccountLogic(
   userId: string,
   userRole = 'passenger'
 ): Promise<DeleteOwnAccountResult> {
-  if (!userId || typeof userId !== 'string' || userId.trim() === '' || userId === 'anonymous') {
+  if (!userId || typeof userId !== 'string' || userId.trim() === '') {
     throw new HttpsError('unauthenticated', 'A valid authenticated user ID is required.');
   }
 

@@ -112,13 +112,23 @@ export async function enforceRateLimit(
   nowMs: number = Date.now(),
   options?: EnforceRateLimitOptions
 ): Promise<RateLimitResult> {
-  const isAnon = Boolean(options?.isAnonymous || userId === 'anonymous');
-
-  // Prevent missing or empty user ID
+  // PRODUCTION HARDENING: this function must fail closed on a missing identity, not open.
+  // Both current callers (sendSOS, reportBlackSpot) derive `userId` from the server-verified
+  // `request.auth.uid` after an explicit `request.auth` check, so it is always a real, non-empty
+  // string here — including for genuine Firebase Anonymous-Auth sessions, whose uid is a random
+  // string, never the literal word 'anonymous'. A previous version of this check special-cased
+  // the literal string 'anonymous' and returned `allowed: true` (an unconditional bypass) for it;
+  // that branch was dead code in practice, but "unlimited on a falsy/placeholder id" is the wrong
+  // default to leave in place for any future caller. Note: this guard does not by itself defend
+  // against an attacker minting many fresh anonymous sessions to obtain many fresh per-uid rate
+  // budgets — that is a separate, product-level question (e.g. whether anonymous sessions should
+  // have a stricter limit, or require phone verification before SOS/report access) that this fix
+  // does not resolve and that requires a product decision, not a code change.
   if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-    throw new HttpsError('unauthenticated', 'User identity required for rate limit enforcement.');
+    throw new Error('enforceRateLimit called without a verified userId.');
   }
 
+  const isAnon = Boolean(options?.isAnonymous);
   const config = RATE_LIMIT_CONFIGS[action];
   const effectiveMaxAllowed =
     options?.maxAllowedOverride ?? (isAnon ? config.anonymousMaxAllowed : config.maxAllowed);
@@ -134,7 +144,7 @@ export async function enforceRateLimit(
     });
   }
 
-  const primaryDocId = userId === 'anonymous' ? 'anonymous_session' : userId;
+  const primaryDocId = userId;
   const rateLimitRef = db.collection('rate_limits').doc(primaryDocId);
 
   const secondaryRef =

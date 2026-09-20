@@ -23,44 +23,44 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
   const location = useLocation();
   const currentUser = useAuthStore((s) => s.user);
 
-  // Read trip either from props or location state or fallback
-  const tripData: Trip = propTrip || (location.state as { trip?: Trip })?.trip || {
-    id: `trip_${Date.now()}`,
-    vehicleRegNumber: 'KDB 892J',
-    plateNumber: 'KDB 892J',
-    saccoId: 'sacco_metro',
-    saccoName: 'Super Metro SACCO',
-    routeName: 'Thika Road Corridor',
-    status: 'completed',
-    currentSpeedKmH: 0,
-    maxSpeedKmH: 78,
-    avgSpeedKmH: 52,
-    durationSeconds: 1620,
-    overspeedEventsCount: 0,
-    violationsCount: 0,
-    startTime: new Date(Date.now() - 1620000).toISOString(),
-    endTime: new Date().toISOString(),
-  };
+  // Read trip either from props or location state (no hardcoded fallback)
+  const tripData: Trip | null = propTrip || (location.state as { trip?: Trip })?.trip || null;
 
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [aiRiskTier, setAiRiskTier] = useState<'low' | 'moderate' | 'high'>('low');
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(true);
   const [aiError, setAiError] = useState<string | null>(null);
+  // Tracks whether the summary shown actually came from a generative model or the
+  // deterministic rule engine, so the UI can label it truthfully either way. See the
+  // effect below: as of this codebase's current implementation, generateTripSummary
+  // always returns 'rule_engine' — there is no live model call yet.
+  const [summaryGeneratedBy, setSummaryGeneratedBy] = useState<'gemini' | 'rule_engine'>('rule_engine');
   const [pointsAwarded, setPointsAwarded] = useState<number | null>(null);
   const pointsAwardedRef = useRef(false);
 
   // Award trip completion points once
   useEffect(() => {
+    if (!tripData) return;
     if (currentUser?.uid && !pointsAwardedRef.current && tripData.status === 'completed') {
       pointsAwardedRef.current = true;
       void pointsService.awardPoints(currentUser.uid, 'trip_completed').then(() => {
         setPointsAwarded(15);
       });
     }
-  }, [currentUser?.uid, tripData.status]);
+  }, [currentUser?.uid, tripData]);
 
-  // Call Gemini callable via Cloud Function
+  // Calls the generateTripSummary Cloud Function. PRODUCTION HARDENING NOTE: this function's
+  // current implementation (apps/functions/src/risk/generateTripSummary.ts) is a deterministic
+  // rule engine, not a live generative model call — its type supports a future 'gemini' path
+  // (GenerateTripSummaryResult.generatedBy), but that path is not implemented today. The UI
+  // below reads `generatedBy` from the real response and labels the result accordingly, so it
+  // stays honest automatically if a real model integration is added later.
   useEffect(() => {
+    if (!tripData) {
+      setIsLoadingAi(false);
+      return;
+    }
+
     let isCancelled = false;
 
     const fetchSummary = async () => {
@@ -106,12 +106,14 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
         if (!isCancelled && res.data && res.data.summary) {
           setAiSummary(res.data.summary);
           setAiRiskTier(res.data.riskTier || fallbackTier);
+          setSummaryGeneratedBy(res.data.generatedBy === 'gemini' ? 'gemini' : 'rule_engine');
         }
       } catch (err: unknown) {
         console.warn('Cloud Function generateTripSummary call failed, utilizing graceful fallback:', err);
         if (!isCancelled) {
           setAiSummary(fallbackSummary);
           setAiRiskTier(fallbackTier);
+          setSummaryGeneratedBy('rule_engine');
           setAiError('Offline mode: Deterministic safety analysis active.');
         }
       } finally {
@@ -133,6 +135,51 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
     const remainder = secs % 60;
     return `${mins.toString().padStart(2, '0')}:${remainder.toString().padStart(2, '0')}`;
   };
+
+  if (!tripData) {
+    return (
+      <div className="min-h-screen bg-background text-on-background p-4 sm:p-6 max-w-lg mx-auto space-y-5 animate-in fade-in duration-300">
+        <div className="flex items-center justify-between pt-2">
+          <button
+            onClick={() => navigate('/passenger')}
+            className="p-2 rounded-full hover:bg-surface-container-high transition-colors"
+            aria-label="Back"
+          >
+            <span className="material-symbols-outlined text-2xl">arrow_back</span>
+          </button>
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+            Trip Safety Summary
+          </span>
+          <div className="w-8" />
+        </div>
+
+        <Card className="p-8 text-center border border-outline-variant/30 bg-surface-container-low/50">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-surface-container-high text-on-surface-variant">
+            <span className="material-symbols-outlined text-3xl">no_crash</span>
+          </div>
+          <h2 className="text-lg font-bold text-on-surface mb-1">No Trip Data Available</h2>
+          <p className="text-sm text-on-surface-variant max-w-xs mx-auto mb-6">
+            No active or completed trip details were found for this summary. To view past trips, check your trip history.
+          </p>
+          <div className="flex flex-col gap-2">
+            <Button
+              onClick={() => navigate('/passenger/trips', { replace: true })}
+              className="w-full"
+            >
+              View Trip History
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate('/passenger', { replace: true })}
+              className="w-full"
+            >
+              Return to Dashboard
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const isIncompleteSignalLost = tripData.status === 'incomplete_signal_lost';
   const isHighRisk = !isIncompleteSignalLost && (tripData.maxSpeedKmH > 90 || (tripData.overspeedEventsCount ?? 0) > 0);
@@ -246,12 +293,14 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
         </div>
       </Card>
 
-      {/* Gemini AI Plain-Language Safety Summary Card */}
+      {/* Plain-language trip safety summary. Labeled dynamically (see summaryGeneratedBy)
+          because today this is always the deterministic rule engine, not a live model call —
+          do not hardcode an AI claim here again without checking generatedBy. */}
       <Card className="p-4 space-y-2 border border-primary/20 bg-primary/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
             <span className="material-symbols-outlined text-base">auto_awesome</span>
-            <span>AI Safety Assessment</span>
+            <span>{summaryGeneratedBy === 'gemini' ? 'AI Safety Assessment' : 'Safety Assessment'}</span>
           </div>
           <Badge variant={riskTierToBadgeVariant(aiRiskTier)} className="text-[10px]">
             {aiRiskTier.toUpperCase()} RISK
@@ -261,7 +310,7 @@ export const TripSummaryScreen: React.FC<TripSummaryScreenProps> = ({ trip: prop
         {isLoadingAi ? (
           <div className="py-3 flex items-center gap-3 text-xs text-on-surface-variant">
             <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            <span className="font-mono">Analyzing speed profile & violation telemetry with Gemini AI...</span>
+            <span className="font-mono">Analyzing speed profile & violation telemetry...</span>
           </div>
         ) : (
           <p className="text-xs text-on-surface leading-relaxed font-medium">

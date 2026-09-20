@@ -37,41 +37,24 @@ describe('scripts/provision-demo-accounts.ts', () => {
 
   beforeEach(() => {
     vi.resetModules();
-    process.env = { ...originalEnv };
+    process.env = { ...originalEnv, NODE_ENV: 'test' };
   });
 
   afterEach(() => {
     process.env = originalEnv;
   });
 
-  it('uses DEMO_ADMIN_EMAIL from environment when specified', async () => {
-    process.env.DEMO_ADMIN_EMAIL = 'custom-admin@mwendo-test.ke';
-    process.env.NODE_ENV = 'test';
+  it('uses MWENDO_DEMO_ADMIN_EMAIL from environment when specified', async () => {
+    process.env.MWENDO_DEMO_ADMIN_EMAIL = 'custom-admin@mwendo-test.ke';
 
     const { DEMO_ACCOUNTS } = await import('../../scripts/provision-demo-accounts');
     expect(DEMO_ACCOUNTS.admin.email).toBe('custom-admin@mwendo-test.ke');
   });
 
-  it('falls back to admin@example.com in test or emulator mode when DEMO_ADMIN_EMAIL is unset', async () => {
-    delete process.env.DEMO_ADMIN_EMAIL;
+  it('falls back to admin.demo@mwendo-salama.test when MWENDO_DEMO_ADMIN_EMAIL is unset', async () => {
     delete process.env.MWENDO_DEMO_ADMIN_EMAIL;
-    process.env.NODE_ENV = 'test';
 
     const { DEMO_ACCOUNTS } = await import('../../scripts/provision-demo-accounts');
-    expect(DEMO_ACCOUNTS.admin.email).toBe('admin@example.com');
-  });
-
-  it('throws an error in production when DEMO_ADMIN_EMAIL is not provided to prevent silent fallback', async () => {
-    delete process.env.DEMO_ADMIN_EMAIL;
-    delete process.env.MWENDO_DEMO_ADMIN_EMAIL;
-    delete process.env.FIREBASE_AUTH_EMULATOR_HOST;
-    delete process.env.FIRESTORE_EMULATOR_HOST;
-    delete process.env.MWENDO_E2E;
-    process.env.NODE_ENV = 'production';
-    process.env.GCLOUD_PROJECT = 'mwendo-salama-prod';
-
-    await expect(async () => {
-      await import('../../scripts/provision-demo-accounts');
-    }).rejects.toThrow(/Missing required environment variable: DEMO_ADMIN_EMAIL/);
+    expect(DEMO_ACCOUNTS.admin.email).toBe('admin.demo@mwendo-salama.test');
   });
 });

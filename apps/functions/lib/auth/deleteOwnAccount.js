@@ -18,7 +18,7 @@ const env_1 = require("../lib/env");
  * 5. An authoritative audit log entry is written for compliance tracking.
  */
 async function processDeleteOwnAccountLogic(db, authAdmin, userId, userRole = 'passenger') {
-    if (!userId || typeof userId !== 'string' || userId.trim() === '' || userId === 'anonymous') {
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
         throw new https_1.HttpsError('unauthenticated', 'A valid authenticated user ID is required.');
     }
     const nowIso = new Date().toISOString();

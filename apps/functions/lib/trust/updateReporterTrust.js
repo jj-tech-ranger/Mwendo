@@ -16,7 +16,7 @@ const env_1 = require("../lib/env");
  * 3. An authoritative audit log entry is recorded for security and audit trail.
  */
 async function processUpdateReporterTrustLogic(db, userId, nowMs = Date.now(), actorRole = 'passenger') {
-    if (!userId || typeof userId !== 'string' || userId.trim() === '' || userId === 'anonymous') {
+    if (!userId || typeof userId !== 'string' || userId.trim() === '') {
         throw new https_1.HttpsError('unauthenticated', 'A valid authenticated user ID is required.');
     }
     const nowIso = new Date(nowMs).toISOString();

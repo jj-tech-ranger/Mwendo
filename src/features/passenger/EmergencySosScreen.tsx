@@ -101,7 +101,13 @@ export const EmergencySosScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sos' | 'contacts' | 'tips'>('sos');
   const [dispatchedSummary, setDispatchedSummary] = useState<{
     contacts: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' | 'queued' | string }>;
-    channels: Array<{ label: string; status: 'dispatched' | 'failed' | 'queued' | string; channelType?: string }>;
+    // Real counts from the sendSOS Cloud Function response — NOT a hardcoded list of channel
+    // names. This app has no integration with any external emergency-authority system; FCM
+    // pushes go only to internal SACCO/authority app users subscribed to a Mwendo notification
+    // topic. Do not reintroduce named third-party/government systems here unless a real
+    // integration is built and this comment is updated to reflect it.
+    fcmDispatchedCount: number;
+    dlqCount: number;
     alertId?: string;
     location?: { lat: number; lng: number } | null;
     isBackupActive?: boolean;
@@ -190,7 +196,8 @@ export const EmergencySosScreen: React.FC = () => {
 
       setDispatchedSummary({
         contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
-        channels: [],
+        fcmDispatchedCount: 0,
+        dlqCount: 0,
         alertId,
         location,
         isBackupActive: true,
@@ -230,51 +237,10 @@ export const EmergencySosScreen: React.FC = () => {
       });
 
       if (result && result.success) {
-        // Derive honest channels directly from real backend response fields
-        const derivedChannels: Array<{ label: string; status: 'dispatched' | 'failed'; channelType?: string }> = [];
-
-        if (Array.isArray(result.notifiedChannels) && result.notifiedChannels.length > 0) {
-          for (const ch of result.notifiedChannels) {
-            // Keep FCM and internal officer notifications in channels list (contacts are displayed from contactsSummary)
-            if (ch.channel !== 'sms') {
-              derivedChannels.push({
-                label: ch.label,
-                status: ch.status,
-                channelType: ch.channel,
-              });
-            }
-          }
-        } else if (Array.isArray(result.fcmSummary) && result.fcmSummary.length > 0) {
-          for (const f of result.fcmSummary) {
-            if (f.target.startsWith('sacco_')) {
-              derivedChannels.push({
-                label: f.status === 'dispatched'
-                  ? "Internal alert sent to your SACCO's operations team"
-                  : "Alert to SACCO operations team failed",
-                status: f.status,
-                channelType: 'sacco_fcm',
-              });
-            } else if (f.target === 'authority_alerts') {
-              derivedChannels.push({
-                label: f.status === 'dispatched'
-                  ? 'Internal alert sent to on-duty safety officers'
-                  : 'Alert to safety officers failed',
-                status: f.status,
-                channelType: 'authority_fcm',
-              });
-            }
-          }
-        } else if (typeof result.fcmDispatchedCount === 'number' && result.fcmDispatchedCount > 0) {
-          derivedChannels.push({
-            label: "Internal alert sent to your SACCO's operations team",
-            status: 'dispatched',
-            channelType: 'sacco_fcm',
-          });
-        }
-
         setDispatchedSummary({
           contacts: result.contactsSummary || contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'dispatched' })),
-          channels: derivedChannels,
+          fcmDispatchedCount: result.fcmDispatchedCount ?? 0,
+          dlqCount: result.dlqCount ?? 0,
           alertId,
           location,
           isBackupActive: false,
@@ -316,7 +282,8 @@ export const EmergencySosScreen: React.FC = () => {
 
       setDispatchedSummary({
         contacts: contacts.map((c) => ({ name: c.name, relationship: c.relationship, status: 'queued' })),
-        channels: [],
+        fcmDispatchedCount: 0,
+        dlqCount: 0,
         alertId,
         location,
         isBackupActive: true,
@@ -666,7 +633,7 @@ export const EmergencySosScreen: React.FC = () => {
                       href="tel:0800720822"
                       className="p-2.5 rounded-xl bg-surface-container border border-outline-variant/30 font-bold flex items-center justify-between text-xs hover:bg-surface-container-high text-on-surface"
                     >
-                      <span>Call NTSA (0800720822)</span>
+                      <span>Call Road Safety Hotline (0800720822)</span>
                       <span className="material-symbols-outlined text-primary text-sm">call</span>
                     </a>
                   </div>
@@ -760,21 +727,30 @@ export const EmergencySosScreen: React.FC = () => {
                         : `Sent SMS to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`}
                     </div>
                   ))}
-                  {dispatchedSummary?.channels.map((ch, idx) => (
-                    <div
-                      key={`channel_${idx}`}
-                      className={`font-bold flex items-center gap-1.5 ${
-                        ch.status === 'failed'
-                          ? 'text-amber-700 dark:text-amber-400'
-                          : 'text-emerald-700 dark:text-emerald-400'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-xs">
-                        {ch.status === 'failed' ? 'error_outline' : 'notifications_active'}
-                      </span>
-                      {ch.label}
+                  {(dispatchedSummary?.fcmDispatchedCount ?? 0) > 0 && (
+                    <div className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-xs">notifications_active</span>
+                      Internal alert sent to your SACCO's dispatch team ({dispatchedSummary?.fcmDispatchedCount} notification{dispatchedSummary?.fcmDispatchedCount === 1 ? '' : 's'})
                     </div>
-                  ))}
+                  )}
+                  {(dispatchedSummary?.dlqCount ?? 0) > 0 && (
+                    <div className="text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-xs">warning</span>
+                      {dispatchedSummary?.dlqCount} notification{dispatchedSummary?.dlqCount === 1 ? '' : 's'} could not be confirmed delivered
+                    </div>
+                  )}
+                  {/*
+                    PRODUCTION HARDENING: this list must only ever describe what the Cloud
+                    Function actually reports happened (see fcmDispatchedCount/dlqCount above).
+                    A previous version of this screen displayed a hardcoded claim that the alert
+                    was logged to safety incident portals and pushed to a safety control center —
+                    neither of which exists anywhere in this application's backend. This app has
+                    no integration with national transport safety authorities or any emergency-dispatch
+                    system. Do not reintroduce a claim like that unless a real, operational
+                    integration is built — see the "Quick Hotline Dial" section below, which
+                    correctly links to real emergency numbers instead of implying this button
+                    already reached them.
+                  */}
                 </div>
 
                 {/* Supplementary SMS deep-link notice */}
@@ -858,7 +834,7 @@ export const EmergencySosScreen: React.FC = () => {
                     href="tel:0800720822"
                     className="p-3 rounded-xl bg-surface-container border border-outline-variant/30 flex items-center justify-between font-bold hover:bg-surface-container-high"
                   >
-                    <span>NTSA Safety Hotline</span>
+                    <span>Road Safety Hotline (0800720822)</span>
                     <span className="material-symbols-outlined text-primary">call</span>
                   </a>
                 </div>
@@ -936,7 +912,7 @@ export const EmergencySosScreen: React.FC = () => {
               Verify PSV License & SACCO Markings
             </div>
             <p className="text-xs text-on-surface-variant leading-relaxed">
-              Always ensure the vehicle displays an official NTSA inspection sticker and SACCO branding on both sides before boarding.
+              Always ensure the vehicle displays an official inspection sticker and SACCO branding on both sides before boarding.
             </p>
           </Card>
 

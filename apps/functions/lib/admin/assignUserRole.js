@@ -6,6 +6,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
 const env_1 = require("../lib/env");
 const rateLimit_1 = require("../lib/rateLimit");
+const auth_2 = require("../lib/auth");
 const FUNCTION_OPTIONS = {
     region: 'europe-west1',
     enforceAppCheck: env_1.APP_CHECK_ENFORCED,
@@ -25,6 +26,8 @@ function verifyAdminCaller(request) {
     if (token.activeRole !== 'admin') {
         throw new https_1.HttpsError('permission-denied', 'Only administrators are authorized to assign roles.');
     }
+    // SEC-MFA: Authoritative backend MFA check for role assignments
+    (0, auth_2.requireMfaVerification)(token);
     return {
         uid: request.auth.uid,
         displayName: token.name || token.email || request.auth.uid,

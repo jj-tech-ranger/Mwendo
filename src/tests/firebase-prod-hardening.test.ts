@@ -91,4 +91,28 @@ describe('PROD-HARDENING: Production Firebase Decoupling & Regional Integrity', 
       expect(analyticsService.getDpaConsent()).toBe(true);
     });
   });
+
+  describe('Fix 4: Emulator URL Trigger Production Hardening', () => {
+    const evaluateUseEmulators = (
+      envVar: string | undefined,
+      isDev: boolean,
+      search: string
+    ): boolean => {
+      return envVar === 'true' || (isDev && typeof window !== 'undefined' && search.includes('useEmulator=true'));
+    };
+
+    it('asserts the URL trigger has no effect when DEV is false (production)', () => {
+      expect(evaluateUseEmulators(undefined, false, '?useEmulator=true')).toBe(false);
+      expect(evaluateUseEmulators('false', false, '?useEmulator=true')).toBe(false);
+    });
+
+    it('asserts the URL trigger activates emulators when DEV is true (development)', () => {
+      expect(evaluateUseEmulators(undefined, true, '?useEmulator=true')).toBe(true);
+    });
+
+    it('asserts env-var trigger remains functional regardless of URL or DEV state', () => {
+      expect(evaluateUseEmulators('true', false, '')).toBe(true);
+      expect(evaluateUseEmulators('true', false, '?useEmulator=false')).toBe(true);
+    });
+  });
 });

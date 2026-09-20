@@ -150,10 +150,17 @@ try {
 export const storage: FirebaseStorage = getStorage(app);
 export const functions: Functions = getFunctions(app, 'europe-west1');
 
-// Connect to local Firebase Emulator Suite when requested in development or test
+// Connect to local Firebase Emulator Suite when requested in development or test.
+// PRODUCTION HARDENING: the URL-query-param trigger is gated behind import.meta.env.DEV
+// (a Vite compile-time constant that is `false`, and dead-code-eliminated, in a production
+// build). Without this gate, appending `?useEmulator=true` to a production URL would cause
+// a visiting user's browser to permanently repoint its own Auth/Firestore/Storage/Functions
+// SDK instances at 127.0.0.1, breaking that session for the rest of the page lifetime. The
+// env-var trigger (`VITE_USE_FIREBASE_EMULATORS`) is unaffected and remains available for
+// local development and CI, since it is set at build time, not by an untrusted runtime URL.
 const useEmulators =
   import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true' ||
-  (typeof window !== 'undefined' && window.location.search.includes('useEmulator=true'));
+  (import.meta.env.DEV && typeof window !== 'undefined' && window.location.search.includes('useEmulator=true'));
 
 if (useEmulators) {
   const host = import.meta.env.VITE_FIREBASE_EMULATOR_HOST || '127.0.0.1';

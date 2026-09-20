@@ -122,11 +122,14 @@ export class BaseRepository<T extends { id: string }> {
         if (docSnap.exists()) {
           return docSnap.data();
         }
+        return null;
       } catch (err) {
-        console.warn(`[BaseRepository] getById error for ${this.collectionName}/${id}:`, err);
+        console.error(`[BaseRepository] getById query failure for ${this.collectionName}/${id}:`, err);
+        throw err;
       }
     }
 
+    // Fallback in-memory fixture store is ONLY reachable when Firebase is not configured at all (!hasRealConfig)
     const store = inMemoryStore[this.collectionName];
     if (store && store.has(id)) {
       return (store.get(id) as T) || null;
@@ -139,14 +142,15 @@ export class BaseRepository<T extends { id: string }> {
       try {
         const q = query(this.getCollection(), ...constraints);
         const querySnap = await getDocs(q);
-        if (!querySnap.empty) {
-          return querySnap.docs.map((docSnap) => docSnap.data());
-        }
+        // Honest query return: when Firestore legitimately returns 0 documents, return []
+        return querySnap.docs.map((docSnap) => docSnap.data());
       } catch (err) {
-        console.warn(`[BaseRepository] getAll error for ${this.collectionName}:`, err);
+        console.error(`[BaseRepository] getAll query failure for ${this.collectionName}:`, err);
+        throw err;
       }
     }
 
+    // Fallback in-memory fixture store is ONLY reachable when Firebase is not configured at all (!hasRealConfig)
     const store = inMemoryStore[this.collectionName];
     if (store && store.size > 0) {
       return Array.from(store.values()) as T[];
@@ -169,6 +173,7 @@ export class BaseRepository<T extends { id: string }> {
         await setDoc(this.getDocRef(data.id), data);
       } catch (err) {
         console.error(`[BaseRepository] save error for ${this.collectionName}/${data.id}:`, err);
+        throw err;
       }
     }
   }
@@ -187,6 +192,7 @@ export class BaseRepository<T extends { id: string }> {
         await updateDoc(doc(db, this.collectionName, id), data as DocumentData);
       } catch (err) {
         console.error(`[BaseRepository] update error for ${this.collectionName}/${id}:`, err);
+        throw err;
       }
     }
   }

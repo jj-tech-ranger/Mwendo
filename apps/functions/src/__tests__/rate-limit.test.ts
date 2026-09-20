@@ -120,4 +120,17 @@ describe('SEC-005: Rate Limiting Enforcement', () => {
       )
     ).rejects.toThrowError(/RATE_LIMIT_EXCEEDED/);
   });
+
+  it('fails closed and throws an Error when userId is missing or empty', async () => {
+    // Fails closed on empty string or falsy userId
+    await expect(enforceRateLimit(db, '', 'sos')).rejects.toThrowError(
+      /enforceRateLimit called without a verified userId/
+    );
+    await expect(enforceRateLimit(db, '   ', 'sos')).rejects.toThrowError(
+      /enforceRateLimit called without a verified userId/
+    );
+    await expect(enforceRateLimit(db, null as any, 'sos')).rejects.toThrowError(
+      /enforceRateLimit called without a verified userId/
+    );
+  });
 });

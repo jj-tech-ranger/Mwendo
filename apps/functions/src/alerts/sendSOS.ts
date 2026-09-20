@@ -92,10 +92,12 @@ export async function processSendSosLogic(
   options?: ProcessSendSosOptions
 ): Promise<SendSosResult> {
   const isAnonymous = options?.isAnonymous ?? false;
-  const userId = payload.userId || (isAnonymous ? 'anonymous_guest' : 'anonymous');
-  if (!userId || (userId === 'anonymous' && !isAnonymous)) {
-    throw new HttpsError('unauthenticated', 'Authenticated passenger required.');
-  }
+  // `payload.userId` is always set by the onCall wrapper below from the server-verified
+  // request.auth.uid, so this is a defensive guard against a malformed/empty value, not an
+  // anonymous-vs-registered check: a genuine Firebase Anonymous-Auth uid is a random string,
+  // never the literal word 'anonymous'.
+  const userId = payload.userId;
+  if (!userId) throw new HttpsError('unauthenticated', 'Authenticated passenger required.');
 
   const rawLat = payload.location?.lat ?? (payload as { latitude?: number }).latitude;
   const rawLng = payload.location?.lng ?? (payload as { longitude?: number }).longitude;

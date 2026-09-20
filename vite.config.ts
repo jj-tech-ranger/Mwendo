@@ -69,6 +69,10 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+      dedupe: ['react', 'react-dom', 'react-router', 'react-router-dom'],
+    },
+    optimizeDeps: {
+      include: ['react', 'react-dom', 'react-router-dom'],
     },
     server: {
       port: 3000,

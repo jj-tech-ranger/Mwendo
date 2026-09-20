@@ -54,16 +54,18 @@ describe('SaccoViolationsScreen (UI-014: Honest Empty State and Confidence Score
     );
 
     await waitFor(() => {
-      expect(screen.getByText('No Violations Recorded')).toBeDefined();
+      expect(screen.getByText('No violations recorded')).toBeDefined();
     });
 
     expect(
-      screen.getByText('No violations recorded in the selected period.')
+      screen.getByText(
+        'This may reflect a genuinely clean record, or that violation reporting has not yet started for this fleet. Absence of data here is not itself proof of a safe fleet.'
+      )
     ).toBeDefined();
-    expect(screen.queryByText('95%')).toBeNull();
+    expect(screen.queryByText(/95%/)).toBeNull();
   });
 
-  it('renders "Not available" and "—" risk weight when confidenceScore is absent/undefined rather than 95%', async () => {
+  it('renders "Not available" when confidenceScore is absent/undefined rather than 95%', async () => {
     const mockViolation = {
       id: 'viol_101',
       violationId: 'VIO-2026-101',
@@ -99,11 +101,10 @@ describe('SaccoViolationsScreen (UI-014: Honest Empty State and Confidence Score
       expect(screen.getByText('Violation Report: VIO-2026-101')).toBeDefined();
     });
 
-    // Verification confidence should say "Not available" — NOT 95%!
-    expect(screen.getByText(/Verification Confidence:\s*Not available/i)).toBeDefined();
-    expect(screen.getByText(/\(Risk Weight:\s*—\)/i)).toBeDefined();
+    // Verification confidence should say "Not available for this record" — NOT 95%!
+    expect(screen.getByText('Verification confidence: Not available for this record')).toBeDefined();
     expect(screen.queryByText(/95%/)).toBeNull();
-    expect(screen.queryByText(/0\.95x/)).toBeNull();
+    expect(screen.queryByText(/0\.95/)).toBeNull();
   });
 
   it('renders real percentage and risk weight when confidenceScore is present on record', async () => {
@@ -146,7 +147,7 @@ describe('SaccoViolationsScreen (UI-014: Honest Empty State and Confidence Score
     expect(screen.getByText(/\(Risk Weight:\s*0\.88x\)/i)).toBeDefined();
   });
 
-  it('renders filtered empty state when search term matches no violations', async () => {
+  it('renders table empty state when search term matches no violations', async () => {
     const mockViolation = {
       id: 'viol_103',
       violationId: 'VIO-2026-103',
@@ -177,9 +178,13 @@ describe('SaccoViolationsScreen (UI-014: Honest Empty State and Confidence Score
     fireEvent.change(searchInput, { target: { value: 'NONEXISTENT' } });
 
     await waitFor(() => {
-      expect(screen.getByText('No Matching Violations')).toBeDefined();
+      expect(screen.getByText('No violations recorded')).toBeDefined();
     });
 
-    expect(screen.getByText('No recorded violations match "NONEXISTENT".')).toBeDefined();
+    expect(
+      screen.getByText(
+        'This may reflect a genuinely clean record, or that violation reporting has not yet started for this fleet. Absence of data here is not itself proof of a safe fleet.'
+      )
+    ).toBeDefined();
   });
 });

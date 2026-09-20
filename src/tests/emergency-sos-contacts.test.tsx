@@ -597,8 +597,7 @@ describe('DATA-002: Emergency SOS Contacts Real Data & Zero Hardcoded Fake Profi
 
       // (b) Assert that every rendered claim corresponds to real fields in the response
       expect(channelsContainer.textContent).toContain('Sent SMS to David Muthoni (Brother)');
-      expect(channelsContainer.textContent).toContain("Internal alert sent to your SACCO's operations team");
-      expect(channelsContainer.textContent).toContain('Internal alert sent to on-duty safety officers');
+      expect(channelsContainer.textContent).toContain("Internal alert sent to your SACCO's dispatch team (2 notifications)");
 
       vi.useRealTimers();
     });
@@ -683,7 +682,7 @@ describe('DATA-002: Emergency SOS Contacts Real Data & Zero Hardcoded Fake Profi
 
       // Confirms honesty: Shows failed message, NOT false "Sent SMS" or false success
       expect(channelsContainer.textContent).toContain('SMS delivery failed to John Mwangi (Father)');
-      expect(channelsContainer.textContent).toContain('Alert to SACCO operations team failed');
+      expect(channelsContainer.textContent).toContain('2 notifications could not be confirmed delivered');
       expect(channelsContainer.textContent).not.toContain('Sent SMS to John Mwangi');
       expect(channelsContainer.textContent).not.toContain('NTSA');
 

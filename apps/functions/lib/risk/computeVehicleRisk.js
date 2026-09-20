@@ -8,6 +8,7 @@ const engine_1 = require("../lib/engine");
 const env_1 = require("../lib/env");
 const plate_1 = require("../lib/plate");
 const constants_1 = require("../lib/constants");
+const auth_1 = require("../lib/auth");
 function parseSeverity(val) {
     if (val === 'medium' || val === 'high' || val === 'critical') {
         return val;
@@ -144,6 +145,10 @@ exports.computeVehicleRisk = (0, https_1.onCall)({ enforceAppCheck: env_1.APP_CH
     // Role and tenancy authorization check
     const role = (request.auth.token?.activeRole || request.auth.token?.role || 'passenger');
     const userSaccoId = request.auth.token?.saccoId;
+    // SEC-MFA: Authoritative backend MFA check for privileged operations
+    if (role === 'admin' || role === 'authority') {
+        (0, auth_1.requireMfaVerification)(request.auth.token);
+    }
     if (role === 'sacco_manager' && userSaccoId && event.saccoId && userSaccoId !== event.saccoId) {
         throw new https_1.HttpsError('permission-denied', 'Cannot compute risk for a different SACCO.');
     }

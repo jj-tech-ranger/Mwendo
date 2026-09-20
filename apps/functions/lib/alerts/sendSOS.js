@@ -60,9 +60,14 @@ async function writeToDLQ(db, entry) {
         console.error('[DLQ] Failed to record notification failure:', err);
     }
 }
-async function processSendSosLogic(db, messagingProvider, smsProvider, payload) {
-    const userId = payload.userId || 'anonymous';
-    if (!userId || userId === 'anonymous')
+async function processSendSosLogic(db, messagingProvider, smsProvider, payload, options) {
+    const isAnonymous = options?.isAnonymous ?? false;
+    // `payload.userId` is always set by the onCall wrapper below from the server-verified
+    // request.auth.uid, so this is a defensive guard against a malformed/empty value, not an
+    // anonymous-vs-registered check: a genuine Firebase Anonymous-Auth uid is a random string,
+    // never the literal word 'anonymous'.
+    const userId = payload.userId;
+    if (!userId)
         throw new https_1.HttpsError('unauthenticated', 'Authenticated passenger required.');
     const rawLat = payload.location?.lat ?? payload.latitude;
     const rawLng = payload.location?.lng ?? payload.longitude;
@@ -89,7 +94,10 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
         throw err;
     });
     try {
-        await (0, rateLimit_1.enforceRateLimit)(db, userId, 'sos');
+        await (0, rateLimit_1.enforceRateLimit)(db, userId, 'sos', Date.now(), {
+            isAnonymous,
+            secondaryKey: options?.secondaryKey,
+        });
         const userSnap = await db.collection('users').doc(userId).get();
         const userData = userSnap.data() || {};
         const userDisplayName = typeof userData.displayName === 'string' ? userData.displayName.slice(0, 120) : 'Passenger';
@@ -156,6 +164,36 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
                 await writeToDLQ(db, { id: `dlq_fcm_${alertId}_${Date.now()}`, topic: 'safety-alerts', type: 'fcm_push_notification', alertId, userId, targetRecipient: topic, payload: fcmPayload, error: err });
             }
         }
+        const notifiedChannels = [];
+        for (const c of contactsSummary) {
+            notifiedChannels.push({
+                channel: 'sms',
+                label: c.status === 'dispatched'
+                    ? `Sent SMS to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`
+                    : `SMS delivery failed to ${c.name}${c.relationship ? ` (${c.relationship})` : ''}`,
+                status: c.status,
+            });
+        }
+        for (const f of fcmSummary) {
+            if (f.target.startsWith('sacco_')) {
+                notifiedChannels.push({
+                    channel: 'sacco_fcm',
+                    label: f.status === 'dispatched'
+                        ? "Internal alert sent to your SACCO's operations team"
+                        : "Alert to SACCO operations team failed",
+                    status: f.status,
+                });
+            }
+            else if (f.target === 'authority_alerts') {
+                notifiedChannels.push({
+                    channel: 'authority_fcm',
+                    label: f.status === 'dispatched'
+                        ? 'Internal alert sent to on-duty safety officers'
+                        : 'Alert to safety officers failed',
+                    status: f.status,
+                });
+            }
+        }
         const safetyAlertData = {
             id: alertId, tripId: payload.tripId || null, userId, vehicleRegNumber: effectiveVehicleReg, saccoId: effectiveSaccoId,
             type: 'sos', severity: 'critical', message: payload.message || `Emergency SOS triggered by ${userDisplayName}`,
@@ -165,7 +203,7 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
             emergencyContactsCount: emergencyContacts.length, updatedAt: new Date().toISOString(),
         };
         await db.collection('safety_alerts').doc(alertId).create(safetyAlertData);
-        const result = { success: true, alertId, userId, saccoId: effectiveSaccoId, contactsNotifiedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount, contactsSummary, fcmSummary };
+        const result = { success: true, alertId, userId, saccoId: effectiveSaccoId, contactsNotifiedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount, contactsSummary, fcmSummary, notifiedChannels };
         await db.collection('audit_logs').doc(`audit_${alertId}`).set({ id: `audit_${alertId}`, action: 'EMERGENCY_SOS_DISPATCHED', actorUid: userId, actorName: userDisplayName, actorRole: 'passenger', saccoId: effectiveSaccoId, target: `Alert ${alertId} (${effectiveVehicleReg})`, timestamp: new Date().toISOString(), details: { alertId, emergencyContactsConfigured: emergencyContacts.length, smsDispatchedCount: successfulSmsCount, fcmDispatchedCount: successfulFcmCount, dlqCount } });
         await requestRef.update({ status: 'completed', result, completedAt: new Date().toISOString() });
         return result;
@@ -178,9 +216,11 @@ async function processSendSosLogic(db, messagingProvider, smsProvider, payload) 
 exports.sendSOS = (0, https_1.onCall)({ enforceAppCheck: true }, async (request) => {
     if (!request.auth)
         throw new https_1.HttpsError('unauthenticated', 'Caller must be authenticated to invoke sendSOS.');
+    const isAnonymous = (0, rateLimit_1.isAnonymousAuth)(request.auth);
+    const secondaryKey = (0, rateLimit_1.extractClientIdentifier)(request);
     const payload = { ...request.data, userId: request.auth.uid };
     try {
-        return await processSendSosLogic((0, firestore_1.getFirestore)(), new DefaultMessagingProvider(), new DefaultSmsProvider(), payload);
+        return await processSendSosLogic((0, firestore_1.getFirestore)(), new DefaultMessagingProvider(), new DefaultSmsProvider(), payload, { isAnonymous, secondaryKey });
     }
     catch (err) {
         if (err instanceof https_1.HttpsError)

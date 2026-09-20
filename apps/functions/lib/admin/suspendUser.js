@@ -5,6 +5,7 @@ const https_1 = require("firebase-functions/v2/https");
 const firestore_1 = require("firebase-admin/firestore");
 const auth_1 = require("firebase-admin/auth");
 const env_1 = require("../lib/env");
+const auth_2 = require("../lib/auth");
 /**
  * Verify caller is an active admin by inspecting Auth token claims.
  * SEC-004 & SEC-009: Auth custom claims (auth.token.activeRole === 'admin') are the sole source
@@ -25,6 +26,8 @@ async function verifyAdminCaller(auth) {
     if (tokenClaimRole !== 'admin') {
         throw new https_1.HttpsError('permission-denied', 'Caller does not possess administrative privileges.');
     }
+    // SEC-MFA: Authoritative backend MFA check for sensitive administrative operations
+    (0, auth_2.requireMfaVerification)(auth.token);
     let displayName = typeof auth.token?.name === 'string' ? auth.token.name : 'System Admin';
     try {
         // Read Firestore document only for displayName in audit logging if available

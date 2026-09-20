@@ -361,14 +361,11 @@ describe('ReportBlackSpotScreen (PROMPT 10 Offline-Queued vs Transmitted Confirm
 
     expect(screen.getByTestId('report-queued-title').textContent).toBe('Report Saved — Will Send Automatically');
     expect(screen.getByTestId('report-queued-description').textContent).toContain(
-      "Your hazard report is safely stored on this device. It has not reached Mwendo's servers yet, but will transmit automatically once connectivity returns."
+      "Your device is offline (or the network request failed), so this report is saved on your phone and hasn't reached our servers yet."
     );
-    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points (Pending Sync)');
-    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score (Pending Sync)');
-    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Queued Locally (Pending Sync)');
-    expect(screen.getByTestId('offline-queue-info-card').textContent).toContain(
-      'You can monitor pending sync items in the banner at the top of the screen.'
-    );
+    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points');
+    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score');
+    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Saved on Device — Not Yet Sent');
 
     // Ensure submitted online claims are NOT rendered
     expect(screen.queryByTestId('report-submitted-title')).toBeNull();
@@ -426,9 +423,12 @@ describe('ReportBlackSpotScreen (PROMPT 10 Offline-Queued vs Transmitted Confirm
     });
 
     expect(screen.getByTestId('report-queued-title').textContent).toBe('Report Saved — Will Send Automatically');
-    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points (Pending Sync)');
-    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score (Pending Sync)');
-    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Queued Locally (Pending Sync)');
+    expect(screen.getByTestId('report-queued-description').textContent).toContain(
+      "Your device is offline (or the network request failed), so this report is saved on your phone and hasn't reached our servers yet."
+    );
+    expect(screen.getByTestId('badge-safety-points-queued').textContent).toBe('+25 Safety Points');
+    expect(screen.getByTestId('badge-trust-score-queued').textContent).toBe('+10 Trust Score');
+    expect(screen.getByTestId('status-report-queued').textContent).toContain('Status: Saved on Device — Not Yet Sent');
 
     // Ensure submitted online claims are NOT rendered
     expect(screen.queryByTestId('report-submitted-title')).toBeNull();

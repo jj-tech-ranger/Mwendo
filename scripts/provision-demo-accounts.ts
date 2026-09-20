@@ -20,10 +20,7 @@ function getSecret(name: string, fallback?: string): string {
   throw new Error(`Missing required environment variable: ${name}`);
 }
 
-const ADMIN_EMAIL =
-  process.env.DEMO_ADMIN_EMAIL ||
-  process.env.MWENDO_DEMO_ADMIN_EMAIL ||
-  getSecret('DEMO_ADMIN_EMAIL', 'admin@example.com');
+const ADMIN_EMAIL = process.env.MWENDO_DEMO_ADMIN_EMAIL || 'admin.demo@mwendo-salama.test';
 
 export const DEMO_ACCOUNTS = {
   admin: {

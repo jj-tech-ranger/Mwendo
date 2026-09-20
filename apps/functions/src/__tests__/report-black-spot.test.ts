@@ -115,14 +115,14 @@ describe('Cloud Functions — reportBlackSpot (HAZ-001, RATE-001 & AUDIT-002)', 
       });
     });
 
-    it('rejects anonymous caller with unauthenticated error', async () => {
+    it('rejects unauthenticated caller with unauthenticated error', async () => {
       const mockDb = createMockDb() as any;
       const payload: ReportBlackSpotPayload = {
         location: { lat: -1.286389, lng: 36.817223 },
       };
 
       await expect(
-        processReportBlackSpotLogic(mockDb, payload, 'anonymous')
+        processReportBlackSpotLogic(mockDb, payload, '')
       ).rejects.toMatchObject({
         code: 'unauthenticated',
       });
