@@ -1,5 +1,5 @@
 /**
- * Core Algorithmic Engine for Mwendosalama
+ * Core Algorithmic Engine for Mwendo Salama
  * Implements GPS smoothing, confidence scoring, vehicle risk calculation,
  * reporter trust engine, and violation detection rules.
  */
@@ -288,18 +288,39 @@ export const detectOverspeedViolations = (
   const violations: OverspeedViolationTrigger[] = [];
   if (!samples || samples.length === 0) return violations;
 
-  const smoother = new SpeedSmoother(0.35, 30);
   let consecutiveOverspeedStartTime: number | null = null;
   let currentMaxSpeed = 0;
   let cooldownUntilMs = 0;
+  let lastValidSampleTimeMs: number | null = null;
 
   for (let i = 0; i < samples.length; i++) {
     const s = samples[i];
     if (!s) continue;
-    const sampleTimeMs = new Date(s.timestamp).getTime();
-    const { isValid, smoothedSpeedKmH } = smoother.processSample(s);
 
-    if (!isValid) continue;
+    // Filter invalid / low-accuracy GPS samples
+    if (
+      typeof s.accuracy !== 'number' ||
+      s.accuracy <= 0 ||
+      s.accuracy > 30 ||
+      !Number.isFinite(s.accuracy) ||
+      typeof s.speedKmH !== 'number' ||
+      !Number.isFinite(s.speedKmH)
+    ) {
+      continue;
+    }
+
+    const sampleTimeMs = new Date(s.timestamp).getTime();
+    if (isNaN(sampleTimeMs)) continue;
+
+    const rawSpeed = Math.max(0, s.speedKmH);
+
+    // Check sample continuity: if gap between consecutive valid samples exceeds 3.5s,
+    // continuous sustained overspeed chain is interrupted.
+    if (lastValidSampleTimeMs !== null && sampleTimeMs - lastValidSampleTimeMs > 3500) {
+      consecutiveOverspeedStartTime = null;
+      currentMaxSpeed = 0;
+    }
+    lastValidSampleTimeMs = sampleTimeMs;
 
     if (sampleTimeMs < cooldownUntilMs) {
       // In cooldown window
@@ -308,12 +329,59 @@ export const detectOverspeedViolations = (
       continue;
     }
 
-    if (smoothedSpeedKmH > speedLimitKmH) {
+    // Single-sample spike rejection via lookback / lookahead:
+    // If a sample's speed spikes > 20 km/h above both its preceding valid sample
+    // and succeeding valid sample, treat it as an isolated GPS noise spike.
+    let effectiveSpeed = rawSpeed;
+    let prevValidSpeed: number | null = null;
+    for (let p = i - 1; p >= 0; p--) {
+      const prev = samples[p];
+      if (
+        prev &&
+        typeof prev.accuracy === 'number' &&
+        prev.accuracy > 0 &&
+        prev.accuracy <= 30 &&
+        Number.isFinite(prev.accuracy) &&
+        typeof prev.speedKmH === 'number' &&
+        Number.isFinite(prev.speedKmH)
+      ) {
+        prevValidSpeed = Math.max(0, prev.speedKmH);
+        break;
+      }
+    }
+
+    let nextValidSpeed: number | null = null;
+    for (let n = i + 1; n < samples.length; n++) {
+      const next = samples[n];
+      if (
+        next &&
+        typeof next.accuracy === 'number' &&
+        next.accuracy > 0 &&
+        next.accuracy <= 30 &&
+        Number.isFinite(next.accuracy) &&
+        typeof next.speedKmH === 'number' &&
+        Number.isFinite(next.speedKmH)
+      ) {
+        nextValidSpeed = Math.max(0, next.speedKmH);
+        break;
+      }
+    }
+
+    if (
+      prevValidSpeed !== null &&
+      nextValidSpeed !== null &&
+      rawSpeed - prevValidSpeed > 20 &&
+      rawSpeed - nextValidSpeed > 20
+    ) {
+      effectiveSpeed = Math.max(prevValidSpeed, nextValidSpeed);
+    }
+
+    if (effectiveSpeed > speedLimitKmH) {
       if (consecutiveOverspeedStartTime === null) {
         consecutiveOverspeedStartTime = sampleTimeMs;
-        currentMaxSpeed = smoothedSpeedKmH;
+        currentMaxSpeed = effectiveSpeed;
       } else {
-        currentMaxSpeed = Math.max(currentMaxSpeed, smoothedSpeedKmH);
+        currentMaxSpeed = Math.max(currentMaxSpeed, effectiveSpeed);
         const durationSec = (sampleTimeMs - consecutiveOverspeedStartTime) / 1000;
 
         if (durationSec >= 4.0) {

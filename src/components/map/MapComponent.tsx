@@ -171,7 +171,7 @@ export const MapComponent: React.FC<MapComponentProps> = ({
       heatmapLayerRef.current = null;
       routeLayerRef.current = null;
     };
-  }, [initialCenter, initialZoom, pinnedLocation]);
+  }, [initialCenter, initialZoom, pinnedLocation, markers]);
 
   // Click listener for manual pin dropping
   useEffect(() => {

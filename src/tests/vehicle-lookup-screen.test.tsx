@@ -82,7 +82,7 @@ describe('FEAT: Passenger Vehicle Lookup Screen ("Check Before You Board")', () 
     expect(screen.queryByText(/inspectionExpiry/i)).toBeNull();
   });
 
-  it('displays provisional status and supportive guidance for unregistered vehicles', async () => {
+  it('displays explicit unverified status and supportive guidance for unregistered vehicles (Phase 6 / BUG-005)', async () => {
     vi.spyOn(vehiclePublicSummaryRepository, 'findByNormalizedPlate').mockResolvedValueOnce(null);
 
     render(
@@ -103,12 +103,44 @@ describe('FEAT: Passenger Vehicle Lookup Screen ("Check Before You Board")', () 
       expect(screen.getByText('KZZ999X')).toBeTruthy();
     });
 
-    expect(screen.getByText(/Provisional \/ Unregistered/i)).toBeTruthy();
+    // Explicit unverified badge and banner
+    expect(screen.getByTestId('unverified-plate-banner')).toBeTruthy();
+    expect(screen.getByText(/Unverified Plate — Not In Fleet Registry/i)).toBeTruthy();
+    expect(screen.getAllByText(/We couldn't confirm this plate/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Independent \/ Unregistered PSV/i)).toBeTruthy();
-    expect(screen.getByText(/No historical risk data on record/i)).toBeTruthy();
+    expect(screen.getAllByText(/you can still start your trip/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('initiates trip tracking when clicking "Board This Vehicle & Track Trip"', async () => {
+  it('tags trip with vehicleVerified: false when boarding an unverified vehicle', async () => {
+    vi.spyOn(vehiclePublicSummaryRepository, 'findByNormalizedPlate').mockResolvedValueOnce(null);
+
+    render(
+      <MemoryRouter initialEntries={['/passenger/lookup?plate=KZZ999X']}>
+        <Routes>
+          <Route path="/passenger/lookup" element={<VehicleLookupScreen />} />
+          <Route path="/passenger/start-trip" element={<div data-testid="start-trip-target">Start Trip Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('unverified-plate-banner')).toBeTruthy();
+    });
+
+    const boardBtn = screen.getByTestId('btn-board-vehicle');
+    expect(boardBtn.textContent).toContain('Unverified Plate');
+    fireEvent.click(boardBtn);
+
+    const activeTrip = useTripStore.getState().activeTrip;
+    expect(activeTrip).not.toBeNull();
+    expect(activeTrip?.plateNumber).toBe('KZZ999X');
+    expect(activeTrip?.vehicleId).toBeUndefined();
+    expect(activeTrip?.vehicleVerified).toBe(false);
+    expect(activeTrip?.isProvisional).toBe(true);
+    expect(screen.getByTestId('start-trip-target')).toBeTruthy();
+  });
+
+  it('initiates trip tracking with vehicleVerified: true when clicking "Board This Vehicle & Track Trip" for verified vehicle', async () => {
     vi.spyOn(vehiclePublicSummaryRepository, 'findByNormalizedPlate').mockResolvedValueOnce({
       id: 'KDA123A',
       vehicleId: 'KDA123A',
@@ -140,6 +172,7 @@ describe('FEAT: Passenger Vehicle Lookup Screen ("Check Before You Board")', () 
     expect(activeTrip).not.toBeNull();
     expect(activeTrip?.plateNumber).toBe('KDA 123A');
     expect(activeTrip?.vehicleId).toBe('KDA123A');
+    expect(activeTrip?.vehicleVerified).toBe(true);
     expect(activeTrip?.saccoId).toBe('sacco_metro');
     expect(activeTrip?.isProvisional).toBe(false);
 

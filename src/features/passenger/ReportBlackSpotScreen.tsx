@@ -113,9 +113,11 @@ export const ReportBlackSpotScreen: React.FC = () => {
     setIsSubmitting(true);
     setRateLimitError(null);
     const reportId = `bs_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `bs_uuid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const newReport = {
       id: reportId,
       spotId: reportId,
+      idempotencyKey,
       title: title.trim() || 'Road Hazard',
       name: title.trim() || locationName || 'Road Hazard',
       description,

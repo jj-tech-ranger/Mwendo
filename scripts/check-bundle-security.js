@@ -14,6 +14,8 @@ const FORBIDDEN_PATTERNS = [
   '__INITIAL_TEST_ROLE__',
   '__INITIAL_TEST_SACCO__',
   'testAuthHarness',
+  'TEST_AUTH_OVERRIDE',
+  'test.mwendo.co.ke',
 ];
 
 function getFilesRecursively(dir) {

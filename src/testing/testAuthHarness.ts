@@ -7,12 +7,14 @@ export interface WindowWithAuthHelpers {
   __TEST_AUTH_OVERRIDE__?: boolean;
   __INITIAL_TEST_ROLE__?: UserRole;
   __INITIAL_TEST_SACCO__?: string;
+  __isDevAuthBypass?: boolean;
 }
 
 export function installTestAuthHarness(): void {
   if (typeof window === 'undefined') return;
 
   const win = window as unknown as WindowWithAuthHelpers;
+  win.__isDevAuthBypass = true;
   win.__useAuthStore = useAuthStore;
   win.__setTestAuth = (
     role: UserRole = 'admin',

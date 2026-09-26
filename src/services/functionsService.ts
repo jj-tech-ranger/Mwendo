@@ -693,6 +693,7 @@ export const functionsService = {
    */
   async reportBlackSpot(payload: {
     id?: string | undefined;
+    idempotencyKey?: string | undefined;
     title?: string | undefined;
     description?: string | undefined;
     hazardType?: string | undefined;
@@ -709,9 +710,9 @@ export const functionsService = {
     corroborationsCount?: number | undefined;
     createdAt?: string | undefined;
     updatedAt?: string | undefined;
-  }): Promise<{ success: boolean; spotId: string }> {
+  }): Promise<{ success: boolean; spotId: string; alreadyProcessed?: boolean }> {
     try {
-      const callable = httpsCallable<typeof payload, { success: boolean; spotId: string }>(functions, 'reportBlackSpot');
+      const callable = httpsCallable<typeof payload, { success: boolean; spotId: string; alreadyProcessed?: boolean }>(functions, 'reportBlackSpot');
       const res = await callable(payload);
       return res.data;
     } catch (remoteErr: unknown) {
@@ -1098,5 +1099,65 @@ export const functionsService = {
       'assignUserRole',
       payload as Record<string, unknown>
     );
+  },
+
+  /**
+   * Register device FCM push notification token (§27)
+   */
+  async registerDeviceToken(payload: { token: string; platform?: string | undefined }): Promise<{ success: boolean; tokenId: string }> {
+    try {
+      const callable = httpsCallable<typeof payload, { success: boolean; tokenId: string }>(functions, 'registerDeviceToken');
+      const res = await callable(payload);
+      return res.data;
+    } catch (remoteErr) {
+      console.warn('[functionsService] Remote registerDeviceToken failed or offline, saving to Firestore directly:', remoteErr);
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('User must be authenticated to register device token.');
+      }
+      const now = new Date().toISOString();
+      const tokenId = payload.token.slice(-32);
+      await setDoc(doc(db, 'users', user.uid, 'fcm_tokens', tokenId), {
+        id: tokenId,
+        token: payload.token,
+        platform: payload.platform || 'web',
+        userId: user.uid,
+        createdAt: now,
+        updatedAt: now,
+        lastSeenAt: now,
+      }, { merge: true });
+      await updateDoc(doc(db, 'users', user.uid), {
+        fcmToken: payload.token,
+        updatedAt: now,
+      }).catch(async () => {
+        await setDoc(doc(db, 'users', user.uid), { fcmToken: payload.token, updatedAt: now }, { merge: true });
+      });
+      return { success: true, tokenId };
+    }
+  },
+
+  /**
+   * Unregister device FCM push notification token
+   */
+  async unregisterDeviceToken(payload: { token: string }): Promise<{ success: boolean }> {
+    try {
+      const callable = httpsCallable<typeof payload, { success: boolean }>(functions, 'unregisterDeviceToken');
+      const res = await callable(payload);
+      return res.data;
+    } catch (remoteErr) {
+      console.warn('[functionsService] Remote unregisterDeviceToken failed or offline, updating Firestore directly:', remoteErr);
+      const user = auth.currentUser;
+      if (user) {
+        const tokenId = payload.token.slice(-32);
+        try {
+          const { deleteDoc: delDoc } = await import('firebase/firestore');
+          await delDoc(doc(db, 'users', user.uid, 'fcm_tokens', tokenId));
+          await updateDoc(doc(db, 'users', user.uid), { fcmToken: null });
+        } catch (e) {
+          console.warn('[functionsService] Local unregister error:', e);
+        }
+      }
+      return { success: true };
+    }
   },
 };

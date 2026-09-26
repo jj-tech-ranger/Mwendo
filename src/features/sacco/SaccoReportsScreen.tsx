@@ -128,6 +128,15 @@ export const SaccoReportsScreen: React.FC = () => {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] p-xl space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        <p className="font-body-md text-sm text-on-surface-variant">Compiling SACCO safety data...</p>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <EmptyState

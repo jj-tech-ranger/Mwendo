@@ -13,9 +13,11 @@ interface AuthState {
   logout: () => void;
 }
 
+export const AUTH_SESSION_STORAGE_KEY = 'mwendosalama_auth_session_cache';
+
 const getInitialAuthState = (): { user: UserProfile | null; claims: UserClaims | null; isAuthenticated: boolean } => {
   if (typeof window !== 'undefined') {
-    const cached = window.localStorage.getItem('mwendosalama_demo_auth_session');
+    const cached = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY);
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
@@ -26,41 +28,6 @@ const getInitialAuthState = (): { user: UserProfile | null; claims: UserClaims |
     }
   }
 
-  if (import.meta.env.DEV && typeof window !== 'undefined') {
-    const win = window as unknown as Record<string, unknown>;
-    const testOverrideKey = ['__', 'TEST', '_', 'AUTH', '_', 'OVERRIDE', '__'].join('');
-    const initialRoleKey = ['__', 'INITIAL', '_', 'TEST', '_', 'ROLE', '__'].join('');
-    const initialSaccoKey = ['__', 'INITIAL', '_', 'TEST', '_', 'SACCO', '__'].join('');
-
-    if (win[testOverrideKey] && win[initialRoleKey]) {
-      const role = (win[initialRoleKey] as UserRole) || 'admin';
-      const saccoId = (win[initialSaccoKey] as string) || 'sacco_metrolink';
-      const claims: UserClaims = {
-        activeRole: role,
-        saccoId: role === 'sacco_manager' ? saccoId : undefined,
-        authorityScope: role === 'authority' ? 'national' : undefined,
-        isSuspended: false,
-      };
-      const user: UserProfile = {
-        id: `test_${role}_uid`,
-        uid: `test_${role}_uid`,
-        email: `${role}@test.mwendo.co.ke`,
-        displayName: `Test ${role.toUpperCase()}`,
-        role,
-        activeRole: role,
-        claimedActiveRole: role,
-        saccoId: role === 'sacco_manager' ? saccoId : undefined,
-        claims,
-        isActive: true,
-        isVerified: true,
-        isMfaEnrolled: true,
-        isMfaVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      return { user, claims, isAuthenticated: true };
-    }
-  }
   return { user: null, claims: null, isAuthenticated: false };
 };
 
@@ -81,11 +48,11 @@ export const useAuthStore = create<AuthState>((set) => ({
       try {
         if (user) {
           window.localStorage.setItem(
-            'mwendosalama_demo_auth_session',
+            AUTH_SESSION_STORAGE_KEY,
             JSON.stringify({ user, claims: resolvedClaims })
           );
         } else {
-          window.localStorage.removeItem('mwendosalama_demo_auth_session');
+          window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
         }
       } catch {}
     }
@@ -134,7 +101,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   logout: () => {
     if (typeof window !== 'undefined') {
       try {
-        window.localStorage.removeItem('mwendosalama_demo_auth_session');
+        window.localStorage.removeItem(AUTH_SESSION_STORAGE_KEY);
       } catch {}
     }
     set({ user: null, claims: null, isAuthenticated: false, isLoading: false });

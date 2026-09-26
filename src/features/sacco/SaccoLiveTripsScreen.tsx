@@ -61,7 +61,7 @@ export const SaccoLiveTripsScreen: React.FC = () => {
       q,
       (snapshot) => {
         if (!snapshot.empty) {
-          const liveTrips = snapshot.docs.map((docSnap, idx) => {
+          const liveTrips = snapshot.docs.map((docSnap) => {
             const t = docSnap.data();
             return {
               id: docSnap.id,
@@ -172,7 +172,12 @@ export const SaccoLiveTripsScreen: React.FC = () => {
               Active Vehicles On Route — {saccoName}
             </h3>
 
-            {trips.length === 0 ? (
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-md text-on-surface-variant gap-2">
+                <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                <p className="text-xs">Connecting to live vehicle telemetry...</p>
+              </div>
+            ) : trips.length === 0 ? (
               <p className="text-xs text-on-surface-variant font-mono p-4">No active trips currently tracked for this SACCO.</p>
             ) : (
               trips.map((t) => (

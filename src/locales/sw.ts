@@ -352,6 +352,8 @@ export const sw = {
       quickTools: 'Zana za Haraka',
       emergencySos: 'Dharura ya SOS',
       tripLogs: 'Kumbukumbu za Safari',
+      recentTrips: 'Safari za Hivi Karibuni',
+      viewAllTrips: 'Tazama Zote',
     },
     trips: {
       title: 'Kumbukumbu za Safari',

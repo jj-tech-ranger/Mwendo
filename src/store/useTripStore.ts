@@ -24,7 +24,15 @@ interface PersistedTripState {
 }
 
 interface TripState extends PersistedTripState {
-  startTrip: (params: { vehicleId?: string | undefined; plateNumber: string; saccoName?: string | undefined; saccoId?: string | undefined; routeName?: string | undefined; isProvisional?: boolean | undefined }) => void;
+  startTrip: (params: {
+    vehicleId?: string | undefined;
+    plateNumber: string;
+    saccoName?: string | undefined;
+    saccoId?: string | undefined;
+    routeName?: string | undefined;
+    isProvisional?: boolean | undefined;
+    vehicleVerified?: boolean | undefined;
+  }) => void;
   updateTelemetry: (speed: number, gps?: GPSPoint) => void;
   pauseTrip: () => void;
   resumeTrip: () => void;
@@ -151,7 +159,15 @@ let lastTelemetryPersistence = 0;
 export const useTripStore = create<TripState>((set, get) => ({
   ...persistedTrip,
 
-  startTrip: ({ vehicleId, plateNumber, saccoName, saccoId, routeName = 'Standard Route', isProvisional }) => {
+  startTrip: ({
+    vehicleId,
+    plateNumber,
+    saccoName,
+    saccoId,
+    routeName = 'Standard Route',
+    isProvisional,
+    vehicleVerified,
+  }) => {
     const state = get();
     if (state.activeTrip && state.isTracking) {
       throw new Error('TRIP001: An active trip is already in progress.');
@@ -167,12 +183,18 @@ export const useTripStore = create<TripState>((set, get) => ({
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const cleanPlate = plateNumber.trim().toUpperCase();
+    const isVerified =
+      typeof vehicleVerified === 'boolean'
+        ? vehicleVerified
+        : Boolean(vehicleId && !isProvisional);
+
     const newTrip: Trip = {
       id: `trip_${uuid}`,
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
       ...(userId ? { userId } : {}),
       ...(vehicleId ? { vehicleId } : {}),
       ...(typeof isProvisional === 'boolean' ? { isProvisional } : !vehicleId ? { isProvisional: true } : {}),
+      vehicleVerified: isVerified,
       vehicleRegNumber: cleanPlate,
       plateNumber: cleanPlate,
       saccoId,

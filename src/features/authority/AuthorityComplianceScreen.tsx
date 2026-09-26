@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { limit, orderBy } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { violationRepository, auditLogRepository } from '../../repositories';
-import { Violation, SeverityLevel } from '../../types';
+import { Violation } from '../../types';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { severityToBadgeVariant } from '../../lib/severity';
@@ -175,7 +175,16 @@ export const AuthorityComplianceScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-              {filteredViolations.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={8} className="py-8 px-3 text-center text-on-surface-variant">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span>Loading compliance violations...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredViolations.length > 0 ? (
                 filteredViolations.map((v) => (
                   <tr key={v.id} className="hover:bg-surface-container-low/50">
                     <td className="py-3 px-3 font-bold text-on-surface">{v.vehicleRegNumber}</td>

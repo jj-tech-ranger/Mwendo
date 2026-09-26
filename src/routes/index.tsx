@@ -9,9 +9,9 @@ import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { RouteErrorElement } from '../components/common/RouteErrorElement';
 import { lazyWithRetry } from '../lib/lazyWithRetry';
 import { BrandLoader } from '../components/ui/LoadingIndicators';
+import { WelcomeScreen } from '../features/auth/WelcomeScreen';
 
 // Route-based Code Splitting with Auto-Retry
-const WelcomeScreen = lazyWithRetry(() => import('../features/auth/WelcomeScreen').then((m) => ({ default: m.WelcomeScreen })));
 const LoginScreen = lazyWithRetry(() => import('../features/auth/LoginScreen').then((m) => ({ default: m.LoginScreen })));
 const RegisterScreen = lazyWithRetry(() => import('../features/auth/RegisterScreen').then((m) => ({ default: m.RegisterScreen })));
 const ForgotPasswordScreen = lazyWithRetry(() => import('../features/auth/ForgotPasswordScreen').then((m) => ({ default: m.ForgotPasswordScreen })));
@@ -103,8 +103,8 @@ const withFullPageSuspense = (element: React.ReactNode) => (
 );
 
 const router = createBrowserRouter([
-  { path: '/', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<WelcomeScreen />) },
-  { path: '/onboarding', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<WelcomeScreen />) },
+  { path: '/', errorElement: <RouteErrorElement />, element: <WelcomeScreen /> },
+  { path: '/onboarding', errorElement: <RouteErrorElement />, element: <WelcomeScreen /> },
   { path: '/location-permission', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<PermissionsWizardScreen />) },
   { path: '/permissions-wizard', errorElement: <RouteErrorElement />, element: withFullPageSuspense(<PermissionsWizardScreen />) },
 

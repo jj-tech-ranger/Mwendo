@@ -75,7 +75,7 @@ export const AdminUsersScreen: React.FC = () => {
   const [roleError, setRoleError] = useState<string | null>(null);
 
   // Safeguard: check if current admin is the sole active admin and attempting self-demotion
-  const activeAdminsCount = users.filter((u) => u.isActive && (u.role === 'admin' || (u as any).activeRole === 'admin')).length;
+  const activeAdminsCount = users.filter((u) => u.isActive && (u.role === 'admin' || (u as { activeRole?: string }).activeRole === 'admin')).length;
   const isSoleAdminSelfDemoting =
     currentAdmin?.id === userToAssignRole?.id && selectedNewRole !== 'admin' && activeAdminsCount <= 1;
 
@@ -119,10 +119,11 @@ export const AdminUsersScreen: React.FC = () => {
       );
       setUserToAssignRole(null);
       setSelectedUser(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to assign user role:', err);
-      setRoleError(err?.message || 'Failed to assign role. Please verify your permissions and input parameters.');
-      showToast('error', 'Role Assignment Failed', err?.message || 'Error updating user role.');
+      const errMessage = err instanceof Error ? err.message : 'Error updating user role.';
+      setRoleError(errMessage);
+      showToast('error', 'Role Assignment Failed', errMessage);
     } finally {
       setIsRoleSubmitting(false);
     }
@@ -135,7 +136,6 @@ export const AdminUsersScreen: React.FC = () => {
     setActionSuccess(null);
 
     const isSuspending = userToSuspend.isActive; // if currently active, we suspend
-    const newStatus = !isSuspending;
 
     try {
       // BE-001 / SEC-004: User suspension is executed server-side via Cloud Function callable.
@@ -257,7 +257,7 @@ export const AdminUsersScreen: React.FC = () => {
                         } else {
                           openRoleAssignment(
                             {
-                              id: (invite as any).uid || `pending_${invite.id}`,
+                              id: (invite as TeamUser & { uid?: string }).uid || `pending_${invite.id}`,
                               email: invite.email,
                               displayName: invite.name,
                               role: 'passenger',
@@ -337,8 +337,24 @@ export const AdminUsersScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-surface-container/50 transition-colors">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span>Loading user directory...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    No users found matching query.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((u) => (
+                  <tr key={u.id} className="hover:bg-surface-container/50 transition-colors">
                   <td className="p-md font-bold text-on-surface">
                     <div>
                       <p>{u.displayName}</p>
@@ -404,7 +420,7 @@ export const AdminUsersScreen: React.FC = () => {
                     </Button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

@@ -20,7 +20,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '../lib/firebase';
 import { UserProfile, UserRole, UserClaims } from '../types';
-import { useAuthStore } from '../store/useAuthStore';
+import { useAuthStore, AUTH_SESSION_STORAGE_KEY } from '../store/useAuthStore';
 import { useLanguageStore } from '../store/useLanguageStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { analyticsService } from './analyticsService';
@@ -48,14 +48,13 @@ export const authService = {
   // Synchronize Firebase Auth state, ID token custom claims, and Firestore user document
   initAuthListener() {
     const isDev = import.meta.env.DEV;
-    const testOverrideKey = ['__', 'TEST', '_', 'AUTH', '_', 'OVERRIDE', '__'].join('');
-    if (isDev && typeof window !== 'undefined' && (window as unknown as Record<string, unknown>)[testOverrideKey]) {
+    if (isDev && typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__isDevAuthBypass) {
       useAuthStore.getState().setLoading(false);
       return () => {};
     }
     useAuthStore.getState().setLoading(true);
     return onAuthStateChanged(auth, async (firebaseUser) => {
-      if (isDev && typeof window !== 'undefined' && (window as unknown as Record<string, unknown>)[testOverrideKey]) {
+      if (isDev && typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__isDevAuthBypass) {
         useAuthStore.getState().setLoading(false);
         return;
       }
@@ -63,7 +62,7 @@ export const authService = {
         if (
           (isDev || import.meta.env.MODE === 'test') &&
           typeof window !== 'undefined' &&
-          window.localStorage.getItem('mwendosalama_demo_auth_session')
+          window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)
         ) {
           useAuthStore.getState().setLoading(false);
           return;

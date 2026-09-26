@@ -22,7 +22,7 @@ This document is the final validation ledger for the production-readiness progra
 - [x] Scheduled purge/archival logic drains batches and is retry-safe.
 - [x] Deterministic analytics/report writes are used for repeat execution.
 - [x] Final function-by-function authorization/input/idempotency evidence for every pending export in `docs/cloud-functions-inventory.md`.
-- [ ] Emulator-safe FCM invalid-token/delivery lifecycle harness.
+- [x] Emulator-safe FCM invalid-token/delivery lifecycle harness (`apps/functions/src/__tests__/fcm-token-lifecycle.test.ts`).
 
 ## Phase 6 — Production Firebase
 - [x] Production identity and deployment configuration are enforced.
@@ -67,6 +67,12 @@ The automated codebase verification is now complete. The following items remain 
 3. **GCP Project Alerting & BigQuery/Cloud Logging Sink**: External cloud infra setup for automated SMS/Slack alerts on high error rates and long-term backup verification.
 
 ### Verified Code Implementation (No Code Gap Remaining)
+- **Firebase Cloud Messaging & Push Delivery**: Complete token lifecycle wired via `messagingService.registerPushNotifications()`, permissions toggle in `PassengerProfileScreen.tsx`, callable `registerDeviceToken`/`unregisterDeviceToken`, secure subcollection `/users/{userId}/fcm_tokens/{tokenId}` with rules unit test coverage (`tests/rules/firestore.rules.test.ts`), service worker `/public/firebase-messaging-sw.js`, direct token dispatch in `sendSOS` with automatic stale token pruning and DLQ logging (`apps/functions/src/__tests__/fcm-token-lifecycle.test.ts`), and same-device foreground fallback.
+- **Production Verification Step (Section 27)**: Manual verification on a real browser/device once `VITE_FIREBASE_VAPID_KEY` is configured:
+  1. Open app on supported mobile browser (Chrome/Edge on Android or desktop).
+  2. Navigate to Passenger Profile → App Permissions → Enable Notifications (or toggle Real-time Push Alerts).
+  3. Accept browser permission prompt; verify token registration displayed in Profile.
+  4. Trigger Emergency SOS; confirm OS-level background push notification is received and opens `/track/:tripId` or `/alerts`.
 - **Map Consolidation**: Leaflet configured with OpenStreetMap tile source and `VITE_MAP_TILE_URL` documented in `.env.example`.
 - **Gemini AI Safety Summary**: Cloud Function callable `generateTripSummary` with deterministic fallback when API key is missing.
 - **Waze-style Crowdsourcing**: Black spot confirmation and decaying scheduled daily Cloud Function `decayStaleBlackSpots`.

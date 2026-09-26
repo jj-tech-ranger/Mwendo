@@ -38,9 +38,9 @@ export const ActiveTripScreen: React.FC = () => {
     clearActiveTripPersistence,
   } = useTripStore();
 
-  const [setupPlate, setSetupPlate] = useState('');
-  const [setupSacco, setSetupSacco] = useState('');
-  const [setupRoute, setSetupRoute] = useState('');
+  const [setupPlate, _setSetupPlate] = useState('');
+  const [setupSacco, _setSetupSacco] = useState('');
+  const [setupRoute, _setSetupRoute] = useState('');
   const [showEndModal, setShowEndModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
@@ -203,6 +203,7 @@ export const ActiveTripScreen: React.FC = () => {
       clearGpsWatchdog();
       navigator?.geolocation?.clearWatch?.(watchId);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isTracking, isPaused, telemetryRestored]);
 
   useEffect(() => {
@@ -219,10 +220,12 @@ export const ActiveTripScreen: React.FC = () => {
           saccoName: setupSacco,
           routeName: setupRoute,
           isProvisional: true,
+          vehicleVerified: false,
         });
       }
       updateTelemetry(0);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => () => clearGpsWatchdog(), []);
@@ -255,6 +258,7 @@ export const ActiveTripScreen: React.FC = () => {
       vehicleRegNumber: normalizePlate(completed.vehicleRegNumber || cleanPlate),
       plateNumber: normalizePlate(completed.plateNumber || cleanPlate),
       isProvisional: completed.isProvisional ?? activeTrip?.isProvisional ?? true,
+      vehicleVerified: completed.vehicleVerified ?? activeTrip?.vehicleVerified ?? (!activeTrip?.isProvisional && Boolean(activeTrip?.vehicleId)),
       overspeedEventsCount: calculatedOverspeedCount,
       violationsCount: calculatedOverspeedCount,
     } : {
@@ -262,6 +266,7 @@ export const ActiveTripScreen: React.FC = () => {
       tripId: `TRIP-${Math.floor(100000 + Math.random() * 900000)}`,
       userId,
       vehicleId: activeTrip?.vehicleId,
+      vehicleVerified: activeTrip?.vehicleVerified ?? (!activeTrip?.isProvisional && Boolean(activeTrip?.vehicleId)),
       vehicleRegNumber: cleanPlate,
       plateNumber: cleanPlate,
       saccoId: activeTrip?.saccoId || 'unassigned',

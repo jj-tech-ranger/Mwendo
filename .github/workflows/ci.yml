@@ -83,9 +83,13 @@ jobs:
         run: |
           bun run build
           bun run check:bundle-security
+          bun run check:database-id
 
       - name: Build Functions
         run: cd apps/functions && npm run build
+
+      - name: Verify Engine Parity
+        run: bun run check:engine-parity
 
       - name: Run Vitest tests
         run: bun run test

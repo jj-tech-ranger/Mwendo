@@ -189,8 +189,11 @@ export class OfflineSyncService {
 
           // Strip retryCount so queue telemetry does not pollute Firestore document data
           const { retryCount: _retryCount, ...reportToSave } = currentReport;
+          // Ensure client idempotency key is preserved/attached
+          const idempotencyKey = currentReport.idempotencyKey || reportId;
+          const payloadWithKey = { ...reportToSave, idempotencyKey };
           // Use the SAME client-generated ID already embedded in the stored object
-          await blackSpotRepository.save(reportToSave as BlackSpot);
+          await blackSpotRepository.save(payloadWithKey as BlackSpot);
           await offlineStorage.removeItem(key);
           syncedReports++;
         } catch (err) {

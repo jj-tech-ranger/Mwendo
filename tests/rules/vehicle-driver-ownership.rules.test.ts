@@ -18,6 +18,23 @@ function dbFor(uid: string, saccoId = 'sacco-a') {
   }).firestore();
 }
 
+function dbForAuthority(uid = 'authority-1') {
+  if (!testEnv) throw new Error('Test environment not initialized');
+  return testEnv.authenticatedContext(uid, {
+    activeRole: 'authority',
+    authorityScope: 'national',
+    firebase: { sign_in_provider: 'custom' },
+  }).firestore();
+}
+
+function dbForAdmin(uid = 'admin-1') {
+  if (!testEnv) throw new Error('Test environment not initialized');
+  return testEnv.authenticatedContext(uid, {
+    activeRole: 'admin',
+    firebase: { sign_in_provider: 'custom' },
+  }).firestore();
+}
+
 function endpoint(value: string) {
   const [host, port] = value.split(':');
   return { host, port: Number(port ?? 8080) };
@@ -112,5 +129,37 @@ describe('SACCO vehicle and driver ownership rules', () => {
       });
     });
     await assertSucceeds(updateDoc(doc(dbFor('manager-a'), 'drivers/d1'), { status: 'on_leave', phone: '+254700000000' }));
+  });
+
+  it('SEC-002: blocks authority token from directly modifying vehicle riskScore or riskTier', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('vehicles/v-sec-auth').set({
+        saccoId: 'sacco-a', saccoName: 'A', regNumber: 'KAA 222B', capacity: 33,
+        status: 'active', insuranceExpiry: '2027-01-01', inspectionExpiry: '2027-01-01', riskScore: 50, riskTier: 'medium',
+      });
+    });
+
+    // Directly writing riskScore must be rejected
+    await assertFails(updateDoc(doc(dbForAuthority(), 'vehicles/v-sec-auth'), { riskScore: 10 }));
+    // Directly writing riskTier must be rejected
+    await assertFails(updateDoc(doc(dbForAuthority(), 'vehicles/v-sec-auth'), { riskTier: 'low' }));
+    // Legitimate operational updates must succeed
+    await assertSucceeds(updateDoc(doc(dbForAuthority(), 'vehicles/v-sec-auth'), { status: 'suspended' }));
+  });
+
+  it('SEC-002: blocks admin token from directly modifying vehicle riskScore or riskTier', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('vehicles/v-sec-admin').set({
+        saccoId: 'sacco-a', saccoName: 'A', regNumber: 'KAA 333C', capacity: 33,
+        status: 'active', insuranceExpiry: '2027-01-01', inspectionExpiry: '2027-01-01', riskScore: 75, riskTier: 'high',
+      });
+    });
+
+    // Directly writing riskScore must be rejected
+    await assertFails(updateDoc(doc(dbForAdmin(), 'vehicles/v-sec-admin'), { riskScore: 20 }));
+    // Directly writing riskTier must be rejected
+    await assertFails(updateDoc(doc(dbForAdmin(), 'vehicles/v-sec-admin'), { riskTier: 'low' }));
+    // Legitimate operational updates must succeed
+    await assertSucceeds(updateDoc(doc(dbForAdmin(), 'vehicles/v-sec-admin'), { capacity: 45 }));
   });
 });

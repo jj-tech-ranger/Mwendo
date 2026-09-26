@@ -17,10 +17,26 @@
         "isVerified": { "type": "boolean" },
         "isActive": { "type": "boolean" },
         "trustScore": { "type": "number" },
+        "fcmToken": { "type": "string", "maxLength": 500 },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
       "required": ["uid", "email", "role", "isActive"]
+    },
+    "DeviceToken": {
+      "title": "DeviceToken",
+      "description": "Private FCM device push notification registration token",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "token": { "type": "string", "maxLength": 500 },
+        "platform": { "type": "string", "maxLength": 32 },
+        "userId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "lastSeenAt": { "type": "string" }
+      },
+      "required": ["token", "userId", "updatedAt"]
     },
     "Trip": {
       "title": "Trip",
@@ -184,6 +200,10 @@
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
       "description": "User profile collection"
+    },
+    "/users/{userId}/fcm_tokens/{tokenId}": {
+      "schema": { "$ref": "#/entities/DeviceToken" },
+      "description": "Private FCM device push notification tokens"
     },
     "/trips/{tripId}": {
       "schema": { "$ref": "#/entities/Trip" },

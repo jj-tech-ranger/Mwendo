@@ -285,7 +285,12 @@ Active passenger trips can persist telemetry locally and reconcile with the back
 
 ### Notifications
 
-Firebase Cloud Messaging support provides the foundation for safety alerts and operational notifications, with token registration and delivery lifecycle handling in the messaging service.
+Firebase Cloud Messaging support provides the foundation for critical safety alerts and operational notifications:
+
+- **Token registration and lifecycle handling:** Users manage push permissions directly from the Passenger Profile. When granted, tokens are registered through the `registerDeviceToken` callable Cloud Function and persisted to the isolated `/users/{userId}/fcm_tokens/{tokenId}` subcollection and profile attributes.
+- **Strict security boundaries:** Token subcollections are protected by ABAC Firestore rules, accessible exclusively to the owning user and administrative operators—cross-user, SACCO-level, or unauthenticated token reading is strictly prevented.
+- **Server dispatch and resilient pruning:** Safety alerts (such as `sendSOS`) dispatch FCM messages directly to registered device tokens alongside SACCO/authority topics. Stale or unregistered tokens are automatically pruned without throwing errors, and dispatch failures route to the Dead Letter Queue (`dlq_notifications`).
+- **Foreground and background delivery:** Background push messages are handled by `/public/firebase-messaging-sw.js`, while same-device foreground notifications remain active as an instant zero-latency fallback.
 
 ---
 
@@ -416,15 +421,23 @@ and the English equivalent:
 
 Recommended tooling:
 
-- Bun
-- Node.js 22 for Firebase Functions
+- Bun (default fast runtime & package manager for CI / root workspace)
+- Node.js 22 & npm (supported at root via synchronized `package-lock.json` for `npm ci`, and required for Firebase Functions)
 - Java 21 for Firebase Emulator Suite rules tests
 - Firebase CLI
 
 ### Install dependencies
 
+With Bun (primary CI runner):
+
 ```bash
 bun install --frozen-lockfile
+```
+
+With npm (fully supported via synchronized root lockfile):
+
+```bash
+npm ci
 ```
 
 ### Configure the frontend

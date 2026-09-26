@@ -3,6 +3,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { enforceRateLimit, isAnonymousAuth, extractClientIdentifier } from '../lib/rateLimit';
 import { isWithinKenya, isPlausibleSpeed } from '../lib/constants';
+import { sanitizeTokenId } from './registerDeviceToken';
 
 export interface EmergencyContact { name: string; phone: string; relationship: string; }
 export interface SendSosPayload {
@@ -23,13 +24,16 @@ export interface SendSosResult {
   contactsSummary: Array<{ name: string; relationship: string; status: 'dispatched' | 'failed' }>;
   fcmSummary: Array<{ target: string; status: 'dispatched' | 'failed' }>;
   notifiedChannels?: Array<{
-    channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+    channel: 'sms' | 'sacco_fcm' | 'authority_fcm' | 'passenger_fcm';
     label: string;
     status: 'dispatched' | 'failed';
   }>;
 }
 export interface SmsProvider { sendSms: (to: string, message: string) => Promise<{ messageId: string; success: boolean }>; }
-export interface MessagingProvider { sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>; }
+export interface MessagingProvider {
+  sendToTopic: (topic: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>;
+  sendToDevice?: (token: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }) => Promise<unknown>;
+}
 
 export interface ProcessSendSosOptions {
   isAnonymous?: boolean | undefined;
@@ -66,7 +70,16 @@ export class DefaultMessagingProvider implements MessagingProvider {
     try {
       return await getMessaging().send({ topic, notification: payload.notification, data: payload.data || {} });
     } catch (err) {
-      if (isEmulator()) return { messageId: `emulator_fcm_${Date.now()}` };
+      if (isEmulator()) return { messageId: `emulator_fcm_topic_${Date.now()}` };
+      throw err;
+    }
+  }
+
+  async sendToDevice(token: string, payload: { notification: { title: string; body: string }; data?: Record<string, string> }): Promise<unknown> {
+    try {
+      return await getMessaging().send({ token, notification: payload.notification, data: payload.data || {} });
+    } catch (err) {
+      if (isEmulator()) return { messageId: `emulator_fcm_device_${Date.now()}` };
       throw err;
     }
   }
@@ -182,8 +195,70 @@ export async function processSendSosLogic(
       catch (err) { dlqCount++; fcmSummary.push({ target: topic, status: 'failed' }); await writeToDLQ(db, { id: `dlq_fcm_${alertId}_${Date.now()}`, topic: 'safety-alerts', type: 'fcm_push_notification', alertId, userId, targetRecipient: topic, payload: fcmPayload, error: err }); }
     }
 
+    // Direct FCM Device Push: Deliver to caller's active device tokens
+    const callerDeviceTokens = new Set<string>();
+    try {
+      const tokensSnap = await db.collection('users').doc(userId).collection('fcm_tokens').get();
+      tokensSnap.forEach((docSnap) => {
+        const t = docSnap.data()?.token;
+        if (typeof t === 'string' && t.trim().length >= 10) {
+          callerDeviceTokens.add(t.trim());
+        }
+      });
+    } catch (err) {
+      console.warn('[sendSOS] Could not query fcm_tokens collection:', err);
+    }
+    if (typeof userData.fcmToken === 'string' && userData.fcmToken.trim().length >= 10) {
+      callerDeviceTokens.add(userData.fcmToken.trim());
+    }
+
+    if (messagingProvider.sendToDevice && callerDeviceTokens.size > 0) {
+      for (const token of callerDeviceTokens) {
+        try {
+          await messagingProvider.sendToDevice(token, fcmPayload);
+          successfulFcmCount++;
+          fcmSummary.push({ target: `device:${token.slice(0, 12)}...`, status: 'dispatched' });
+        } catch (err: unknown) {
+          dlqCount++;
+          fcmSummary.push({ target: `device:${token.slice(0, 12)}...`, status: 'failed' });
+          await writeToDLQ(db, {
+            id: `dlq_fcm_device_${alertId}_${Date.now()}`,
+            topic: 'safety-alerts-device',
+            type: 'fcm_push_notification',
+            alertId,
+            userId,
+            targetRecipient: `device:${token.slice(0, 12)}...`,
+            payload: fcmPayload,
+            error: err,
+          });
+
+          // Gracefully prune stale or unregistered token without throwing
+          const errCode = (err as { code?: string })?.code || '';
+          const errMsg = err instanceof Error ? err.message : String(err);
+          const isStale =
+            errCode === 'messaging/registration-token-not-registered' ||
+            errCode === 'messaging/invalid-registration-token' ||
+            errMsg.includes('not-registered') ||
+            errMsg.includes('invalid-registration-token') ||
+            errMsg.includes('Requested entity was not found');
+
+          if (isStale) {
+            try {
+              const tokenId = sanitizeTokenId(token);
+              await db.collection('users').doc(userId).collection('fcm_tokens').doc(tokenId).delete();
+              if (userData.fcmToken === token) {
+                await db.collection('users').doc(userId).update({ fcmToken: null });
+              }
+            } catch (pruneErr) {
+              console.warn('[sendSOS] Could not prune stale token:', pruneErr);
+            }
+          }
+        }
+      }
+    }
+
     const notifiedChannels: Array<{
-      channel: 'sms' | 'sacco_fcm' | 'authority_fcm';
+      channel: 'sms' | 'sacco_fcm' | 'authority_fcm' | 'passenger_fcm';
       label: string;
       status: 'dispatched' | 'failed';
     }> = [];
@@ -213,6 +288,14 @@ export async function processSendSosLogic(
           label: f.status === 'dispatched'
             ? 'Internal alert sent to on-duty safety officers'
             : 'Alert to safety officers failed',
+          status: f.status,
+        });
+      } else if (f.target.startsWith('device:')) {
+        notifiedChannels.push({
+          channel: 'passenger_fcm',
+          label: f.status === 'dispatched'
+            ? 'Push notification delivered to your registered device'
+            : 'Direct device push delivery failed or token expired',
           status: f.status,
         });
       }

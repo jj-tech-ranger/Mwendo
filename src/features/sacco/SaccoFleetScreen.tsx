@@ -31,7 +31,6 @@ export const SaccoFleetScreen: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'all' | 'provisional'>('overview');
   const [searchTerm, setSearchTerm] = useState('');
-  const [routeFilter, setRouteFilter] = useState('all');
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showAddEditSlideover, setShowAddEditSlideover] = useState(false);
@@ -44,7 +43,6 @@ export const SaccoFleetScreen: React.FC = () => {
   const [formPlate, setFormPlate] = useState('');
   const [formRoute, setFormRoute] = useState('Thika Superhighway');
   const [formCapacity, setFormCapacity] = useState('33');
-  const [formDriver, setFormDriver] = useState('Driver #12');
 
   const [provisionalVehicles, setProvisionalVehicles] = useState<ProvisionalVehicle[]>([]);
 
@@ -63,7 +61,6 @@ export const SaccoFleetScreen: React.FC = () => {
     setFormPlate('');
     setFormRoute('Thika Superhighway');
     setFormCapacity('33');
-    setFormDriver('Driver #12');
     setShowAddEditSlideover(true);
   };
 
@@ -72,7 +69,6 @@ export const SaccoFleetScreen: React.FC = () => {
     setFormPlate(v.regNumber);
     setFormRoute('Thika Superhighway');
     setFormCapacity(v.capacity.toString());
-    setFormDriver('Driver #12');
     setShowAddEditSlideover(true);
   };
 
@@ -149,6 +145,15 @@ export const SaccoFleetScreen: React.FC = () => {
         title="Account Not Fully Provisioned"
         description="Your account is missing a SACCO assignment. Contact your administrator."
       />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] p-xl space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        <p className="font-body-md text-sm text-on-surface-variant">Loading SACCO fleet directory...</p>
+      </div>
     );
   }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { limit } from 'firebase/firestore';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { blackSpotRepository, auditLogRepository } from '../../repositories';
@@ -330,7 +330,16 @@ export const AuthorityBlackSpotsScreen: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-                {filteredSpots.length > 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 px-3 text-center text-on-surface-variant">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                        <span>Loading verified black spots...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredSpots.length > 0 ? (
                   filteredSpots.map((spot) => (
                     <tr key={spot.id} className="hover:bg-surface-container-low/50">
                       <td className="py-3 px-3 font-bold text-on-surface">{spot.name || spot.title}</td>

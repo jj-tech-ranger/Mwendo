@@ -47,6 +47,15 @@ export const SaccoBlackSpotsScreen: React.FC = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[300px] p-xl space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        <p className="font-body-md text-sm text-on-surface-variant">Loading corridor hazard registry...</p>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <EmptyState

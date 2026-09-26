@@ -11,12 +11,11 @@ import {
   analyticsRepository,
   alertRepository,
 } from '../../repositories';
-import { Trip, Violation, BlackSpot, SafetyAlert, SACCO, PlatformAnalyticsDaily } from '../../types';
+import { SafetyAlert, PlatformAnalyticsDaily } from '../../types';
 import { AreaChartWrapper, BarChartWrapper } from '../../components/charts/Charts';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { Input } from '../../components/ui/Input';
 import { severityToBadgeVariant } from '../../lib/severity';
 import { MapComponent, MapMarker } from '../../components/map/MapComponent';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
@@ -95,11 +94,11 @@ export const AuthorityDashboard: React.FC = () => {
     staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
   });
 
-  const trips = authorityData?.trips || [];
-  const violations = authorityData?.violations || [];
-  const blackSpots = authorityData?.blackSpots || [];
+  const trips = useMemo(() => authorityData?.trips || [], [authorityData?.trips]);
+  const violations = useMemo(() => authorityData?.violations || [], [authorityData?.violations]);
+  const blackSpots = useMemo(() => authorityData?.blackSpots || [], [authorityData?.blackSpots]);
   const alerts = realtimeAlerts;
-  const saccos = authorityData?.saccos || [];
+  const saccos = useMemo(() => authorityData?.saccos || [], [authorityData?.saccos]);
 
   // Sort SACCOs by safetyScore ascending (lowest safety score = highest audit priority)
   const auditPrioritySaccos = useMemo(() => {
@@ -203,6 +202,15 @@ export const AuthorityDashboard: React.FC = () => {
     }
     return Object.values(counts);
   }, [violations]);
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-xl space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        <p className="font-body-md text-sm text-on-surface-variant">Loading Authority Operations Center telemetry...</p>
+      </div>
+    );
+  }
 
   if (isError) {
     return (

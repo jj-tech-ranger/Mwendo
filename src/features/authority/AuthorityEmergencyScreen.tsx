@@ -146,7 +146,12 @@ export const AuthorityEmergencyScreen: React.FC = () => {
             </h3>
 
             <div className="space-y-sm max-h-[360px] overflow-y-auto pr-1">
-              {emergencyAlerts.length > 0 ? (
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center p-md text-on-surface-variant gap-2">
+                  <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                  <p className="text-xs">Monitoring emergency frequency...</p>
+                </div>
+              ) : emergencyAlerts.length > 0 ? (
                 emergencyAlerts.map((alert) => (
                   <div
                     key={alert.id}

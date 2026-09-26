@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { SosButton } from '../../components/ui/SosButton';
+import { RecentTrips } from './components/RecentTrips';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTripStore } from '../../store/useTripStore';
 import { useMotionPresets } from '../../lib/motion';
@@ -228,6 +229,7 @@ export const PassengerDashboard: React.FC = () => {
         saccoName: matchedVehicle.saccoName || sacco || matchedVehicle.saccoId,
         routeName: route || 'Standard Route',
         isProvisional: !!matchedVehicle.isProvisional,
+        vehicleVerified: !matchedVehicle.isProvisional,
       });
     } else {
       // Unregistered / provisional trip: do NOT attach a bogus vehicleId!
@@ -242,6 +244,7 @@ export const PassengerDashboard: React.FC = () => {
         saccoName: sacco || 'Independent / Unassigned',
         routeName: route || 'Standard Route',
         isProvisional: true,
+        vehicleVerified: false,
       });
     }
 
@@ -588,6 +591,10 @@ export const PassengerDashboard: React.FC = () => {
             {t('passenger.dashboard.noReportedSpots')}
           </p>
         </Card>
+      </motion.div>
+
+      <motion.div variants={variants.staggerItem}>
+        <RecentTrips limitCount={3} />
       </motion.div>
 
       <motion.div variants={variants.staggerItem} className="space-y-2">

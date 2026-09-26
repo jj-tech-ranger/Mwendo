@@ -143,7 +143,16 @@ export const AuthorityComplaintsScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-              {filteredComplaints.length > 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-8 px-3 text-center text-on-surface-variant">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span>Loading passenger complaints...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filteredComplaints.length > 0 ? (
                 filteredComplaints.map((c) => (
                   <tr key={c.id} className="hover:bg-surface-container-low/50">
                     <td className="py-3 px-3 font-bold text-on-surface">{c.title}</td>

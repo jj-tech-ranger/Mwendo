@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { limit, orderBy } from 'firebase/firestore';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/ui/Badge';
@@ -44,11 +44,11 @@ export const AuthorityReportsScreen: React.FC = () => {
     staleTime: QUERY_STALE_TIMES.ANALYTICS_SUMMARIES,
   });
 
-  const allSaccos = reportData?.saccos || [];
-  const allBlackSpots = reportData?.blackSpots || [];
-  const allViolations = reportData?.violations || [];
-  const allTrips = reportData?.trips || [];
-  const allVehicles = reportData?.vehicles || [];
+  const allSaccos = useMemo(() => reportData?.saccos || [], [reportData?.saccos]);
+  const allBlackSpots = useMemo(() => reportData?.blackSpots || [], [reportData?.blackSpots]);
+  const allViolations = useMemo(() => reportData?.violations || [], [reportData?.violations]);
+  const allTrips = useMemo(() => reportData?.trips || [], [reportData?.trips]);
+  const allVehicles = useMemo(() => reportData?.vehicles || [], [reportData?.vehicles]);
 
   // Calculate timestamps for selected date window and previous comparison period
   const { periodStartMs, prevPeriodStartMs, prevPeriodEndMs } = useMemo(() => {
@@ -77,13 +77,13 @@ export const AuthorityReportsScreen: React.FC = () => {
   }, [dateRange]);
 
   // Scope filter helper
-  const matchesScope = (countyOrLocation?: string, routeName?: string) => {
+  const matchesScope = useCallback((countyOrLocation?: string, routeName?: string) => {
     if (selectedScope === 'All Kenya (National)') return true;
     const scopeLower = selectedScope.toLowerCase();
     const countyMatch = countyOrLocation ? countyOrLocation.toLowerCase().includes(scopeLower) : false;
     const routeMatch = routeName ? routeName.toLowerCase().includes(scopeLower) : false;
     return countyMatch || routeMatch;
-  };
+  }, [selectedScope]);
 
   // Filtered dataset for active window and jurisdiction
   const filteredTrips = useMemo(() => {
@@ -95,7 +95,7 @@ export const AuthorityReportsScreen: React.FC = () => {
       }
       return true;
     });
-  }, [allTrips, periodStartMs, selectedScope]);
+  }, [allTrips, matchesScope, periodStartMs, selectedScope]);
 
   const filteredViolations = useMemo(() => {
     return allViolations.filter((v) => {
@@ -106,7 +106,7 @@ export const AuthorityReportsScreen: React.FC = () => {
       }
       return true;
     });
-  }, [allViolations, periodStartMs, selectedScope]);
+  }, [allViolations, matchesScope, periodStartMs, selectedScope]);
 
   const prevMetrics = useMemo(() => {
     const prevViolations = allViolations.filter((v) => {
@@ -121,12 +121,12 @@ export const AuthorityReportsScreen: React.FC = () => {
     return {
       violationsCount: prevViolations.length,
     };
-  }, [allViolations, prevPeriodStartMs, prevPeriodEndMs, selectedScope]);
+  }, [allViolations, matchesScope, prevPeriodStartMs, prevPeriodEndMs, selectedScope]);
 
   const filteredBlackSpots = useMemo(() => {
     if (selectedScope === 'All Kenya (National)') return allBlackSpots;
     return allBlackSpots.filter((b) => matchesScope(b.county, b.routeName || b.name));
-  }, [allBlackSpots, selectedScope]);
+  }, [allBlackSpots, matchesScope, selectedScope]);
 
   // Derived KPI metrics
   const totalTripsCount = filteredTrips.length;

@@ -6,7 +6,6 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useAuthStore } from '../../store/useAuthStore';
 import { driverRepository, vehicleRepository } from '../../repositories';
 import { where } from 'firebase/firestore';
-import { Driver, Vehicle } from '../../types';
 import { getSaccoName, getEffectiveSaccoId } from '../../lib/saccoUtils';
 import { QUERY_STALE_TIMES } from '../../lib/queryClient';
 

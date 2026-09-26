@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Card } from '../../components/ui/Card';
@@ -9,6 +9,7 @@ import { BrandMark } from '../../components/assets/BrandAssets';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../services/authService';
 import { analyticsService } from '../../services/analyticsService';
+import { messagingService } from '../../services/messagingService';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { computeRewardTier } from '../../services/pointsService';
@@ -34,6 +35,41 @@ export const PassengerProfileScreen: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isRefreshingTrust, setIsRefreshingTrust] = useState(false);
   const [trustFeedback, setTrustFeedback] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => messagingService.getPermissionStatus());
+  const [isRegisteringPush, setIsRegisteringPush] = useState(false);
+  const [pushFeedback, setPushFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNotificationPermission(messagingService.getPermissionStatus());
+  }, []);
+
+  const handleTogglePushNotifications = async () => {
+    if (isRegisteringPush) return;
+    setIsRegisteringPush(true);
+    setPushFeedback(null);
+
+    try {
+      if (notificationPermission === 'granted' && user?.fcmToken) {
+        await messagingService.unregisterPushNotifications();
+        setNotificationPermission(messagingService.getPermissionStatus());
+        setPushFeedback('Push notifications disabled');
+      } else {
+        const res = await messagingService.registerPushNotifications();
+        setNotificationPermission(res.permission);
+        if (res.success) {
+          setPushFeedback('Push notifications activated for emergency SOS and alerts');
+        } else {
+          setPushFeedback(res.error || 'Could not enable push notifications');
+        }
+      }
+    } catch (err) {
+      console.warn('[PassengerProfile] Error toggling push notifications:', err);
+      setPushFeedback('Error configuring push notifications');
+    } finally {
+      setIsRegisteringPush(false);
+      setTimeout(() => setPushFeedback(null), 4000);
+    }
+  };
 
   const handleRefreshTrust = async () => {
     if (isRefreshingTrust) return;
@@ -299,6 +335,65 @@ export const PassengerProfileScreen: React.FC = () => {
           </Card>
         </div>
 
+        {/* Push Notifications & Safety Alerts */}
+        <div className="space-y-2">
+          <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
+            Push Notifications & Safety Alerts
+          </h2>
+          <Card className="p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-primary">notifications_active</span>
+                <div>
+                  <div className="font-bold">Real-time Push Alerts</div>
+                  <div className="text-[11px] text-on-surface-variant">
+                    Emergency SOS triggers, severe overspeeding & hazard warnings
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={notificationPermission === 'granted' && user?.fcmToken ? 'success' : notificationPermission === 'denied' ? 'danger' : 'neutral'}
+                  className="font-mono text-[10px]"
+                >
+                  {notificationPermission === 'granted' && user?.fcmToken ? 'Active' : notificationPermission === 'denied' ? 'Blocked' : 'Disabled'}
+                </Badge>
+                <button
+                  type="button"
+                  onClick={handleTogglePushNotifications}
+                  disabled={isRegisteringPush}
+                  aria-label="Toggle push notifications"
+                  className={`w-12 h-6 rounded-full transition-colors relative p-0.5 cursor-pointer disabled:opacity-50 ${
+                    notificationPermission === 'granted' && user?.fcmToken ? 'bg-primary' : 'bg-surface-container-high'
+                  }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
+                      notificationPermission === 'granted' && user?.fcmToken ? 'translate-x-6' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {pushFeedback && (
+              <div className="p-2 bg-surface-container rounded text-[11px] text-primary font-medium animate-in fade-in">
+                {pushFeedback}
+              </div>
+            )}
+
+            {notificationPermission === 'granted' && user?.fcmToken && (
+              <div className="pt-2 border-t border-outline-variant/20 flex items-center justify-between text-[11px] text-on-surface-variant font-mono">
+                <span>Device Token:</span>
+                <span className="text-[10px] text-emerald-700 font-bold">
+                  {user.fcmToken.slice(0, 14)}...{user.fcmToken.slice(-6)}
+                </span>
+              </div>
+            )}
+          </Card>
+        </div>
+
         {/* Appearance & Language */}
         <div className="space-y-2">
           <h2 className="text-xs font-mono font-bold text-on-surface-variant uppercase">
@@ -542,17 +637,61 @@ export const PassengerProfileScreen: React.FC = () => {
         title={t('passenger.profile.appPermissions')}
       >
         <div className="space-y-2 text-xs">
-          {[
-            { name: t('passenger.profile.locationGps'), status: t('passenger.profile.allowed') },
-            { name: t('passenger.profile.notifications'), status: t('passenger.profile.allowed') },
-            { name: t('passenger.profile.smsAlert'), status: t('passenger.profile.allowed') },
-            { name: t('passenger.profile.camera'), status: t('passenger.profile.allowed') },
-          ].map((p, i) => (
-            <div key={i} className="flex justify-between p-2 bg-surface-container rounded-lg font-mono">
-              <span>{p.name}</span>
-              <span className="text-emerald-700 font-bold">{p.status}</span>
+          <div className="flex justify-between items-center p-2.5 bg-surface-container rounded-lg font-mono">
+            <span>{t('passenger.profile.locationGps')}</span>
+            <span className="text-emerald-700 font-bold">{t('passenger.profile.allowed')}</span>
+          </div>
+
+          <div className="flex justify-between items-center p-2.5 bg-surface-container rounded-lg font-mono">
+            <div>
+              <span className="block font-medium">{t('passenger.profile.notifications')}</span>
+              <span className="text-[10px] text-on-surface-variant font-sans">
+                {notificationPermission === 'granted'
+                  ? (user?.fcmToken ? 'FCM Token Registered' : 'Browser Permitted')
+                  : notificationPermission === 'denied'
+                  ? 'Blocked in Browser'
+                  : 'Pending Permission'}
+              </span>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <span
+                className={`font-bold ${
+                  notificationPermission === 'granted'
+                    ? 'text-emerald-700'
+                    : notificationPermission === 'denied'
+                    ? 'text-error'
+                    : 'text-amber-600'
+                }`}
+              >
+                {notificationPermission === 'granted'
+                  ? t('passenger.profile.allowed')
+                  : notificationPermission === 'denied'
+                  ? 'Blocked'
+                  : 'Not Enabled'}
+              </span>
+              {notificationPermission !== 'granted' && (
+                <Button
+                  size="sm"
+                  className="h-7 text-[10px] px-2"
+                  isLoading={isRegisteringPush}
+                  onClick={handleTogglePushNotifications}
+                >
+                  Enable
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center p-2.5 bg-surface-container rounded-lg font-mono">
+            <span>{t('passenger.profile.smsAlert')}</span>
+            <span className="text-emerald-700 font-bold">{t('passenger.profile.allowed')}</span>
+          </div>
+
+          <div className="flex justify-between items-center p-2.5 bg-surface-container rounded-lg font-mono">
+            <span>{t('passenger.profile.camera')}</span>
+            <span className="text-emerald-700 font-bold">{t('passenger.profile.allowed')}</span>
+          </div>
+
           <Button className="w-full mt-3" onClick={() => setActiveModal(null)}>
             {t('passenger.profile.done')}
           </Button>

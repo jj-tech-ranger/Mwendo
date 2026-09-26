@@ -10,6 +10,7 @@ export const DEFAULT_DEDUPLICATION_WINDOW_DAYS = 14;
 
 export interface ReportBlackSpotPayload {
   id?: string;
+  idempotencyKey?: string;
   title?: string;
   description?: string;
   hazardType?: string;
@@ -38,6 +39,7 @@ export interface ReportBlackSpotResult {
   status: string;
   createdAt: string;
   corroborated?: boolean;
+  alreadyProcessed?: boolean;
 }
 
 function boundedText(value: unknown, max: number): value is string {
@@ -57,6 +59,41 @@ export async function processReportBlackSpotLogic(
   // word 'anonymous'.
   if (!userId) {
     throw new HttpsError('unauthenticated', 'User must be authenticated to report a road hazard.');
+  }
+
+  // 1. Client-Side Idempotency Key Determination & Scoping (§28 / Test C)
+  // Derive client idempotency key from payload.idempotencyKey or payload.id
+  const rawIdempotencyKey = payload.idempotencyKey || payload.id;
+  let ledgerDocId: string | null = null;
+  let cleanIdempotencyKey: string | null = null;
+
+  if (rawIdempotencyKey && typeof rawIdempotencyKey === 'string') {
+    cleanIdempotencyKey = rawIdempotencyKey.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+    // CRITICAL SECURITY CONSTRAINT: Scope the ledger document ID by both the authenticated
+    // caller's UID and the client key to prevent cross-user overwrite attacks or collision exploitation.
+    ledgerDocId = `bs_${userId}_${cleanIdempotencyKey}`;
+  }
+
+  // 2. Idempotency Check via processedEvents ledger (§28 / Test C)
+  if (ledgerDocId) {
+    const ledgerRef = db.collection('processedEvents').doc(ledgerDocId);
+    const ledgerSnap = await ledgerRef.get();
+    if (ledgerSnap.exists) {
+      const ledgerData = ledgerSnap.data() || {};
+      // Security assertion: caller must match the recorded event's owner
+      if (ledgerData.userId && ledgerData.userId !== userId) {
+        throw new HttpsError('permission-denied', 'Cannot access or replay idempotency records of another user.');
+      }
+      return {
+        success: true,
+        spotId: (ledgerData.spotId as string) || payload.id || ledgerDocId,
+        title: (ledgerData.title as string) || payload.title || 'Road Hazard',
+        status: (ledgerData.status as string) || 'pending',
+        createdAt: (ledgerData.createdAt as string) || (ledgerData.processedAt as string) || new Date().toISOString(),
+        corroborated: ledgerData.corroborated ?? false,
+        alreadyProcessed: true,
+      };
+    }
   }
 
   const lat = payload.location?.lat ?? payload.latitude;
@@ -292,6 +329,23 @@ export async function processReportBlackSpotLogic(
       },
     });
 
+    // Record corroboration event in idempotency ledger
+    if (ledgerDocId && cleanIdempotencyKey) {
+      const ledgerRef = db.collection('processedEvents').doc(ledgerDocId);
+      await ledgerRef.set({
+        eventId: ledgerDocId,
+        handler: 'reportBlackSpot',
+        userId,
+        idempotencyKey: cleanIdempotencyKey,
+        spotId: matchedSpotId,
+        title: matchedData.title || 'Road Hazard',
+        status: matchedData.status || 'pending',
+        corroborated: true,
+        createdAt: now,
+        processedAt: now,
+      });
+    }
+
     return {
       success: true,
       spotId: matchedSpotId,
@@ -328,7 +382,7 @@ export async function processReportBlackSpotLogic(
     latitude: lat,
     longitude: lng,
     location: { lat, lng },
-    photoUrl: payload.photoUrl || undefined,
+    photoUrl: payload.photoUrl || null,
     reportedByUid: userId,
     reportedByUserId: userId,
     reportedByDisplayName: payload.reportedByDisplayName?.trim().slice(0, 120) || 'Commuter',
@@ -379,6 +433,23 @@ export async function processReportBlackSpotLogic(
     timestamp: now,
     details: { spotId, hazardType: docData.hazardType, severity: docData.severity, location: { lat, lng } },
   });
+
+  // Record initial report in idempotency ledger
+  if (ledgerDocId && cleanIdempotencyKey) {
+    const ledgerRef = db.collection('processedEvents').doc(ledgerDocId);
+    await ledgerRef.set({
+      eventId: ledgerDocId,
+      handler: 'reportBlackSpot',
+      userId,
+      idempotencyKey: cleanIdempotencyKey,
+      spotId,
+      title: docData.title,
+      status: 'pending',
+      corroborated: false,
+      createdAt: now,
+      processedAt: now,
+    });
+  }
 
   return { success: true, spotId, title: docData.title, status: 'pending', createdAt: now, corroborated: false };
 }

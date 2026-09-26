@@ -14,8 +14,6 @@ import {
   Info,
   Car,
   Building2,
-  ExternalLink,
-  ChevronRight,
   Sparkles,
 } from 'lucide-react';
 import { normalizePlate, isValidPlateFormat } from '../../lib/plate';
@@ -35,7 +33,7 @@ import { useMotionPresets } from '../../lib/motion';
 const RECENT_LOOKUPS_STORAGE_KEY = 'mwendo_recent_vehicle_lookups';
 
 export const VehicleLookupScreen: React.FC = () => {
-  const { t } = useTranslation();
+  const { t: _t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialPlate = searchParams.get('plate') || '';
@@ -111,7 +109,11 @@ export const VehicleLookupScreen: React.FC = () => {
       }
 
       if (summary) {
-        setSelectedVehicle(summary);
+        setSelectedVehicle({
+          ...summary,
+          isUnverified: false,
+          vehicleVerified: !summary.isProvisional,
+        });
         saveRecentLookup(summary.regNumber);
 
         // Fetch SACCO details if available
@@ -124,14 +126,16 @@ export const VehicleLookupScreen: React.FC = () => {
           }
         }
       } else {
-        // Not found in fleet database - provisional state
+        // Not found in fleet database - explicit unverified state (BUG-005 / PHASE 6)
         setSelectedVehicle({
           id: normalized,
-          vehicleId: normalized,
+          vehicleId: undefined,
           regNumber: normalized,
-          saccoId: 'unassigned',
+          saccoId: 'sacco_metrolink',
           saccoName: 'Independent / Unregistered PSV',
           isProvisional: true,
+          isUnverified: true,
+          vehicleVerified: false,
         });
         saveRecentLookup(normalized);
       }
@@ -175,6 +179,7 @@ export const VehicleLookupScreen: React.FC = () => {
     if (initialPlate && isValidPlateFormat(initialPlate)) {
       performLookup(initialPlate);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPlate]);
 
   // Click-outside listener for autocomplete
@@ -206,19 +211,30 @@ export const VehicleLookupScreen: React.FC = () => {
     if (!selectedVehicle) return;
 
     const norm = normalizePlate(selectedVehicle.regNumber || inputPlate);
+    const isUnverified = Boolean(selectedVehicle.isUnverified || selectedVehicle.isProvisional);
     startTrip({
-      vehicleId: selectedVehicle.isProvisional ? undefined : selectedVehicle.id,
+      vehicleId: isUnverified ? undefined : selectedVehicle.id,
       plateNumber: selectedVehicle.regNumber || norm,
-      saccoId: selectedVehicle.saccoId || 'unassigned',
+      saccoId: selectedVehicle.saccoId && selectedVehicle.saccoId !== 'unassigned' ? selectedVehicle.saccoId : 'sacco_metrolink',
       saccoName: selectedVehicle.saccoName || 'Independent / Unassigned',
       routeName: 'Standard Route',
-      isProvisional: !!selectedVehicle.isProvisional,
+      isProvisional: isUnverified,
+      vehicleVerified: !isUnverified,
     });
 
     navigate('/passenger/start-trip');
   };
 
-  const getRiskBadge = (tier?: string) => {
+  const getRiskBadge = (tier?: string, isUnverified?: boolean) => {
+    if (isUnverified) {
+      return {
+        label: 'Unverified Plate',
+        icon: AlertTriangle,
+        color: 'text-amber-800 bg-amber-50 border-amber-300 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-800',
+        guidance: "We couldn't confirm this plate in the registered fleet database. You can still safely board and track your journey; speed telemetry and incident reporting will function normally.",
+        accentColor: 'border-amber-400',
+      };
+    }
     switch (tier) {
       case 'low':
         return {
@@ -263,7 +279,7 @@ export const VehicleLookupScreen: React.FC = () => {
     }
   };
 
-  const riskInfo = getRiskBadge(selectedVehicle?.riskTier);
+  const riskInfo = getRiskBadge(selectedVehicle?.riskTier, selectedVehicle?.isUnverified);
   const RiskIcon = riskInfo.icon;
 
   return (
@@ -454,8 +470,20 @@ export const VehicleLookupScreen: React.FC = () => {
               {/* Kenyan License Plate Visual Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-outline-variant/20">
                 <div>
-                  <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant mb-1">
-                    Verified Vehicle Registration
+                  <div
+                    data-testid="lookup-registration-status"
+                    className={`text-[10px] font-mono font-bold uppercase tracking-wider mb-1 flex items-center gap-1 ${
+                      selectedVehicle.isUnverified ? 'text-amber-700 dark:text-amber-400' : 'text-on-surface-variant'
+                    }`}
+                  >
+                    {selectedVehicle.isUnverified ? (
+                      <>
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                        <span>Unverified Plate — Not In Fleet Registry</span>
+                      </>
+                    ) : (
+                      'Verified Vehicle Registration'
+                    )}
                   </div>
                   {/* KenPlate Visual */}
                   <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-yellow-300 border-2 border-black rounded-lg shadow-sm">
@@ -475,6 +503,22 @@ export const VehicleLookupScreen: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Explicit Unverified Notice Banner (Phase 6 / BUG-005) */}
+              {selectedVehicle.isUnverified && (
+                <div
+                  data-testid="unverified-plate-banner"
+                  className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1"
+                >
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                    <span>Unverified Plate — We couldn't confirm this plate</span>
+                  </div>
+                  <p className="text-xs text-amber-900/80 dark:text-amber-200/80 leading-relaxed">
+                    We couldn't confirm this plate in the registered SACCO / NTSA database. You can still start your trip — real-time GPS speed tracking, hazard alerts, and emergency SOS remain fully active.
+                  </p>
+                </div>
+              )}
 
               {/* Standing Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -501,20 +545,27 @@ export const VehicleLookupScreen: React.FC = () => {
                     Fleet Status
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {selectedVehicle.isProvisional ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                    {selectedVehicle.isUnverified ? (
+                      <span data-testid="fleet-status-text" className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Unverified Plate
+                      </span>
+                    ) : selectedVehicle.isProvisional ? (
+                      <span data-testid="fleet-status-text" className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 dark:text-amber-300">
                         <AlertTriangle className="w-3.5 h-3.5" />
                         Provisional / Unregistered
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                      <span data-testid="fleet-status-text" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Accredited SACCO Fleet
                       </span>
                     )}
                   </div>
                   <div className="text-[11px] text-on-surface-variant">
-                    {selectedVehicle.isProvisional
+                    {selectedVehicle.isUnverified
+                      ? "We couldn't confirm this plate — you can still start your trip"
+                      : selectedVehicle.isProvisional
                       ? 'No formal SACCO record filed'
                       : 'Verified PSV operator license'}
                   </div>
@@ -536,11 +587,14 @@ export const VehicleLookupScreen: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   id="btn-board-vehicle"
+                  data-testid="btn-board-vehicle"
                   onClick={handleBoardVehicle}
                   className="flex-1 h-12 font-bold text-sm shadow-md"
                 >
                   <Car className="w-4 h-4 mr-2" />
-                  Board This Vehicle & Track Trip
+                  {selectedVehicle.isUnverified
+                    ? 'Board & Track Trip (Unverified Plate)'
+                    : 'Board This Vehicle & Track Trip'}
                 </Button>
 
                 <Button

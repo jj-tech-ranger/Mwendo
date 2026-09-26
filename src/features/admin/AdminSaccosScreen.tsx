@@ -18,8 +18,6 @@ export const AdminSaccosScreen: React.FC = () => {
 
   // Modals
   const [showRegisterModal, setShowRegisterModal] = useState(false);
-  const [saccoToSuspend, setSaccoToDelete] = useState<SACCO | null>(null);
-  const [saccoToVerify, setSaccoToVerify] = useState<SACCO | null>(null);
 
   // Form State
   const [newSacco, setNewSacco] = useState({
@@ -98,7 +96,6 @@ export const AdminSaccosScreen: React.FC = () => {
 
       await queryClient.invalidateQueries({ queryKey: ['adminSaccos'] });
       setToastMsg(`${sacco.name} verified and activated.`);
-      setSaccoToVerify(null);
     } catch (err) {
       console.error('Failed to verify SACCO:', err);
     } finally {
@@ -216,8 +213,24 @@ export const AdminSaccosScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {filtered.map((s) => (
-                <tr key={s.id} className="hover:bg-surface-container/50">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span>Loading transport SACCOs...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    No SACCO entities found matching query.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((s) => (
+                  <tr key={s.id} className="hover:bg-surface-container/50">
                   <td className="p-md font-bold text-on-surface">{s.name}</td>
                   <td className="p-md font-label-mono text-[10px] text-outline">{s.registrationCode}</td>
                   <td className="p-md font-label-mono font-bold text-xs">{s.fleetCount} Matatus</td>
@@ -243,7 +256,7 @@ export const AdminSaccosScreen: React.FC = () => {
                     )}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

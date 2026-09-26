@@ -40,7 +40,7 @@ export const AuthorityInspectionsScreen: React.FC = () => {
     staleTime: QUERY_STALE_TIMES.VEHICLES_AND_DRIVERS,
   });
 
-  const reports = inspectionData?.reports || [];
+  const reports = useMemo(() => inspectionData?.reports || [], [inspectionData?.reports]);
 
   const filteredReports = useMemo(() => {
     return reports.filter((r) =>
@@ -217,7 +217,16 @@ export const AuthorityInspectionsScreen: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/10 text-on-surface">
-                {filteredReports.length > 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 px-3 text-center text-on-surface-variant">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                        <span>Loading inspection reports...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredReports.length > 0 ? (
                   filteredReports.map((r) => (
                     <tr key={r.id} className="hover:bg-surface-container-low/50">
                       <td className="py-3 px-3 font-bold text-on-surface">{r.vehicleRegNumber}</td>

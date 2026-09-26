@@ -6,3 +6,4 @@
  * APP_CHECK_ENFORCED='false' for local emulator testing without debug tokens.
  */
 export const APP_CHECK_ENFORCED = process.env.APP_CHECK_ENFORCED !== 'false';
+export const GEMINI_API_KEY = process.env.GEMINI_API_KEY || null;

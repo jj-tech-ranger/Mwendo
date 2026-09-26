@@ -109,8 +109,24 @@ export const AdminVehiclesScreen: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/20">
-              {filtered.map((v) => (
-                <tr key={v.id} className="hover:bg-surface-container/50">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                      <span>Loading fleet vehicles...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-lg text-center text-on-surface-variant">
+                    No vehicles found matching query.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((v) => (
+                  <tr key={v.id} className="hover:bg-surface-container/50">
                   <td className="p-md font-label-mono font-bold text-sm text-primary">
                     {v.regNumber}
                   </td>
@@ -137,7 +153,7 @@ export const AdminVehiclesScreen: React.FC = () => {
                     </Button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

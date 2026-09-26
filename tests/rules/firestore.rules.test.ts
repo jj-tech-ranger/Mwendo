@@ -369,6 +369,72 @@ describe('Firestore security rules', () => {
     }));
   });
 
+  it('allows creating trip without matching vehicleId when vehicleVerified is false (Phase 6 / BUG-005)', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await assertSucceeds(setDoc(doc(db, 'trips/trip-unverified-valid'), {
+      userId: 'passenger-1',
+      saccoId: 'sacco-a',
+      vehicleRegNumber: 'KZZ999X',
+      vehicleVerified: false,
+      maxSpeedKmH: 60,
+    }));
+  });
+
+  it('rejects creating trip without matching vehicleId when vehicleVerified is claimed true (server-side data validation)', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await assertFails(setDoc(doc(db, 'trips/trip-unverified-fraudulent'), {
+      userId: 'passenger-1',
+      saccoId: 'sacco-a',
+      vehicleRegNumber: 'KZZ999X',
+      vehicleVerified: true,
+      maxSpeedKmH: 60,
+    }));
+  });
+
+  it('allows creating trip with verified vehicle reference when vehicleVerified is true', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'vehicles/veh-verified-phase6'), {
+        saccoId: 'sacco-a',
+        regNumber: 'KDA 123A',
+        status: 'active',
+      });
+    });
+
+    await assertSucceeds(setDoc(doc(db, 'trips/trip-verified-valid'), {
+      userId: 'passenger-1',
+      vehicleId: 'veh-verified-phase6',
+      saccoId: 'sacco-a',
+      vehicleRegNumber: 'KDA 123A',
+      vehicleVerified: true,
+      maxSpeedKmH: 60,
+    }));
+  });
+
+  it('rejects creating trip with verified vehicle reference when vehicleVerified is false', async () => {
+    const db = authedDb('passenger-1', 'passenger');
+
+    await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'vehicles/veh-verified-phase6'), {
+        saccoId: 'sacco-a',
+        regNumber: 'KDA 123A',
+        status: 'active',
+      });
+    });
+
+    await assertFails(setDoc(doc(db, 'trips/trip-verified-mismatched'), {
+      userId: 'passenger-1',
+      vehicleId: 'veh-verified-phase6',
+      saccoId: 'sacco-a',
+      vehicleRegNumber: 'KDA 123A',
+      vehicleVerified: false,
+      maxSpeedKmH: 60,
+    }));
+  });
+
   it('allows registered user to submit black spot confirmation under their own UID', async () => {
     const db = authedDb('passenger-1', 'passenger');
     const confRef = doc(db, 'black_spots/spot-1/confirmations/passenger-1');
@@ -471,5 +537,118 @@ describe('Firestore security rules', () => {
     });
 
     await assertSucceeds(deleteDoc(doc(db, 'users/user-to-del-2')));
+  });
+
+  describe('FCM Device Token Access Boundary & Security Hardening (§27)', () => {
+    it('allows a user to update their own fcmToken on users/{userId}', async () => {
+      const db = authedDb('passenger-fcm-1', 'passenger');
+      await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users/passenger-fcm-1'), {
+          displayName: 'Passenger FCM',
+          role: 'passenger',
+          activeRole: 'passenger',
+          roles: ['passenger'],
+          updatedAt: new Date().toISOString(),
+        });
+      });
+
+      await assertSucceeds(
+        updateDoc(doc(db, 'users/passenger-fcm-1'), {
+          fcmToken: 'valid_sample_fcm_token_string_12345',
+          updatedAt: new Date().toISOString(),
+        })
+      );
+    });
+
+    it('allows a user to read and write to their own /users/{userId}/fcm_tokens/{tokenId}', async () => {
+      const db = authedDb('passenger-fcm-1', 'passenger');
+      const tokenRef = doc(db, 'users/passenger-fcm-1/fcm_tokens/token-doc-1');
+
+      await assertSucceeds(
+        setDoc(tokenRef, {
+          id: 'token-doc-1',
+          token: 'device_registration_token_1234567890',
+          platform: 'web',
+          userId: 'passenger-fcm-1',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(),
+        })
+      );
+
+      await assertSucceeds(getDoc(tokenRef));
+      await assertSucceeds(deleteDoc(tokenRef));
+    });
+
+    it('denies other passengers access to a user private fcm_tokens subcollection', async () => {
+      const attackerDb = authedDb('attacker-passenger', 'passenger');
+      await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users/victim-user/fcm_tokens/victim-token'), {
+          id: 'victim-token',
+          token: 'private_victim_device_token',
+          platform: 'web',
+          userId: 'victim-user',
+        });
+      });
+
+      await assertFails(getDoc(doc(attackerDb, 'users/victim-user/fcm_tokens/victim-token')));
+      await assertFails(
+        setDoc(doc(attackerDb, 'users/victim-user/fcm_tokens/victim-token'), {
+          token: 'malicious_overwrite_token',
+        })
+      );
+    });
+
+    it('denies SACCO managers and authorities read/write access to user private fcm_tokens', async () => {
+      const managerDb = authedDb('sacco-mgr-1', 'sacco_manager', 'sacco-a');
+      const authorityDb = authedDb('authority-officer-1', 'authority');
+
+      await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users/sacco-commuter-1'), {
+          displayName: 'Sacco Commuter',
+          saccoId: 'sacco-a',
+          role: 'passenger',
+          activeRole: 'passenger',
+          roles: ['passenger'],
+        });
+        await setDoc(doc(ctx.firestore(), 'users/sacco-commuter-1/fcm_tokens/commuter-token'), {
+          id: 'commuter-token',
+          token: 'commuter_private_fcm_token',
+          userId: 'sacco-commuter-1',
+        });
+      });
+
+      // SACCO Manager cannot read or write commuter's FCM tokens
+      await assertFails(getDoc(doc(managerDb, 'users/sacco-commuter-1/fcm_tokens/commuter-token')));
+      await assertFails(deleteDoc(doc(managerDb, 'users/sacco-commuter-1/fcm_tokens/commuter-token')));
+
+      // Authority officer cannot read or write user's FCM tokens
+      await assertFails(getDoc(doc(authorityDb, 'users/sacco-commuter-1/fcm_tokens/commuter-token')));
+      await assertFails(deleteDoc(doc(authorityDb, 'users/sacco-commuter-1/fcm_tokens/commuter-token')));
+    });
+
+    it('denies unauthenticated access to /users/{userId}/fcm_tokens', async () => {
+      const unauthDb = testEnv!.unauthenticatedContext().firestore();
+      await assertFails(getDoc(doc(unauthDb, 'users/any-user/fcm_tokens/any-token')));
+      await assertFails(
+        setDoc(doc(unauthDb, 'users/any-user/fcm_tokens/any-token'), {
+          token: 'unauthenticated_token',
+        })
+      );
+    });
+
+    it('allows admin to read and delete user device tokens for administrative moderation', async () => {
+      const adminDb = authedDb('platform-admin', 'admin');
+      await testEnv!.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'users/user-audit-1/fcm_tokens/token-audit'), {
+          id: 'token-audit',
+          token: 'admin_managed_device_token',
+          userId: 'user-audit-1',
+        });
+      });
+
+      await assertSucceeds(getDoc(doc(adminDb, 'users/user-audit-1/fcm_tokens/token-audit')));
+      await assertSucceeds(deleteDoc(doc(adminDb, 'users/user-audit-1/fcm_tokens/token-audit')));
+    });
   });
 });

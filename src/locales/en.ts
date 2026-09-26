@@ -352,6 +352,8 @@ export const en = {
       quickTools: 'Quick Tools',
       emergencySos: 'Emergency SOS',
       tripLogs: 'Trip Logs',
+      recentTrips: 'Recent Trips',
+      viewAllTrips: 'View All',
     },
     trips: {
       title: 'Trip History',

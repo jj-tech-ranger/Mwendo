@@ -286,7 +286,7 @@ export const WelcomeScreenV2: React.FC = () => {
                       onClick={(e) => handleNav('get-started', e)}
                     >
                       <span>Create Account</span>
-                      <span className="material-symbols-outlined text-sm">download</span>
+                      <span className="material-symbols-outlined text-sm">person_add</span>
                     </a>
                     <a
                       className="inline-flex items-center justify-center gap-space-xs bg-surface-container-low text-primary font-body-md text-body-md font-semibold px-space-lg py-space-md rounded-lg hover:bg-surface-container transition-all cursor-pointer"

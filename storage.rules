@@ -31,6 +31,14 @@ service firebase.storage {
                    && request.resource.contentType.matches('image/(jpeg|png|webp|jpg)');
     }
 
+    // SEC-001 ARCHITECTURAL CONSTRAINT & CROSS-REFERENCE SAFETY NOTICE:
+    // Firebase Storage Security Rules require the literal database ID '(default)' for all
+    // cross-service Firestore lookups: /databases/(default)/documents/...
+    // The Firestore database used by Mwendo Salama MUST remain '(default)'.
+    // If the Firestore database is ever migrated to a custom/named database ID, these
+    // cross-service queries will fail closed, locking out valid uploads and evidence access.
+    // Enforced in CI via scripts/check-storage-rules-database-id.js and functions startup assertions.
+
     // Complaint Evidence (5MB limit, image or video)
     match /evidence/{saccoId}/{complaintId}/{filename} {
       allow read: if isSignedIn() && (

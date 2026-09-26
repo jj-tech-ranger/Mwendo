@@ -115,12 +115,21 @@ export const SaccoDashboard: React.FC = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] p-xl space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary animate-spin">progress_activity</span>
+        <p className="font-body-md text-sm text-on-surface-variant">Loading SACCO operations telemetry...</p>
+      </div>
+    );
+  }
+
   if (isError) {
     return (
       <EmptyState
         icon="error"
         title="We couldn't load the dashboard metrics"
-        description="Unable to fetch fleet information and compliance metrics. Please check your connection and try again."
+        description={(error as Error)?.message || "Unable to fetch fleet information and compliance metrics. Please check your connection and try again."}
         secondaryCtaLabel="Try Again"
         onSecondaryCta={() => refetch()}
       />

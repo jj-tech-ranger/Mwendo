@@ -38,7 +38,7 @@ This is the working backlog for the application audit and production-readiness p
 ### Notifications / backend
 - [x] Export-level audit of every deployed Cloud Function is documented.
 - [x] Function-by-function authorization/input/idempotency evidence.
-- [ ] Verify FCM token registration and push delivery paths.
+- [x] Verify FCM token registration and push delivery paths (callable registerDeviceToken/unregisterDeviceToken, isolated subcollection users/{userId}/fcm_tokens/{tokenId}, self-update rules, Profile UX permission toggle, sendSOS direct token dispatch, stale-token pruning, and DLQ tracking; live push delivery gated on production VAPID key).
 - [x] Retry/rate-limit/failure behavior has targeted automated coverage.
 - [x] Missing-document/malformed-input behavior is covered in targeted backend tests.
 
